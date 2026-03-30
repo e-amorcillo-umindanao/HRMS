@@ -1,0 +1,198 @@
+@page "/violations"
+@inject ViolationService ViolationService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageHeader Title="Violations & Incidents" Subtitle="Track filed cases, status updates, and violation reports." />
+
+<MudPaper Class="hrms-page-card" Style="padding: 16px; margin-bottom: 24px;" Elevation="0">
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
+        <FieldGroup Label="Homeowner Name" Style="min-width: 220px;">
+            <MudTextField T="string"
+                          Value="_homeownerNameFilter"
+                          ValueChanged="OnHomeownerNameFilterChanged"
+                          Variant="Variant.Outlined"
+                          Immediate="true" />
+        </FieldGroup>
+
+        <FieldGroup Label="Status" Style="min-width: 180px;">
+            <MudSelect T="string"
+                       Value="_statusFilter"
+                       ValueChanged="OnStatusFilterChanged"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@string.Empty">All Statuses</MudSelectItem>
+                @foreach (var status in StatusOptions)
+                {
+                    <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
+                }
+            </MudSelect>
+        </FieldGroup>
+
+        <FieldGroup Label="Violation Type" Style="min-width: 220px;">
+            <MudSelect T="string"
+                       Value="_typeFilter"
+                       ValueChanged="OnTypeFilterChanged"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@string.Empty">All Types</MudSelectItem>
+                @foreach (var type in ViolationTypes)
+                {
+                    <MudSelectItem T="string" Value="@type">@type</MudSelectItem>
+                }
+            </MudSelect>
+        </FieldGroup>
+
+        <div style="margin-left: auto;">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="/violations/add">
+                File Violation
+            </MudButton>
+        </div>
+    </div>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else if (_violations.Count == 0)
+{
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <EmptyState Title="No violations found"
+                    Subtitle="File a violation or adjust your filters to see results."
+                    Icon="@Icons.Material.Filled.Gavel" />
+    </MudPaper>
+}
+else
+{
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <MudTable T="ViolationRecord" Items="_violations" Hover="false" Striped="false">
+            <HeaderContent>
+                <MudTh>Violation Number</MudTh>
+                <MudTh>Homeowner</MudTh>
+                <MudTh>Violation Type</MudTh>
+                <MudTh>Violation Date</MudTh>
+                <MudTh>Filed At</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Filed By</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Violation Number">@DisplayValue(context.ViolationNumber)</MudTd>
+                <MudTd DataLabel="Homeowner">@DisplayValue(context.HomeownerName)</MudTd>
+                <MudTd DataLabel="Violation Type">@DisplayValue(context.ViolationType)</MudTd>
+                <MudTd DataLabel="Violation Date">@FormatDate(context.ViolationDate)</MudTd>
+                <MudTd DataLabel="Filed At">@FormatDate(context.FiledAt)</MudTd>
+                <MudTd DataLabel="Status"><StatusChip Label="@context.Status" /></MudTd>
+                <MudTd DataLabel="Filed By">@DisplayValue(context.FiledByUser?.Username)</MudTd>
+                <MudTd DataLabel="Actions">
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/violations/{context.ViolationId}"))">
+                            View
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/violations/edit/{context.ViolationId}"))">
+                            Edit
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => PromptDeleteAsync(context))">
+                            Delete
+                        </MudButton>
+                    </div>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+    <TableRecordCount Count="_violations.Count" EntityLabel="violations" />
+}
+
+@code {
+    private static readonly string[] StatusOptions = ["Open", "Under Review", "Resolved", "Closed"];
+    private static readonly string[] ViolationTypes = ["Noise Complaint", "Unauthorized Construction", "Unpaid Dues", "Pet Violation", "Parking Violation", "Other"];
+
+    private List<ViolationRecord> _violations = [];
+    private string _homeownerNameFilter = string.Empty;
+    private string _statusFilter = string.Empty;
+    private string _typeFilter = string.Empty;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadViolationsAsync();
+    }
+
+    private async Task LoadViolationsAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        _violations = await ViolationService.SearchAsync(
+            NullIfEmpty(_homeownerNameFilter),
+            NullIfEmpty(_statusFilter),
+            NullIfEmpty(_typeFilter));
+
+        _isLoading = false;
+    }
+
+    private async Task OnHomeownerNameFilterChanged(string value)
+    {
+        _homeownerNameFilter = value;
+        await LoadViolationsAsync();
+    }
+
+    private async Task OnStatusFilterChanged(string value)
+    {
+        _statusFilter = value;
+        await LoadViolationsAsync();
+    }
+
+    private async Task OnTypeFilterChanged(string value)
+    {
+        _typeFilter = value;
+        await LoadViolationsAsync();
+    }
+
+    private async Task PromptDeleteAsync(ViolationRecord violation)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Delete Violation",
+            [nameof(ConfirmDialog.Message)] = $"Are you sure you want to delete {violation.ViolationNumber}?",
+            [nameof(ConfirmDialog.OnConfirm)] = EventCallback.Factory.Create(this, async () => await DeleteAsync(violation.ViolationId))
+        };
+
+        await DialogService.ShowAsync<ConfirmDialog>(string.Empty, parameters);
+    }
+
+    private async Task DeleteAsync(int violationId)
+    {
+        if (AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        var deleted = await ViolationService.DeleteAsync(violationId, AuthService.CurrentUser.UserId);
+        if (!deleted)
+        {
+            Snackbar.Add("Unable to delete violation.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Violation deleted successfully.", Severity.Success);
+        await LoadViolationsAsync();
+    }
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string FormatDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed))
+        {
+            return "-";
+        }
+
+        return parsed.ToString("MMMM dd, yyyy");
+    }
+}

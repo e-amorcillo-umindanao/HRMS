@@ -1,0 +1,96 @@
+@page "/login"
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<MudPaper Class="hrms-page-card" Style="width: 100%; max-width: 400px; padding: 40px;" Elevation="0">
+    <MudText Style="font-size: 2rem; font-weight: 700; color: #1E293B;">HRMS</MudText>
+    <MudText Style="margin-bottom: 24px; color: #64748B;">Homeowners Record Management System</MudText>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Dense="true" Class="mb-4">
+            @_errorMessage
+        </MudAlert>
+    }
+
+    <FieldGroup Label="Username" Class="mb-3">
+        <MudTextField @bind-Value="_username"
+                      Variant="Variant.Outlined"
+                      FullWidth="true"
+                      Margin="Margin.Dense"
+                      OnKeyUp="HandleKeyUp" />
+    </FieldGroup>
+
+    <FieldGroup Label="Password">
+        <MudTextField @bind-Value="_password"
+                      Variant="Variant.Outlined"
+                      FullWidth="true"
+                      Margin="Margin.Dense"
+                      InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                      Adornment="Adornment.End"
+                      AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                      OnAdornmentClick="TogglePasswordVisibility"
+                      OnKeyUp="HandleKeyUp" />
+    </FieldGroup>
+
+    <MudButton FullWidth="true"
+               Color="Color.Primary"
+               Variant="Variant.Filled"
+               Disabled="_isSubmitting"
+               Style="margin-top: 20px;"
+               OnClick="SubmitAsync">
+        LOGIN
+    </MudButton>
+
+    <MudText Style="margin-top: 24px; text-align: center; color: #94A3B8; font-size: 0.875rem;">
+        &copy; Homeowners Association
+    </MudText>
+</MudPaper>
+
+@code {
+    private string _username = string.Empty;
+    private string _password = string.Empty;
+    private string? _errorMessage;
+    private bool _showPassword;
+    private bool _isSubmitting;
+
+    private async Task SubmitAsync()
+    {
+        if (_isSubmitting)
+        {
+            return;
+        }
+
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var isValid = await AuthService.LoginAsync(_username, _password);
+            if (isValid)
+            {
+                NavigationManager.NavigateTo("/dashboard");
+                return;
+            }
+
+            _errorMessage = "Invalid username or password.";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        _showPassword = !_showPassword;
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await SubmitAsync();
+        }
+    }
+}

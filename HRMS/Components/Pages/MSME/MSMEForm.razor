@@ -1,0 +1,321 @@
+@page "/msme/add"
+@page "/msme/edit/{MSMEId:int}"
+@inject MSMEService MSMEService
+@inject HomeownerService HomeownerService
+@inject UnitService UnitService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageHeader Title="@(IsEdit ? "Edit MSME" : "Register Business")"
+            Subtitle="Capture business, owner, and registration details." />
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
+                @_errorMessage
+            </MudAlert>
+        }
+
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Business Information</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" Label="Business Name" @bind-Value="_model.BusinessName" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" Label="Business Type" @bind-Value="_model.BusinessType" Variant="Variant.Outlined">
+                    @foreach (var businessType in BusinessTypeOptions)
+                    {
+                        <MudSelectItem T="string" Value="@businessType">@businessType</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudAutocomplete T="Homeowner"
+                                 Label="Owner"
+                                 Value="_selectedOwner"
+                                 ValueChanged="OnOwnerChanged"
+                                 SearchFunc="SearchOwnersAsync"
+                                 ToStringFunc="GetHomeownerDisplay"
+                                 Variant="Variant.Outlined"
+                                 Clearable="true"
+                                 ResetValueOnEmptyText="true"
+                                 MaxItems="8"
+                                 Dense="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="int?" Label="Unit" @bind-Value="_model.UnitId" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="@((int?)null)">-</MudSelectItem>
+                    @foreach (var unit in _units)
+                    {
+                        <MudSelectItem T="int?" Value="@unit.UnitId">@($"{unit.UnitNumber} - {unit.Address}")</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+
+        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Registration Details</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudDatePicker Label="Registration Date" DateFormat="MMMM dd, yyyy" @bind-Date="_registrationDate" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudDatePicker Label="Expiry Date" DateFormat="MMMM dd, yyyy" @bind-Date="_expiryDate" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="string" Label="Status" @bind-Value="_model.Status" Variant="Variant.Outlined">
+                    @foreach (var status in StatusOptions)
+                    {
+                        <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+
+        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Additional Information</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" Label="Contact Number" @bind-Value="_model.ContactNumber" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField T="string" Label="Description" @bind-Value="_model.Description" Variant="Variant.Outlined" Lines="4" />
+            </MudItem>
+        </MudGrid>
+
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
+            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    private static readonly string[] BusinessTypeOptions =
+    [
+        "Sari-sari Store",
+        "Home Salon/Barbershop",
+        "Food Business",
+        "Online Selling",
+        "Repair Shop",
+        "Other"
+    ];
+
+    private static readonly string[] StatusOptions = ["Active", "Suspended", "Expired", "Closed"];
+
+    [Parameter]
+    public int? MSMEId { get; set; }
+
+    private readonly MSMEFormModel _model = new();
+    private List<Homeowner> _activeHomeowners = [];
+    private List<Unit> _units = [];
+    private Homeowner? _selectedOwner;
+    private DateTime? _registrationDate;
+    private DateTime? _expiryDate;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    private bool IsEdit => MSMEId.HasValue;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        _activeHomeowners = await HomeownerService.GetAllActiveAsync();
+        _units = await UnitService.GetAllAsync();
+
+        if (IsEdit)
+        {
+            var msme = await MSMEService.GetByIdAsync(MSMEId.GetValueOrDefault());
+            if (msme is null)
+            {
+                _errorMessage = "MSME record not found.";
+                _isLoading = false;
+                return;
+            }
+
+            _model.MSMEId = msme.MSMEId;
+            _model.BusinessName = msme.BusinessName;
+            _model.BusinessType = msme.BusinessType;
+            _model.UnitId = msme.UnitId;
+            _model.Status = msme.Status;
+            _model.ContactNumber = msme.ContactNumber ?? string.Empty;
+            _model.Description = msme.Description ?? string.Empty;
+            _registrationDate = ParseDate(msme.RegistrationDate);
+            _expiryDate = ParseDate(msme.ExpiryDate);
+
+            _selectedOwner = _activeHomeowners.FirstOrDefault(homeowner => homeowner.HomeownerId == msme.HomeownerId);
+        }
+        else
+        {
+            ResetModel();
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _errorMessage = Validate();
+        if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null || _selectedOwner is null)
+        {
+            return;
+        }
+
+        var msme = new MSME
+        {
+            MSMEId = _model.MSMEId ?? 0,
+            BusinessName = _model.BusinessName.Trim(),
+            BusinessType = _model.BusinessType,
+            HomeownerId = _selectedOwner.HomeownerId,
+            UnitId = _model.UnitId,
+            ContactNumber = NullIfEmpty(_model.ContactNumber),
+            Description = NullIfEmpty(_model.Description),
+            RegistrationDate = ToIsoDateString(_registrationDate!.Value),
+            ExpiryDate = _expiryDate.HasValue ? ToIsoDateString(_expiryDate.Value) : null,
+            Status = _model.Status
+        };
+
+        if (IsEdit)
+        {
+            var updated = await MSMEService.UpdateAsync(msme, AuthService.CurrentUser.UserId);
+            if (updated is null)
+            {
+                _errorMessage = "Unable to update MSME.";
+                return;
+            }
+
+            Snackbar.Add("MSME updated successfully.", Severity.Success);
+            NavigationManager.NavigateTo($"/msme/{updated.MSMEId}");
+        }
+        else
+        {
+            var created = await MSMEService.AddAsync(msme, AuthService.CurrentUser.UserId);
+            Snackbar.Add("MSME registered successfully.", Severity.Success);
+            NavigationManager.NavigateTo($"/msme/{created.MSMEId}");
+        }
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo(IsEdit ? $"/msme/{MSMEId}" : "/msme");
+    }
+
+    private string? Validate()
+    {
+        if (string.IsNullOrWhiteSpace(_model.BusinessName))
+        {
+            return "Business Name is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.BusinessType))
+        {
+            return "Business Type is required.";
+        }
+
+        if (_selectedOwner is null)
+        {
+            return "Owner is required.";
+        }
+
+        if (_registrationDate is null)
+        {
+            return "Registration Date is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.Status))
+        {
+            return "Status is required.";
+        }
+
+        return null;
+    }
+
+    private void ResetModel()
+    {
+        _model.MSMEId = null;
+        _model.BusinessName = string.Empty;
+        _model.BusinessType = string.Empty;
+        _model.UnitId = null;
+        _model.Status = "Active";
+        _model.ContactNumber = string.Empty;
+        _model.Description = string.Empty;
+        _selectedOwner = null;
+        _registrationDate = null;
+        _expiryDate = null;
+    }
+
+    private Task OnOwnerChanged(Homeowner? homeowner)
+    {
+        _selectedOwner = homeowner;
+        return Task.CompletedTask;
+    }
+
+    private Task<IEnumerable<Homeowner>> SearchOwnersAsync(string value, CancellationToken cancellationToken)
+    {
+        IEnumerable<Homeowner> matches = _activeHomeowners
+            .OrderBy(homeowner => homeowner.LastName)
+            .ThenBy(homeowner => homeowner.FirstName);
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            matches = matches.Where(homeowner =>
+                GetHomeownerDisplay(homeowner).Contains(value, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return Task.FromResult(matches.Take(8));
+    }
+
+    private static string GetHomeownerDisplay(Homeowner? homeowner)
+    {
+        if (homeowner is null)
+        {
+            return string.Empty;
+        }
+
+        var fullName = GetFullName(homeowner);
+        var unitNumber = string.IsNullOrWhiteSpace(homeowner.Unit?.UnitNumber) ? null : homeowner.Unit.UnitNumber;
+
+        return string.IsNullOrWhiteSpace(unitNumber)
+            ? fullName
+            : $"{fullName} ({unitNumber})";
+    }
+
+    private static string GetFullName(Homeowner homeowner)
+    {
+        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" ", parts);
+    }
+
+    private static DateTime? ParseDate(string? value) =>
+        DateTime.TryParse(value, out var parsed) ? parsed : null;
+
+    private static string ToIsoDateString(DateTime value) =>
+        DateTime.SpecifyKind(value.Date, DateTimeKind.Utc).ToString("o");
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class MSMEFormModel
+    {
+        public int? MSMEId { get; set; }
+        public string BusinessName { get; set; } = string.Empty;
+        public string BusinessType { get; set; } = string.Empty;
+        public int? UnitId { get; set; }
+        public string Status { get; set; } = "Active";
+        public string ContactNumber { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+    }
+}

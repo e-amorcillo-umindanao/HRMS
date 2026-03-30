@@ -1,0 +1,165 @@
+@page "/documents"
+@inject HomeownerService HomeownerService
+@inject DocumentService DocumentService
+@inject ISnackbar Snackbar
+
+<PageHeader Title="Document Generator" />
+
+<MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
+            @_errorMessage
+        </MudAlert>
+    }
+
+    <MudGrid>
+        <MudItem xs="12" sm="6">
+            <FieldGroup Label="Homeowner">
+                <MudAutocomplete T="Homeowner"
+                                 Value="_selectedHomeowner"
+                                 ValueChanged="OnHomeownerChanged"
+                                 SearchFunc="SearchHomeownersAsync"
+                                 ToStringFunc="GetHomeownerDisplay"
+                                 Variant="Variant.Outlined"
+                                 Clearable="true"
+                                 ResetValueOnEmptyText="true"
+                                 MaxItems="8"
+                                 Dense="true" />
+            </FieldGroup>
+        </MudItem>
+    </MudGrid>
+
+    <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Document Type</div>
+    <MudDivider Style="margin: 8px 0 20px;" />
+
+    <MudGrid>
+        @foreach (var option in DocumentOptions)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Class="@GetCardClass(option)"
+                          Elevation="0"
+                          @onclick="@(() => SelectDocument(option.Key))">
+                    <MudText Style="@GetCardLabelStyle(option)">
+                        @option.Label
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+
+    <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="GenerateAsync">
+            Generate PDF
+        </MudButton>
+    </div>
+</MudPaper>
+
+@code {
+    private static readonly (string Key, string Label)[] DocumentOptions =
+    [
+        ("Residency", "Certificate of Residency"),
+        ("GoodStanding", "Certificate of Good Standing"),
+        ("OfficialLetter", "Official Letter")
+    ];
+
+    private List<Homeowner> _homeowners = [];
+    private Homeowner? _selectedHomeowner;
+    private string _selectedDocumentType = "Residency";
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _homeowners = await HomeownerService.GetAllActiveAsync();
+    }
+
+    private Task OnHomeownerChanged(Homeowner? homeowner)
+    {
+        _selectedHomeowner = homeowner;
+        return Task.CompletedTask;
+    }
+
+    private void SelectDocument(string key)
+    {
+        _selectedDocumentType = key;
+    }
+
+    private async Task GenerateAsync()
+    {
+        _errorMessage = null;
+
+        if (_selectedHomeowner is null)
+        {
+            _errorMessage = "Select a homeowner first.";
+            return;
+        }
+
+        try
+        {
+            GeneratedDocumentResult? document = _selectedDocumentType switch
+            {
+                "Residency" => await DocumentService.GenerateCertificateOfResidencyAsync(_selectedHomeowner.HomeownerId),
+                "GoodStanding" => await DocumentService.GenerateCertificateOfGoodStandingAsync(_selectedHomeowner.HomeownerId),
+                "OfficialLetter" => await DocumentService.GenerateOfficialLetterAsync(_selectedHomeowner.HomeownerId),
+                _ => null
+            };
+
+            if (document is null)
+            {
+                _errorMessage = "Unable to generate the selected document.";
+                return;
+            }
+
+            var filePath = Path.Combine(Microsoft.Maui.Storage.FileSystem.CacheDirectory, document.FileName);
+            await File.WriteAllBytesAsync(filePath, document.Bytes);
+
+            await Microsoft.Maui.ApplicationModel.Launcher.Default.OpenAsync(
+                new Microsoft.Maui.ApplicationModel.OpenFileRequest(
+                    document.FileName,
+                    new Microsoft.Maui.Storage.ReadOnlyFile(filePath)));
+        }
+        catch (InvalidOperationException exception)
+        {
+            _errorMessage = exception.Message;
+            Snackbar.Add(exception.Message, Severity.Error);
+        }
+    }
+
+    private Task<IEnumerable<Homeowner>> SearchHomeownersAsync(string value, CancellationToken cancellationToken)
+    {
+        IEnumerable<Homeowner> matches = _homeowners
+            .OrderBy(homeowner => homeowner.LastName)
+            .ThenBy(homeowner => homeowner.FirstName);
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            matches = matches.Where(homeowner =>
+                GetHomeownerDisplay(homeowner).Contains(value, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return Task.FromResult(matches.Take(8));
+    }
+
+    private static string GetHomeownerDisplay(Homeowner? homeowner)
+    {
+        if (homeowner is null)
+        {
+            return string.Empty;
+        }
+
+        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" ", parts);
+    }
+
+    private string GetCardClass((string Key, string Label) option) =>
+        _selectedDocumentType == option.Key
+            ? "doc-card doc-card-selected"
+            : "doc-card";
+
+    private string GetCardLabelStyle((string Key, string Label) option) =>
+        _selectedDocumentType == option.Key
+            ? "color: #3B5BDB; font-weight: 600;"
+            : "color: #1E293B; font-weight: 400;";
+}

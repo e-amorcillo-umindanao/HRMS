@@ -1,0 +1,15 @@
+<div style="margin-bottom: 24px;">
+    <h1 style="margin: 0; color: #1E293B; font-size: 2rem; font-weight: 700;">@Title</h1>
+    @if (!string.IsNullOrWhiteSpace(Subtitle))
+    {
+        <p style="margin: 8px 0 0; color: #64748B;">@Subtitle</p>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+}

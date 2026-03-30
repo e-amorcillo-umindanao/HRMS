@@ -1,0 +1,120 @@
+@page "/msme/{Id:int}"
+@inject MSMEService MSMEService
+@inject InteractionService InteractionService
+@inject NavigationManager NavigationManager
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else if (_msme is null)
+{
+    <PageHeader Title="MSME" Subtitle="The requested business could not be loaded." />
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <EmptyState Title="No MSME available"
+                    Subtitle="The requested business record could not be found."
+                    Icon="@Icons.Material.Filled.Storefront" />
+    </MudPaper>
+}
+else
+{
+    <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap;">
+        <PageHeader Title="@_msme.BusinessName" Subtitle="MSME profile and interaction history" />
+        <div style="display: flex; gap: 12px;">
+            <MudButton Variant="Variant.Text" OnClick="GoBack">Back</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => NavigationManager.NavigateTo($"/msme/edit/{_msme.MSMEId}"))">
+                Edit
+            </MudButton>
+        </div>
+    </div>
+
+    <MudPaper Class="hrms-page-card" Style="padding: 24px; margin-bottom: 24px;" Elevation="0">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Business Information</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+        <MudGrid>
+            <MudItem xs="12" sm="4"><MudText><strong>Business Name:</strong> @DisplayValue(_msme.BusinessName)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Business Type:</strong> @DisplayValue(_msme.BusinessType)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Status:</strong> <StatusChip Label="@_msme.Status" /></MudText></MudItem>
+            <MudItem xs="12" sm="4">
+                <MudText><strong>Owner:</strong></MudText>
+                @if (_msme.Homeowner is null)
+                {
+                    <MudText>-</MudText>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Text" Style="padding: 0; min-width: 0;" OnClick="@(() => NavigationManager.NavigateTo($"/homeowners/{_msme.HomeownerId}"))">
+                        @GetFullName(_msme.Homeowner)
+                    </MudButton>
+                }
+            </MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Unit:</strong> @DisplayValue(_msme.Unit?.UnitNumber)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Contact Number:</strong> @DisplayValue(_msme.ContactNumber)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Registration Date:</strong> @FormatDate(_msme.RegistrationDate)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Expiry Date:</strong> @FormatDate(_msme.ExpiryDate)</MudText></MudItem>
+            <MudItem xs="12"><MudText><strong>Description:</strong> @DisplayValue(_msme.Description)</MudText></MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
+        <div style="display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+            <div>
+                <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Interaction History</div>
+                <MudText Style="color: #64748B;">Review all CRM touchpoints logged against this business.</MudText>
+            </div>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LogInteraction">
+                Log Interaction
+            </MudButton>
+        </div>
+
+        <InteractionTimeline Logs="_logs" />
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private MSME? _msme;
+    private List<InteractionLog> _logs = [];
+    private bool _isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _msme = await MSMEService.GetByIdAsync(Id);
+        _logs = await InteractionService.GetByMSMEAsync(Id);
+        _isLoading = false;
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/msme");
+    }
+
+    private void LogInteraction()
+    {
+        NavigationManager.NavigateTo($"/engagement/log?msmeId={Id}&returnUrl=%2Fmsme%2F{Id}");
+    }
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string GetFullName(Homeowner homeowner)
+    {
+        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" ", parts);
+    }
+
+    private static string FormatDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed))
+        {
+            return "-";
+        }
+
+        return parsed.ToString("MMMM dd, yyyy");
+    }
+}

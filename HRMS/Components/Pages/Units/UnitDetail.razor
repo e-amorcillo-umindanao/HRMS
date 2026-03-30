@@ -1,0 +1,204 @@
+@page "/units/{Id:int}"
+@inject UnitService UnitService
+@inject HomeownerService HomeownerService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else if (_unit is null)
+{
+    <PageHeader Title="Unit" Subtitle="The requested unit could not be loaded." />
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <EmptyState Title="No unit available"
+                    Subtitle="The requested unit record could not be found."
+                    Icon="@Icons.Material.Filled.HomeWork" />
+    </MudPaper>
+}
+else
+{
+    <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap;">
+        <PageHeader Title="@_unit.UnitNumber" Subtitle="Unit details and occupant assignments" />
+        <div style="display: flex; gap: 12px;">
+            <MudButton Variant="Variant.Text" OnClick="GoBack">Back</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => NavigationManager.NavigateTo($"/units/edit/{_unit.UnitId}"))">
+                Edit
+            </MudButton>
+        </div>
+    </div>
+
+    <MudPaper Class="hrms-page-card" Style="padding: 24px; margin-bottom: 24px;" Elevation="0">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Unit Information</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+        <MudGrid>
+            <MudItem xs="12" sm="3"><MudText><strong>Unit Number:</strong> @DisplayValue(_unit.UnitNumber)</MudText></MudItem>
+            <MudItem xs="12" sm="3"><MudText><strong>Address:</strong> @DisplayValue(_unit.Address)</MudText></MudItem>
+            <MudItem xs="12" sm="3"><MudText><strong>Phase:</strong> @DisplayValue(_unit.Phase?.Name)</MudText></MudItem>
+            <MudItem xs="12" sm="3"><MudText><strong>Head Homeowner:</strong> @DisplayValue(GetFullName(_unit.HeadHomeowner))</MudText></MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
+        <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px;">
+            <div>
+                <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Occupants</div>
+                <MudText Style="color: #64748B;">Assign existing homeowners to this unit.</MudText>
+            </div>
+
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+                <MudAutocomplete T="Homeowner"
+                                 Label="Add Occupant"
+                                 Value="_selectedOccupant"
+                                 ValueChanged="OnSelectedOccupantChanged"
+                                 SearchFunc="SearchAssignableHomeownersAsync"
+                                 ToStringFunc="GetHomeownerDisplay"
+                                 Variant="Variant.Outlined"
+                                 Clearable="true"
+                                 ResetValueOnEmptyText="true"
+                                 MaxItems="8"
+                                 Dense="true"
+                                 Style="min-width: 280px;" />
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AssignOccupantAsync">
+                    Assign Homeowner
+                </MudButton>
+            </div>
+        </div>
+
+        @if (_occupants.Count == 0)
+        {
+            <EmptyState Title="No occupants assigned"
+                        Subtitle="Assign an existing homeowner to start tracking unit occupancy."
+                        Icon="@Icons.Material.Filled.PeopleOutline" />
+        }
+        else
+        {
+            <MudTable T="Homeowner" Items="_occupants" Hover="false" Striped="false">
+                <HeaderContent>
+                    <MudTh>Homeowner</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Contact Number</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Homeowner">@GetFullName(context)</MudTd>
+                    <MudTd DataLabel="Status"><StatusChip Label="@context.Status" /></MudTd>
+                    <MudTd DataLabel="Contact Number">@DisplayValue(context.ContactNumber)</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Unit? _unit;
+    private List<Homeowner> _occupants = [];
+    private List<Homeowner> _activeHomeowners = [];
+    private Homeowner? _selectedOccupant;
+    private bool _isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _unit = await UnitService.GetByIdAsync(Id);
+        _occupants = await UnitService.GetOccupantsAsync(Id);
+        _activeHomeowners = await HomeownerService.GetAllActiveAsync();
+        _selectedOccupant = null;
+        _isLoading = false;
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/units");
+    }
+
+    private Task OnSelectedOccupantChanged(Homeowner? homeowner)
+    {
+        _selectedOccupant = homeowner;
+        return Task.CompletedTask;
+    }
+
+    private async Task AssignOccupantAsync()
+    {
+        if (_selectedOccupant is null)
+        {
+            Snackbar.Add("Select a homeowner to assign.", Severity.Warning);
+            return;
+        }
+
+        if (AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        var result = await UnitService.AssignHomeownerAsync(Id, _selectedOccupant.HomeownerId, AuthService.CurrentUser.UserId);
+        if (!result.Success)
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Unable to assign homeowner.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Homeowner assigned successfully.", Severity.Success);
+        await LoadAsync();
+    }
+
+    private Task<IEnumerable<Homeowner>> SearchAssignableHomeownersAsync(string value, CancellationToken cancellationToken)
+    {
+        var occupantIds = _occupants
+            .Select(homeowner => homeowner.HomeownerId)
+            .ToHashSet();
+
+        IEnumerable<Homeowner> matches = _activeHomeowners
+            .Where(homeowner => !occupantIds.Contains(homeowner.HomeownerId))
+            .OrderBy(homeowner => homeowner.LastName)
+            .ThenBy(homeowner => homeowner.FirstName);
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            matches = matches.Where(homeowner =>
+                GetHomeownerDisplay(homeowner).Contains(value, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return Task.FromResult(matches.Take(8));
+    }
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string GetFullName(Homeowner? homeowner)
+    {
+        if (homeowner is null)
+        {
+            return "-";
+        }
+
+        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" ", parts);
+    }
+
+    private static string GetHomeownerDisplay(Homeowner? homeowner)
+    {
+        if (homeowner is null)
+        {
+            return string.Empty;
+        }
+
+        var fullName = GetFullName(homeowner);
+        var unitNumber = string.IsNullOrWhiteSpace(homeowner.Unit?.UnitNumber) ? null : homeowner.Unit.UnitNumber;
+
+        return string.IsNullOrWhiteSpace(unitNumber)
+            ? fullName
+            : $"{fullName} ({unitNumber})";
+    }
+}

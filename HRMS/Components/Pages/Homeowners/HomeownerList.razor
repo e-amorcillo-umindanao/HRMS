@@ -1,0 +1,310 @@
+@page "/homeowners"
+@inject HomeownerService HomeownerService
+@inject AppDbContext DbContext
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageHeader Title="Homeowners" Subtitle="Manage homeowner records, profile data, and CSV imports." />
+
+<MudPaper Class="hrms-page-card" Style="padding: 16px; margin-bottom: 24px;" Elevation="0">
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
+        <FieldGroup Label="Name" Style="min-width: 220px;">
+            <MudTextField T="string"
+                          Value="_nameFilter"
+                          ValueChanged="OnNameFilterChanged"
+                          Variant="Variant.Outlined"
+                          Immediate="true" />
+        </FieldGroup>
+
+        <FieldGroup Label="Status" Style="min-width: 180px;">
+            <MudSelect T="string"
+                       Value="_statusFilter"
+                       ValueChanged="OnStatusFilterChanged"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@string.Empty">All Statuses</MudSelectItem>
+                @foreach (var status in StatusOptions)
+                {
+                    <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
+                }
+            </MudSelect>
+        </FieldGroup>
+
+        <FieldGroup Label="Phase" Style="min-width: 180px;">
+            <MudSelect T="int?"
+                       Value="_phaseFilter"
+                       ValueChanged="OnPhaseFilterChanged"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="int?" Value="@((int?)null)">All Phases</MudSelectItem>
+                @foreach (var phase in _phases)
+                {
+                    <MudSelectItem T="int?" Value="@phase.PhaseId">@phase.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </FieldGroup>
+
+        <FieldGroup Label="Category" Style="min-width: 180px;">
+            <MudSelect T="string"
+                       Value="_categoryFilter"
+                       ValueChanged="OnCategoryFilterChanged"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@string.Empty">All Categories</MudSelectItem>
+                @foreach (var category in CategoryOptions)
+                {
+                    <MudSelectItem T="string" Value="@category">@category</MudSelectItem>
+                }
+            </MudSelect>
+        </FieldGroup>
+
+        <div style="margin-left: auto; display: flex; flex-wrap: wrap; gap: 12px;">
+            <MudButton HtmlTag="label" Variant="Variant.Outlined">
+                Import CSV
+                <InputFile OnChange="ImportCsvAsync" accept=".csv" hidden />
+            </MudButton>
+
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="/homeowners/add">
+                Add Homeowner
+            </MudButton>
+        </div>
+    </div>
+</MudPaper>
+
+@if (!string.IsNullOrWhiteSpace(_importMessage))
+{
+    <MudAlert Severity="@_importSeverity" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
+        @_importMessage
+    </MudAlert>
+}
+
+@if (_importErrors.Count > 0)
+{
+    <MudPaper Class="hrms-page-card" Style="padding: 16px; margin-bottom: 24px;" Elevation="0">
+        <MudText Style="font-weight: 700; color: #1E293B; margin-bottom: 8px;">Import Errors</MudText>
+        @foreach (var error in _importErrors)
+        {
+            <MudText Style="color: #64748B;">
+                @(error.RowNumber > 0 ? $"Row {error.RowNumber}: {error.Message}" : error.Message)
+            </MudText>
+        }
+    </MudPaper>
+}
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else if (_homeowners.Count == 0)
+{
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <EmptyState Title="No homeowners found"
+                    Subtitle="Try adjusting your filters or add a new homeowner record."
+                    Icon="@Icons.Material.Filled.Inbox" />
+    </MudPaper>
+}
+else
+{
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <MudTable T="Homeowner" Items="_homeowners" Hover="false" Striped="false">
+            <HeaderContent>
+                <MudTh>Full Name</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Phase</MudTh>
+                <MudTh>Unit</MudTh>
+                <MudTh>Categories</MudTh>
+                <MudTh>Residency Since</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Full Name">@GetFullName(context)</MudTd>
+                <MudTd DataLabel="Status"><StatusChip Label="@context.Status" /></MudTd>
+                <MudTd DataLabel="Phase">@DisplayValue(context.Phase?.Name)</MudTd>
+                <MudTd DataLabel="Unit">@DisplayValue(context.Unit?.UnitNumber)</MudTd>
+                <MudTd DataLabel="Categories">
+                    @if (GetCategories(context).Count == 0)
+                    {
+                        <span>-</span>
+                    }
+                    else
+                    {
+                        @foreach (var category in GetCategories(context))
+                        {
+                            <MudChip T="string" Size="Size.Small" Style="margin-right: 4px; margin-bottom: 4px; background: #E2E8F0; color: #1E293B; font-weight: 600;">
+                                @category
+                            </MudChip>
+                        }
+                    }
+                </MudTd>
+                <MudTd DataLabel="Residency Since">@FormatDate(context.ResidencySince)</MudTd>
+                <MudTd DataLabel="Actions">
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/homeowners/{context.HomeownerId}"))">
+                            View
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/homeowners/edit/{context.HomeownerId}"))">
+                            Edit
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => PromptDeleteAsync(context))">
+                            Delete
+                        </MudButton>
+                    </div>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+    <TableRecordCount Count="_homeowners.Count" EntityLabel="homeowners" />
+}
+
+@code {
+    private static readonly string[] StatusOptions = ["Active", "Inactive", "Transferred", "Deceased"];
+    private static readonly string[] CategoryOptions = ["Senior", "PWD", "4Ps", "Indigent", "Youth"];
+
+    private readonly List<CsvImportError> _importErrors = [];
+    private List<Homeowner> _homeowners = [];
+    private List<Phase> _phases = [];
+    private string _nameFilter = string.Empty;
+    private string _statusFilter = string.Empty;
+    private string _categoryFilter = string.Empty;
+    private int? _phaseFilter;
+    private bool _isLoading = true;
+    private string? _importMessage;
+    private Severity _importSeverity = Severity.Success;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _phases = await DbContext.Phases
+            .AsNoTracking()
+            .OrderBy(p => p.Name)
+            .ToListAsync();
+
+        await LoadHomeownersAsync();
+    }
+
+    private async Task LoadHomeownersAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        _homeowners = await HomeownerService.SearchAsync(
+            NullIfEmpty(_nameFilter),
+            NullIfEmpty(_statusFilter),
+            _phaseFilter,
+            null,
+            NullIfEmpty(_categoryFilter));
+
+        _isLoading = false;
+    }
+
+    private async Task OnNameFilterChanged(string value)
+    {
+        _nameFilter = value;
+        await LoadHomeownersAsync();
+    }
+
+    private async Task OnStatusFilterChanged(string value)
+    {
+        _statusFilter = value;
+        await LoadHomeownersAsync();
+    }
+
+    private async Task OnCategoryFilterChanged(string value)
+    {
+        _categoryFilter = value;
+        await LoadHomeownersAsync();
+    }
+
+    private async Task OnPhaseFilterChanged(int? value)
+    {
+        _phaseFilter = value;
+        await LoadHomeownersAsync();
+    }
+
+    private async Task ImportCsvAsync(InputFileChangeEventArgs args)
+    {
+        _importErrors.Clear();
+        _importMessage = null;
+
+        var file = args.File;
+        if (file is null || AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        await using var stream = file.OpenReadStream(5 * 1024 * 1024);
+        var result = await HomeownerService.ImportFromCsvAsync(stream, AuthService.CurrentUser.UserId);
+
+        _importErrors.AddRange(result.Errors);
+
+        _importSeverity = result.Errors.Count == 0
+            ? Severity.Success
+            : result.ImportedCount > 0
+                ? Severity.Warning
+                : Severity.Error;
+
+        _importMessage = result.Errors.Count == 0
+            ? $"Imported {result.ImportedCount} homeowner record(s) successfully."
+            : $"Imported {result.ImportedCount} homeowner record(s). Some rows could not be processed.";
+
+        Snackbar.Add(_importMessage, _importSeverity);
+
+        await LoadHomeownersAsync();
+    }
+
+    private async Task PromptDeleteAsync(Homeowner homeowner)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Delete Homeowner",
+            [nameof(ConfirmDialog.Message)] = $"Are you sure you want to delete {GetFullName(homeowner)}?",
+            [nameof(ConfirmDialog.OnConfirm)] = EventCallback.Factory.Create(this, async () => await DeleteAsync(homeowner.HomeownerId))
+        };
+
+        await DialogService.ShowAsync<ConfirmDialog>(string.Empty, parameters);
+    }
+
+    private async Task DeleteAsync(int homeownerId)
+    {
+        if (AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        var deleted = await HomeownerService.SoftDeleteAsync(homeownerId, AuthService.CurrentUser.UserId);
+        if (deleted)
+        {
+            Snackbar.Add("Homeowner deleted successfully.", Severity.Success);
+            await LoadHomeownersAsync();
+        }
+    }
+
+    private static string GetFullName(Homeowner homeowner)
+    {
+        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" ", parts);
+    }
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string FormatDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed))
+        {
+            return "-";
+        }
+
+        return parsed.ToString("MMMM dd, yyyy");
+    }
+
+    private static List<string> GetCategories(Homeowner homeowner) =>
+        string.IsNullOrWhiteSpace(homeowner.Categories)
+            ? []
+            : homeowner.Categories
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
+}

@@ -1,0 +1,16 @@
+<div class="hrms-empty-state">
+    <MudIcon Icon="@Icon" Size="Size.Large" Style="color: #94A3B8; font-size: 3rem;" />
+    <div class="hrms-empty-state__title">@Title</div>
+    <p class="hrms-empty-state__subtitle">@Subtitle</p>
+</div>
+
+@code {
+    [Parameter]
+    public string Icon { get; set; } = Icons.Material.Filled.Inbox;
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Subtitle { get; set; } = string.Empty;
+}

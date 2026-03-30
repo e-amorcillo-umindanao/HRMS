@@ -1,0 +1,49 @@
+@if (Logs.Count == 0)
+{
+    <EmptyState Title="No interactions recorded yet"
+                Subtitle="Add an interaction to start building the timeline."
+                Icon="@Icons.Material.Filled.Forum" />
+}
+else
+{
+    <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Right">
+        @foreach (var log in SortedLogs)
+        {
+            <MudTimelineItem Icon="@Icons.Material.Filled.Forum" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
+                <MudPaper Class="hrms-page-card" Style="padding: 16px;" Elevation="0">
+                    <div style="display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                            @DisplayValue(log.InteractionType)
+                        </MudChip>
+                        <MudText Style="color: #64748B;">@FormatDate(log.InteractionDate)</MudText>
+                    </div>
+                    <MudText Style="margin-top: 12px; color: #1E293B;">@DisplayValue(log.Notes)</MudText>
+                    <MudText Style="margin-top: 8px; color: #64748B; font-size: 0.875rem;">
+                        Logged by @DisplayValue(log.CreatedByUser?.Username)
+                    </MudText>
+                </MudPaper>
+            </MudTimelineItem>
+        }
+    </MudTimeline>
+}
+
+@code {
+    [Parameter]
+    public List<InteractionLog> Logs { get; set; } = [];
+
+    private IEnumerable<InteractionLog> SortedLogs => Logs
+        .OrderByDescending(log => ParseDate(log.InteractionDate) ?? DateTime.MinValue)
+        .ThenByDescending(log => ParseDate(log.CreatedAt) ?? DateTime.MinValue);
+
+    private static DateTime? ParseDate(string? value) =>
+        DateTime.TryParse(value, out var parsed) ? parsed : null;
+
+    private static string FormatDate(string? value)
+    {
+        var parsed = ParseDate(value);
+        return parsed.HasValue ? parsed.Value.ToString("MMMM dd, yyyy") : "-";
+    }
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+}

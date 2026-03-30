@@ -1,0 +1,333 @@
+@page "/dues/add"
+@page "/dues/edit/{DuesId:int}"
+@inject DuesService DuesService
+@inject HomeownerService HomeownerService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageHeader Title="@(IsEdit ? "Edit Dues Record" : "Record Dues")"
+            Subtitle="Capture monthly dues, due dates, and payment status." />
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
+                @_errorMessage
+            </MudAlert>
+        }
+
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Dues Information</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudAutocomplete T="Homeowner"
+                                 Label="Homeowner"
+                                 Value="_selectedHomeowner"
+                                 ValueChanged="OnHomeownerChanged"
+                                 SearchFunc="SearchHomeownersAsync"
+                                 ToStringFunc="GetHomeownerDisplay"
+                                 Variant="Variant.Outlined"
+                                 Clearable="true"
+                                 ResetValueOnEmptyText="true"
+                                 MaxItems="8"
+                                 Dense="true" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="int" @bind-Value="_model.Month" Label="Month" Variant="Variant.Outlined">
+                    @foreach (var month in Enumerable.Range(1, 12))
+                    {
+                        <MudSelectItem T="int" Value="@month">@GetMonthName(month)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="int" @bind-Value="_model.Year" Label="Year" Variant="Variant.Outlined">
+                    @foreach (var year in _yearOptions)
+                    {
+                        <MudSelectItem T="int" Value="@year">@year</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudNumericField T="decimal" @bind-Value="_model.Amount" Label="Amount" Variant="Variant.Outlined" Min="0" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudDatePicker Label="Due Date" DateFormat="MMMM dd, yyyy" @bind-Date="_dueDate" Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+
+        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Payment</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="string" Value="_model.Status" ValueChanged="OnStatusChanged" Label="Status" Variant="Variant.Outlined">
+                    @foreach (var status in StatusOptions)
+                    {
+                        <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            @if (_model.Status == "Paid")
+            {
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="Paid Date" DateFormat="MMMM dd, yyyy" @bind-Date="_paidDate" Variant="Variant.Outlined" />
+                </MudItem>
+            }
+        </MudGrid>
+
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
+            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    private static readonly string[] StatusOptions = ["Paid", "Unpaid", "Overdue"];
+
+    [Parameter]
+    public int? DuesId { get; set; }
+
+    private readonly DuesFormModel _model = new();
+    private List<Homeowner> _activeHomeowners = [];
+    private List<int> _yearOptions = [];
+    private Homeowner? _selectedHomeowner;
+    private DateTime? _dueDate;
+    private DateTime? _paidDate;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    private bool IsEdit => DuesId.HasValue;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        _activeHomeowners = await HomeownerService.GetAllActiveAsync();
+        _yearOptions = BuildYearOptions();
+
+        if (IsEdit)
+        {
+            var dues = await DuesService.GetByIdAsync(DuesId.GetValueOrDefault());
+            if (dues is null)
+            {
+                _errorMessage = "Dues record not found.";
+                _isLoading = false;
+                return;
+            }
+
+            _model.DuesId = dues.DuesId;
+            _model.Month = dues.Month;
+            _model.Year = dues.Year;
+            _model.Amount = dues.Amount;
+            _model.Status = dues.Status;
+            _dueDate = ParseDate(dues.DueDate);
+            _paidDate = ParseDate(dues.PaidDate);
+            _selectedHomeowner = _activeHomeowners.FirstOrDefault(homeowner => homeowner.HomeownerId == dues.HomeownerId);
+        }
+        else
+        {
+            ResetModel();
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _errorMessage = Validate();
+        if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null || _selectedHomeowner is null)
+        {
+            return;
+        }
+
+        var dues = new DuesRecord
+        {
+            DuesId = _model.DuesId ?? 0,
+            HomeownerId = _selectedHomeowner.HomeownerId,
+            Month = _model.Month,
+            Year = _model.Year,
+            Amount = _model.Amount,
+            DueDate = ToIsoDateString(_dueDate!.Value),
+            Status = _model.Status,
+            PaidDate = _model.Status == "Paid" && _paidDate.HasValue
+                ? ToIsoDateString(_paidDate.Value)
+                : null
+        };
+
+        try
+        {
+            if (IsEdit)
+            {
+                var updated = await DuesService.UpdateAsync(dues, AuthService.CurrentUser.UserId);
+                if (updated is null)
+                {
+                    _errorMessage = "Unable to update dues record.";
+                    return;
+                }
+
+                Snackbar.Add("Dues record updated successfully.", Severity.Success);
+            }
+            else
+            {
+                await DuesService.AddAsync(dues, AuthService.CurrentUser.UserId);
+                Snackbar.Add("Dues record added successfully.", Severity.Success);
+            }
+
+            NavigationManager.NavigateTo("/dues");
+        }
+        catch (InvalidOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo("/dues");
+    }
+
+    private string? Validate()
+    {
+        if (_selectedHomeowner is null)
+        {
+            return "Homeowner is required.";
+        }
+
+        if (_model.Month is < 1 or > 12)
+        {
+            return "Month is required.";
+        }
+
+        if (_model.Year < 2000)
+        {
+            return "Year is required.";
+        }
+
+        if (_model.Amount <= 0)
+        {
+            return "Amount must be greater than zero.";
+        }
+
+        if (_dueDate is null)
+        {
+            return "Due Date is required.";
+        }
+
+        if (_model.Status == "Paid" && !_paidDate.HasValue)
+        {
+            return "Paid Date is required when status is Paid.";
+        }
+
+        return null;
+    }
+
+    private void ResetModel()
+    {
+        _model.DuesId = null;
+        _model.Month = DateTime.UtcNow.Month;
+        _model.Year = DateTime.UtcNow.Year;
+        _model.Amount = 0;
+        _model.Status = "Unpaid";
+        _selectedHomeowner = null;
+        _dueDate = DateTime.UtcNow.Date;
+        _paidDate = null;
+    }
+
+    private Task OnHomeownerChanged(Homeowner? homeowner)
+    {
+        _selectedHomeowner = homeowner;
+        return Task.CompletedTask;
+    }
+
+    private Task OnStatusChanged(string value)
+    {
+        _model.Status = value;
+        if (_model.Status != "Paid")
+        {
+            _paidDate = null;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task<IEnumerable<Homeowner>> SearchHomeownersAsync(string value, CancellationToken cancellationToken)
+    {
+        IEnumerable<Homeowner> matches = _activeHomeowners
+            .OrderBy(homeowner => homeowner.LastName)
+            .ThenBy(homeowner => homeowner.FirstName);
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            matches = matches.Where(homeowner =>
+                GetHomeownerDisplay(homeowner).Contains(value, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return Task.FromResult(matches.Take(8));
+    }
+
+    private static List<int> BuildYearOptions()
+    {
+        var currentYear = DateTime.UtcNow.Year;
+
+        return Enumerable.Range(currentYear - 5, 9)
+            .OrderByDescending(year => year)
+            .ToList();
+    }
+
+    private static string GetHomeownerDisplay(Homeowner? homeowner)
+    {
+        if (homeowner is null)
+        {
+            return string.Empty;
+        }
+
+        var fullName = GetFullName(homeowner);
+        var unitNumber = string.IsNullOrWhiteSpace(homeowner.Unit?.UnitNumber) ? null : homeowner.Unit.UnitNumber;
+
+        return string.IsNullOrWhiteSpace(unitNumber)
+            ? fullName
+            : $"{fullName} ({unitNumber})";
+    }
+
+    private static string GetFullName(Homeowner homeowner)
+    {
+        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" ", parts);
+    }
+
+    private static string GetMonthName(int month)
+    {
+        if (month < 1 || month > 12)
+        {
+            return "-";
+        }
+
+        return System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
+    }
+
+    private static DateTime? ParseDate(string? value) =>
+        DateTime.TryParse(value, out var parsed) ? parsed : null;
+
+    private static string ToIsoDateString(DateTime value) =>
+        DateTime.SpecifyKind(value.Date, DateTimeKind.Utc).ToString("o");
+
+    private sealed class DuesFormModel
+    {
+        public int? DuesId { get; set; }
+        public int Month { get; set; }
+        public int Year { get; set; }
+        public decimal Amount { get; set; }
+        public string Status { get; set; } = "Unpaid";
+    }
+}

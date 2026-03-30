@@ -1,0 +1,16 @@
+@inject NavigationManager NavigationManager
+
+@code {
+    [Parameter]
+    public string Href { get; set; } = "/";
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        NavigationManager.NavigateTo(Href);
+    }
+}

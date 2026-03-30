@@ -1,0 +1,108 @@
+@page "/engagement"
+@inject EngagementService EngagementService
+@inject NavigationManager NavigationManager
+
+<PageHeader Title="Engagement" />
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <MudGrid Style="margin-bottom: 24px;">
+        <MudItem xs="12" md="4">
+            <KpiCard Title="Total High" Value="@HighCount.ToString()" />
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <KpiCard Title="Total Medium" Value="@MediumCount.ToString()" />
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <KpiCard Title="Total Low" Value="@LowCount.ToString()" />
+        </MudItem>
+    </MudGrid>
+
+    @if (_summaries.Count == 0)
+    {
+        <MudPaper Class="hrms-page-card" Elevation="0">
+            <EmptyState Title="No engagement records yet"
+                        Subtitle="Add homeowners and interactions to start tracking engagement."
+                        Icon="@Icons.Material.Filled.Handshake" />
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Class="hrms-page-card" Elevation="0">
+            <MudTable T="EngagementSummary" Items="_summaries" Hover="false" Striped="false">
+                <HeaderContent>
+                    <MudTh>Homeowner Name</MudTh>
+                    <MudTh>Engagement Score</MudTh>
+                    <MudTh>Badge</MudTh>
+                    <MudTh>Last Interaction Date</MudTh>
+                    <MudTh>Events Attended</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Homeowner Name">@context.HomeownerName</MudTd>
+                    <MudTd DataLabel="Engagement Score">
+                        <div class="engagement-score-cell">
+                            <MudProgressLinear Value="@context.Score"
+                                               Color="@GetScoreColor(context.Score)"
+                                               Rounded="false"
+                                               Size="Size.Small"
+                                               Style="border-radius: 4px;" />
+                            <span class="score-label">@($"{context.Score:0.##}%")</span>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Badge">
+                        <EngagementBadge Label="@context.Label" />
+                    </MudTd>
+                    <MudTd DataLabel="Last Interaction Date">@FormatDate(context.LastInteractionDate)</MudTd>
+                    <MudTd DataLabel="Events Attended">@($"{context.EventsAttended} / {context.TotalEvents}")</MudTd>
+                    <MudTd DataLabel="Actions">
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/homeowners/{context.HomeownerId}"))">
+                                View Homeowner
+                            </MudButton>
+                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/engagement/log?homeownerId={context.HomeownerId}&returnUrl=%2Fengagement"))">
+                                Log Interaction
+                            </MudButton>
+                        </div>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+        <TableRecordCount Count="_summaries.Count" EntityLabel="engagement records" />
+    }
+}
+
+@code {
+    private List<EngagementSummary> _summaries = [];
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _summaries = await EngagementService.GetAllEngagementSummariesAsync();
+        _isLoading = false;
+    }
+
+    private int HighCount => _summaries.Count(summary => summary.Label == "High Engagement");
+    private int MediumCount => _summaries.Count(summary => summary.Label == "Medium Engagement");
+    private int LowCount => _summaries.Count(summary => summary.Label == "Low Engagement");
+
+    private static string FormatDate(DateTime? value) =>
+        value.HasValue ? value.Value.ToString("MMMM dd, yyyy") : "-";
+
+    private static Color GetScoreColor(double score) => score switch
+    {
+        >= 75 => Color.Success,
+        >= 40 => Color.Warning,
+        _ => Color.Error
+    };
+}

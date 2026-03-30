@@ -1,0 +1,241 @@
+@page "/units/add"
+@page "/units/edit/{UnitId:int}"
+@inject AppDbContext DbContext
+@inject UnitService UnitService
+@inject HomeownerService HomeownerService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageHeader Title="@(IsEdit ? "Edit Unit" : "Add Unit")"
+            Subtitle="Capture unit details and optionally assign a head homeowner." />
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
+                @_errorMessage
+            </MudAlert>
+        }
+
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Unit Information</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" Label="Unit Number" @bind-Value="_model.UnitNumber" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" Label="Address" @bind-Value="_model.Address" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="int?" Label="Phase" @bind-Value="_model.PhaseId" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="@((int?)null)">-</MudSelectItem>
+                    @foreach (var phase in _phases)
+                    {
+                        <MudSelectItem T="int?" Value="@phase.PhaseId">@phase.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudAutocomplete T="Homeowner"
+                                 Label="Head Homeowner"
+                                 Value="_selectedHeadHomeowner"
+                                 ValueChanged="OnHeadHomeownerChanged"
+                                 SearchFunc="SearchHeadHomeownersAsync"
+                                 ToStringFunc="GetHomeownerDisplay"
+                                 Variant="Variant.Outlined"
+                                 Clearable="true"
+                                 ResetValueOnEmptyText="true"
+                                 MaxItems="8"
+                                 Dense="true" />
+            </MudItem>
+        </MudGrid>
+
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
+            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public int? UnitId { get; set; }
+
+    private readonly UnitFormModel _model = new();
+    private List<Phase> _phases = [];
+    private List<Homeowner> _activeHomeowners = [];
+    private Homeowner? _selectedHeadHomeowner;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    private bool IsEdit => UnitId.HasValue;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        _phases = await DbContext.Phases
+            .AsNoTracking()
+            .OrderBy(p => p.Name)
+            .ToListAsync();
+
+        _activeHomeowners = await HomeownerService.GetAllActiveAsync();
+
+        if (IsEdit)
+        {
+            var unit = await UnitService.GetByIdAsync(UnitId.GetValueOrDefault());
+            if (unit is null)
+            {
+                _errorMessage = "Unit record not found.";
+                _isLoading = false;
+                return;
+            }
+
+            _model.UnitId = unit.UnitId;
+            _model.UnitNumber = unit.UnitNumber;
+            _model.Address = unit.Address;
+            _model.PhaseId = unit.PhaseId;
+
+            if (unit.HeadHomeowner is not null && _activeHomeowners.All(homeowner => homeowner.HomeownerId != unit.HeadHomeowner.HomeownerId))
+            {
+                _activeHomeowners.Add(unit.HeadHomeowner);
+            }
+
+            _selectedHeadHomeowner = unit.HeadHomeowner is null
+                ? null
+                : _activeHomeowners.FirstOrDefault(homeowner => homeowner.HomeownerId == unit.HeadHomeowner.HomeownerId);
+        }
+        else
+        {
+            ResetModel();
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _errorMessage = Validate();
+        if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        var unit = new Unit
+        {
+            UnitId = _model.UnitId ?? 0,
+            UnitNumber = _model.UnitNumber.Trim(),
+            Address = _model.Address.Trim(),
+            PhaseId = _model.PhaseId,
+            HeadHomeownerId = _selectedHeadHomeowner?.HomeownerId
+        };
+
+        if (IsEdit)
+        {
+            var updated = await UnitService.UpdateAsync(unit, AuthService.CurrentUser.UserId);
+            if (updated is null)
+            {
+                _errorMessage = "Unable to update unit.";
+                return;
+            }
+
+            Snackbar.Add("Unit updated successfully.", Severity.Success);
+            NavigationManager.NavigateTo($"/units/{updated.UnitId}");
+        }
+        else
+        {
+            var created = await UnitService.AddAsync(unit, AuthService.CurrentUser.UserId);
+            Snackbar.Add("Unit added successfully.", Severity.Success);
+            NavigationManager.NavigateTo($"/units/{created.UnitId}");
+        }
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo(IsEdit ? $"/units/{UnitId}" : "/units");
+    }
+
+    private string? Validate()
+    {
+        if (string.IsNullOrWhiteSpace(_model.UnitNumber))
+        {
+            return "Unit Number is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.Address))
+        {
+            return "Address is required.";
+        }
+
+        return null;
+    }
+
+    private void ResetModel()
+    {
+        _model.UnitId = null;
+        _model.UnitNumber = string.Empty;
+        _model.Address = string.Empty;
+        _model.PhaseId = null;
+        _selectedHeadHomeowner = null;
+    }
+
+    private Task OnHeadHomeownerChanged(Homeowner? homeowner)
+    {
+        _selectedHeadHomeowner = homeowner;
+        return Task.CompletedTask;
+    }
+
+    private Task<IEnumerable<Homeowner>> SearchHeadHomeownersAsync(string value, CancellationToken cancellationToken)
+    {
+        IEnumerable<Homeowner> matches = _activeHomeowners
+            .OrderBy(homeowner => homeowner.LastName)
+            .ThenBy(homeowner => homeowner.FirstName);
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            matches = matches.Where(homeowner =>
+                GetHomeownerDisplay(homeowner).Contains(value, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return Task.FromResult(matches.Take(8));
+    }
+
+    private static string GetHomeownerDisplay(Homeowner? homeowner)
+    {
+        if (homeowner is null)
+        {
+            return string.Empty;
+        }
+
+        var fullName = GetFullName(homeowner);
+        var unitNumber = string.IsNullOrWhiteSpace(homeowner.Unit?.UnitNumber) ? null : homeowner.Unit.UnitNumber;
+
+        return string.IsNullOrWhiteSpace(unitNumber)
+            ? fullName
+            : $"{fullName} ({unitNumber})";
+    }
+
+    private static string GetFullName(Homeowner homeowner)
+    {
+        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" ", parts);
+    }
+
+    private sealed class UnitFormModel
+    {
+        public int? UnitId { get; set; }
+        public string UnitNumber { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public int? PhaseId { get; set; }
+    }
+}

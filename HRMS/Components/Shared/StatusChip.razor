@@ -1,0 +1,36 @@
+<MudChip T="string"
+         Size="Size.Small"
+         Style="@($"background:{BackgroundColor};color:#FFFFFF;font-weight:600;")">
+    @DisplayLabel
+</MudChip>
+
+@code {
+    [Parameter]
+    public string? Label { get; set; }
+
+    private string DisplayLabel => string.IsNullOrWhiteSpace(Label) ? "-" : Label;
+
+    private string BackgroundColor => Label switch
+    {
+        "Active" => "#22C55E",
+        "Inactive" => "#94A3B8",
+        "Transferred" => "#3B5BDB",
+        "Deceased" => "#EF4444",
+        "Suspended" => "#F59E0B",
+        "Expired" => "#EF4444",
+        "Closed" => "#94A3B8",
+        "Pending" => "#F59E0B",
+        "Approved" => "#22C55E",
+        "Rejected" => "#EF4444",
+        "Paid" => "#22C55E",
+        "Unpaid" => "#F59E0B",
+        "Overdue" => "#EF4444",
+        "Open" => "#EF4444",
+        "Under Review" => "#F59E0B",
+        "Resolved" => "#22C55E",
+        "High Engagement" => "#22C55E",
+        "Medium Engagement" => "#F59E0B",
+        "Low Engagement" => "#EF4444",
+        _ => "#94A3B8"
+    };
+}

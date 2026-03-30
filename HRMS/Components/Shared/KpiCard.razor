@@ -1,0 +1,36 @@
+<MudPaper Class="hrms-page-card" Style="@GetCardStyle()" Elevation="0">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+        <div>
+            <MudText Style="color: #64748B; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
+                @Title
+            </MudText>
+            <MudText Style="color: #1E293B; font-size: 1.75rem; font-weight: 700;">
+                @Value
+            </MudText>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Icon))
+        {
+            <MudIcon Icon="@Icon" Size="Size.Large" Style="@($"color: {ResolveColor()};")" />
+        }
+    </div>
+</MudPaper>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Icon { get; set; }
+
+    [Parameter]
+    public string? Color { get; set; }
+
+    private string GetCardStyle() => "padding: 16px;";
+
+    private string ResolveColor() =>
+        string.IsNullOrWhiteSpace(Color) ? "#3B5BDB" : Color;
+}

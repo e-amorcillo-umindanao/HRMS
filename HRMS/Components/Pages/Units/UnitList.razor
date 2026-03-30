@@ -1,0 +1,181 @@
+@page "/units"
+@inject AppDbContext DbContext
+@inject UnitService UnitService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageHeader Title="Units" Subtitle="Track subdivision units, head homeowners, and occupant assignments." />
+
+<MudPaper Class="hrms-page-card" Style="padding: 16px; margin-bottom: 24px;" Elevation="0">
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
+        <FieldGroup Label="Address" Style="min-width: 240px;">
+            <MudTextField T="string"
+                          Value="_addressFilter"
+                          ValueChanged="OnAddressFilterChanged"
+                          Variant="Variant.Outlined"
+                          Immediate="true" />
+        </FieldGroup>
+
+        <FieldGroup Label="Phase" Style="min-width: 180px;">
+            <MudSelect T="int?"
+                       Value="_phaseFilter"
+                       ValueChanged="OnPhaseFilterChanged"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="int?" Value="@((int?)null)">All Phases</MudSelectItem>
+                @foreach (var phase in _phases)
+                {
+                    <MudSelectItem T="int?" Value="@phase.PhaseId">@phase.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </FieldGroup>
+
+        <div style="margin-left: auto;">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="/units/add">
+                Add Unit
+            </MudButton>
+        </div>
+    </div>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else if (_units.Count == 0)
+{
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <EmptyState Title="No units found"
+                    Subtitle="Try adjusting your filters or add a unit record."
+                    Icon="@Icons.Material.Filled.HomeWork" />
+    </MudPaper>
+}
+else
+{
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <MudTable T="Unit" Items="_units" Hover="false" Striped="false">
+            <HeaderContent>
+                <MudTh>Unit Number</MudTh>
+                <MudTh>Address</MudTh>
+                <MudTh>Phase</MudTh>
+                <MudTh>Head Homeowner</MudTh>
+                <MudTh>Occupants</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Unit Number">@DisplayValue(context.UnitNumber)</MudTd>
+                <MudTd DataLabel="Address">@DisplayValue(context.Address)</MudTd>
+                <MudTd DataLabel="Phase">@DisplayValue(context.Phase?.Name)</MudTd>
+                <MudTd DataLabel="Head Homeowner">@DisplayValue(GetFullName(context.HeadHomeowner))</MudTd>
+                <MudTd DataLabel="Occupants">@GetOccupantCount(context)</MudTd>
+                <MudTd DataLabel="Actions">
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/units/{context.UnitId}"))">
+                            View
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/units/edit/{context.UnitId}"))">
+                            Edit
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => PromptDeleteAsync(context))">
+                            Delete
+                        </MudButton>
+                    </div>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+    <TableRecordCount Count="_units.Count" EntityLabel="units" />
+}
+
+@code {
+    private List<Unit> _units = [];
+    private List<Phase> _phases = [];
+    private string _addressFilter = string.Empty;
+    private int? _phaseFilter;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _phases = await DbContext.Phases
+            .AsNoTracking()
+            .OrderBy(p => p.Name)
+            .ToListAsync();
+
+        await LoadUnitsAsync();
+    }
+
+    private async Task LoadUnitsAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        _units = await UnitService.SearchAsync(NullIfEmpty(_addressFilter), _phaseFilter);
+
+        _isLoading = false;
+    }
+
+    private async Task OnAddressFilterChanged(string value)
+    {
+        _addressFilter = value;
+        await LoadUnitsAsync();
+    }
+
+    private async Task OnPhaseFilterChanged(int? value)
+    {
+        _phaseFilter = value;
+        await LoadUnitsAsync();
+    }
+
+    private async Task PromptDeleteAsync(Unit unit)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Delete Unit",
+            [nameof(ConfirmDialog.Message)] = $"Are you sure you want to delete unit {unit.UnitNumber}?",
+            [nameof(ConfirmDialog.OnConfirm)] = EventCallback.Factory.Create(this, async () => await DeleteAsync(unit.UnitId))
+        };
+
+        await DialogService.ShowAsync<ConfirmDialog>(string.Empty, parameters);
+    }
+
+    private async Task DeleteAsync(int unitId)
+    {
+        if (AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        var result = await UnitService.DeleteAsync(unitId, AuthService.CurrentUser.UserId);
+        if (!result.Success)
+        {
+            Snackbar.Add(result.ErrorMessage ?? "Unable to delete unit.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Unit deleted successfully.", Severity.Success);
+        await LoadUnitsAsync();
+    }
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static string? GetFullName(Homeowner? homeowner)
+    {
+        if (homeowner is null)
+        {
+            return null;
+        }
+
+        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" ", parts);
+    }
+
+    private static int GetOccupantCount(Unit unit) =>
+        unit.Homeowners.Count(homeowner => !homeowner.IsDeleted);
+}

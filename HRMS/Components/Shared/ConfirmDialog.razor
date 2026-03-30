@@ -1,0 +1,40 @@
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Style="font-weight: 700; color: #1E293B;">@Title</MudText>
+        <MudText Style="margin-top: 12px; color: #64748B;">@Message</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="CancelAsync">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmAsync">Confirm</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Message { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback OnConfirm { get; set; }
+
+    private async Task ConfirmAsync()
+    {
+        if (OnConfirm.HasDelegate)
+        {
+            await OnConfirm.InvokeAsync();
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private Task CancelAsync()
+    {
+        MudDialog.Cancel();
+        return Task.CompletedTask;
+    }
+}

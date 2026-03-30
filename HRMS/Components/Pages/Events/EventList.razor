@@ -1,0 +1,158 @@
+@page "/events"
+@inject EventService EventService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageHeader Title="Events & Programs" Subtitle="Manage activities, programs, and attendance tracking." />
+
+<MudPaper Class="hrms-page-card" Style="padding: 16px; margin-bottom: 24px;" Elevation="0">
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
+        <FieldGroup Label="Event Type" Style="min-width: 220px;">
+            <MudSelect T="string"
+                       Value="_eventTypeFilter"
+                       ValueChanged="OnEventTypeFilterChanged"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@string.Empty">All Event Types</MudSelectItem>
+                @foreach (var eventType in EventTypes)
+                {
+                    <MudSelectItem T="string" Value="@eventType">@eventType</MudSelectItem>
+                }
+            </MudSelect>
+        </FieldGroup>
+
+        <div style="margin-left: auto;">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="/events/add">
+                Add Event
+            </MudButton>
+        </div>
+    </div>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else if (_events.Count == 0)
+{
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <EmptyState Title="No events found"
+                    Subtitle="Add an event to begin attendance tracking."
+                    Icon="@Icons.Material.Filled.EventBusy" />
+    </MudPaper>
+}
+else
+{
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <MudTable T="Event" Items="_events" Hover="false" Striped="false">
+            <HeaderContent>
+                <MudTh>Title</MudTh>
+                <MudTh>Event Type</MudTh>
+                <MudTh>Event Date</MudTh>
+                <MudTh>Venue</MudTh>
+                <MudTh>Attendee Count</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Title">@DisplayValue(context.Title)</MudTd>
+                <MudTd DataLabel="Event Type">@DisplayValue(context.EventType)</MudTd>
+                <MudTd DataLabel="Event Date">@FormatDate(context.EventDate)</MudTd>
+                <MudTd DataLabel="Venue">@DisplayValue(context.Venue)</MudTd>
+                <MudTd DataLabel="Attendee Count">@GetAttendeeCount(context)</MudTd>
+                <MudTd DataLabel="Actions">
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/events/{context.EventId}"))">
+                            View
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/events/edit/{context.EventId}"))">
+                            Edit
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => PromptDeleteAsync(context))">
+                            Delete
+                        </MudButton>
+                    </div>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+    <TableRecordCount Count="_events.Count" EntityLabel="events" />
+}
+
+@code {
+    private static readonly string[] EventTypes = ["Assembly", "Livelihood", "Health", "Relief", "Other"];
+
+    private List<Event> _events = [];
+    private string _eventTypeFilter = string.Empty;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEventsAsync();
+    }
+
+    private async Task LoadEventsAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        var events = await EventService.GetAllAsync();
+        _events = string.IsNullOrWhiteSpace(_eventTypeFilter)
+            ? events
+            : events.Where(evt => evt.EventType == _eventTypeFilter).ToList();
+
+        _isLoading = false;
+    }
+
+    private async Task OnEventTypeFilterChanged(string value)
+    {
+        _eventTypeFilter = value;
+        await LoadEventsAsync();
+    }
+
+    private async Task PromptDeleteAsync(Event evt)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Delete Event",
+            [nameof(ConfirmDialog.Message)] = $"Are you sure you want to delete '{evt.Title}'?",
+            [nameof(ConfirmDialog.OnConfirm)] = EventCallback.Factory.Create(this, async () => await DeleteAsync(evt.EventId))
+        };
+
+        await DialogService.ShowAsync<ConfirmDialog>(string.Empty, parameters);
+    }
+
+    private async Task DeleteAsync(int eventId)
+    {
+        if (AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        var deleted = await EventService.DeleteAsync(eventId, AuthService.CurrentUser.UserId);
+        if (!deleted)
+        {
+            Snackbar.Add("Unable to delete event.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Event deleted successfully.", Severity.Success);
+        await LoadEventsAsync();
+    }
+
+    private static int GetAttendeeCount(Event evt) =>
+        evt.Attendances.Count(attendance => attendance.Status == "Present");
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string FormatDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed))
+        {
+            return "-";
+        }
+
+        return parsed.ToString("MMMM dd, yyyy");
+    }
+}

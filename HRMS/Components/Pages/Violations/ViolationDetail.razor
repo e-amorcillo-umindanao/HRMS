@@ -1,0 +1,98 @@
+@page "/violations/{Id:int}"
+@inject ViolationService ViolationService
+@inject DocumentService DocumentService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else if (_violation is null)
+{
+    <PageHeader Title="Violation" Subtitle="The requested violation record could not be loaded." />
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <EmptyState Title="No violation available"
+                    Subtitle="The requested violation record could not be found."
+                    Icon="@Icons.Material.Filled.Gavel" />
+    </MudPaper>
+}
+else
+{
+    <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap;">
+        <PageHeader Title="@_violation.ViolationNumber" Subtitle="Violation record" />
+        <div style="display: flex; gap: 12px;">
+            <MudButton Variant="Variant.Text" OnClick="GoBack">Back</MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="GeneratePdfAsync">
+                Generate PDF Report
+            </MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => NavigationManager.NavigateTo($"/violations/edit/{_violation.ViolationId}"))">
+                Edit
+            </MudButton>
+        </div>
+    </div>
+
+    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
+        <MudGrid>
+            <MudItem xs="12" sm="4"><MudText><strong>Violation Number:</strong> @DisplayValue(_violation.ViolationNumber)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Homeowner:</strong> @DisplayValue(_violation.HomeownerName)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Status:</strong> <StatusChip Label="@_violation.Status" /></MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Type:</strong> @DisplayValue(_violation.ViolationType)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Violation Date:</strong> @FormatDate(_violation.ViolationDate)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Filed By:</strong> @DisplayValue(_violation.FiledByUser?.Username)</MudText></MudItem>
+            <MudItem xs="12"><MudText><strong>Details:</strong> @DisplayValue(_violation.Details)</MudText></MudItem>
+            <MudItem xs="12"><MudText><strong>Resolution:</strong> @DisplayValue(_violation.Resolution)</MudText></MudItem>
+        </MudGrid>
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private ViolationRecord? _violation;
+    private bool _isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _violation = await ViolationService.GetByIdAsync(Id);
+        _isLoading = false;
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/violations");
+    }
+
+    private async Task GeneratePdfAsync()
+    {
+        var document = await DocumentService.GenerateViolationReportAsync(Id);
+        if (document is null)
+        {
+            Snackbar.Add("Unable to generate violation report.", Severity.Error);
+            return;
+        }
+
+        var filePath = Path.Combine(Microsoft.Maui.Storage.FileSystem.CacheDirectory, document.FileName);
+        await File.WriteAllBytesAsync(filePath, document.Bytes);
+
+        await Microsoft.Maui.ApplicationModel.Launcher.Default.OpenAsync(
+            new Microsoft.Maui.ApplicationModel.OpenFileRequest(
+                document.FileName,
+                new Microsoft.Maui.Storage.ReadOnlyFile(filePath)));
+    }
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string FormatDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed))
+        {
+            return "-";
+        }
+
+        return parsed.ToString("MMMM dd, yyyy");
+    }
+}

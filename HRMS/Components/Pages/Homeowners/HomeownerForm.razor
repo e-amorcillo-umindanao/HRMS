@@ -1,0 +1,322 @@
+@page "/homeowners/add"
+@page "/homeowners/edit/{HomeownerId:int}"
+@inject AppDbContext DbContext
+@inject HomeownerService HomeownerService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageHeader Title="@(IsEdit ? "Edit Homeowner" : "Add Homeowner")"
+            Subtitle="Capture personal, contact, and assignment information." />
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
+                @_errorMessage
+            </MudAlert>
+        }
+
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Personal Information</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" Label="First Name" @bind-Value="_model.FirstName" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" Label="Middle Name" @bind-Value="_model.MiddleName" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" Label="Last Name" @bind-Value="_model.LastName" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker Label="Birth Date" DateFormat="MMMM dd, yyyy" @bind-Date="_birthDate" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" Label="Gender" @bind-Value="_model.Gender" Variant="Variant.Outlined">
+                    <MudSelectItem T="string" Value="@("Male")">Male</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Female")">Female</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Other")">Other</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" Label="Civil Status" @bind-Value="_model.CivilStatus" Variant="Variant.Outlined">
+                    <MudSelectItem T="string" Value="@string.Empty">-</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Single")">Single</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Married")">Married</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Widowed")">Widowed</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Separated")">Separated</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Annulled")">Annulled</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+
+        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Contact Details</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" Label="Contact Number" @bind-Value="_model.ContactNumber" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" Label="Email" @bind-Value="_model.Email" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField T="string" Label="Address" @bind-Value="_model.Address" Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+
+        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Assignment &amp; Classification</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" Label="Status" @bind-Value="_model.Status" Variant="Variant.Outlined">
+                    @foreach (var status in StatusOptions)
+                    {
+                        <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="int?" Label="Phase" @bind-Value="_model.PhaseId" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="@((int?)null)">-</MudSelectItem>
+                    @foreach (var phase in _phases)
+                    {
+                        <MudSelectItem T="int?" Value="@phase.PhaseId">@phase.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="int?" Label="Unit" @bind-Value="_model.UnitId" Variant="Variant.Outlined">
+                    <MudSelectItem T="int?" Value="@((int?)null)">-</MudSelectItem>
+                    @foreach (var unit in _units)
+                    {
+                        <MudSelectItem T="int?" Value="@unit.UnitId">@($"{unit.UnitNumber} - {unit.Address}")</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string"
+                           Label="Categories"
+                           MultiSelection="true"
+                           Variant="Variant.Outlined"
+                           SelectedValues="_selectedCategories"
+                           SelectedValuesChanged="OnSelectedCategoriesChanged">
+                    @foreach (var category in CategoryOptions)
+                    {
+                        <MudSelectItem T="string" Value="@category">@category</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker Label="Residency Since" DateFormat="MMMM dd, yyyy" @bind-Date="_residencySince" Variant="Variant.Outlined" />
+            </MudItem>
+        </MudGrid>
+
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
+            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    private static readonly string[] StatusOptions = ["Active", "Inactive", "Transferred", "Deceased"];
+    private static readonly string[] CategoryOptions = ["Senior", "PWD", "4Ps", "Indigent", "Youth"];
+
+    [Parameter]
+    public int? HomeownerId { get; set; }
+
+    private readonly HomeownerFormModel _model = new();
+    private List<Phase> _phases = [];
+    private List<Unit> _units = [];
+    private HashSet<string> _selectedCategories = [];
+    private DateTime? _birthDate;
+    private DateTime? _residencySince;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    private bool IsEdit => HomeownerId.HasValue;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        _phases = await DbContext.Phases.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
+        _units = await DbContext.Units.AsNoTracking().OrderBy(u => u.UnitNumber).ToListAsync();
+
+        if (IsEdit)
+        {
+            var homeownerId = HomeownerId.GetValueOrDefault();
+            var homeowner = await HomeownerService.GetByIdAsync(homeownerId);
+            if (homeowner is null)
+            {
+                _errorMessage = "Homeowner record not found.";
+                _isLoading = false;
+                return;
+            }
+
+            _model.HomeownerId = homeowner.HomeownerId;
+            _model.FirstName = homeowner.FirstName;
+            _model.MiddleName = homeowner.MiddleName ?? string.Empty;
+            _model.LastName = homeowner.LastName;
+            _model.Gender = homeowner.Gender;
+            _model.CivilStatus = homeowner.CivilStatus ?? string.Empty;
+            _model.ContactNumber = homeowner.ContactNumber ?? string.Empty;
+            _model.Email = homeowner.Email ?? string.Empty;
+            _model.Address = homeowner.Address ?? string.Empty;
+            _model.Status = homeowner.Status;
+            _model.PhaseId = homeowner.PhaseId;
+            _model.UnitId = homeowner.UnitId;
+            _selectedCategories = homeowner.Categories is null
+                ? []
+                : homeowner.Categories.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(StringComparer.Ordinal);
+            _birthDate = ParseDate(homeowner.BirthDate);
+            _residencySince = ParseDate(homeowner.ResidencySince);
+        }
+        else
+        {
+            ResetModel();
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _errorMessage = Validate();
+        if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        var homeowner = new Homeowner
+        {
+            HomeownerId = _model.HomeownerId ?? 0,
+            FirstName = _model.FirstName.Trim(),
+            MiddleName = NullIfEmpty(_model.MiddleName),
+            LastName = _model.LastName.Trim(),
+            BirthDate = ToIsoDateString(_birthDate!.Value),
+            Gender = _model.Gender,
+            CivilStatus = NullIfEmpty(_model.CivilStatus),
+            ContactNumber = NullIfEmpty(_model.ContactNumber),
+            Email = NullIfEmpty(_model.Email),
+            Address = NullIfEmpty(_model.Address),
+            PhaseId = _model.PhaseId,
+            UnitId = _model.UnitId,
+            Status = _model.Status,
+            Categories = _selectedCategories.Count == 0 ? null : string.Join(",", _selectedCategories.OrderBy(value => value)),
+            ResidencySince = ToIsoDateString(_residencySince!.Value)
+        };
+
+        if (IsEdit)
+        {
+            var updated = await HomeownerService.UpdateAsync(homeowner, AuthService.CurrentUser.UserId);
+            if (updated is null)
+            {
+                _errorMessage = "Unable to update homeowner.";
+                return;
+            }
+
+            Snackbar.Add("Homeowner updated successfully.", Severity.Success);
+            NavigationManager.NavigateTo($"/homeowners/{updated.HomeownerId}");
+        }
+        else
+        {
+            await HomeownerService.AddAsync(homeowner, AuthService.CurrentUser.UserId);
+            Snackbar.Add("Homeowner added successfully.", Severity.Success);
+            NavigationManager.NavigateTo("/homeowners");
+        }
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo(IsEdit ? $"/homeowners/{HomeownerId}" : "/homeowners");
+    }
+
+    private string? Validate()
+    {
+        if (string.IsNullOrWhiteSpace(_model.FirstName))
+        {
+            return "First Name is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.LastName))
+        {
+            return "Last Name is required.";
+        }
+
+        if (_birthDate is null)
+        {
+            return "Birth Date is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.Gender))
+        {
+            return "Gender is required.";
+        }
+
+        if (_residencySince is null)
+        {
+            return "Residency Since is required.";
+        }
+
+        return null;
+    }
+
+    private void ResetModel()
+    {
+        _model.HomeownerId = null;
+        _model.FirstName = string.Empty;
+        _model.MiddleName = string.Empty;
+        _model.LastName = string.Empty;
+        _model.Gender = string.Empty;
+        _model.CivilStatus = string.Empty;
+        _model.ContactNumber = string.Empty;
+        _model.Email = string.Empty;
+        _model.Address = string.Empty;
+        _model.Status = "Active";
+        _model.PhaseId = null;
+        _model.UnitId = null;
+        _selectedCategories = [];
+        _birthDate = null;
+        _residencySince = null;
+    }
+
+    private Task OnSelectedCategoriesChanged(IEnumerable<string> values)
+    {
+        _selectedCategories = values.ToHashSet(StringComparer.Ordinal);
+        return Task.CompletedTask;
+    }
+
+    private static DateTime? ParseDate(string? value) =>
+        DateTime.TryParse(value, out var parsed) ? parsed : null;
+
+    private static string ToIsoDateString(DateTime value) =>
+        DateTime.SpecifyKind(value.Date, DateTimeKind.Utc).ToString("o");
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class HomeownerFormModel
+    {
+        public int? HomeownerId { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string MiddleName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Gender { get; set; } = string.Empty;
+        public string CivilStatus { get; set; } = string.Empty;
+        public string ContactNumber { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public string Status { get; set; } = "Active";
+        public int? PhaseId { get; set; }
+        public int? UnitId { get; set; }
+    }
+}

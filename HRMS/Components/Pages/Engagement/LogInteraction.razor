@@ -1,0 +1,241 @@
+@page "/engagement/log"
+@inject AppDbContext DbContext
+@inject InteractionService InteractionService
+@inject EngagementService EngagementService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageHeader Title="Log Interaction" Subtitle="Record homeowner or MSME touchpoints for engagement tracking." />
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else if (!HasValidContext)
+{
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <EmptyState Title="No interaction subject selected"
+                    Subtitle="@(_contextMessage ?? "Choose a homeowner or MSME before logging an interaction.")"
+                    Icon="@Icons.Material.Filled.PersonSearch" />
+    </MudPaper>
+}
+else
+{
+    <MudPaper Class="hrms-page-card" Style="padding: 24px; margin-bottom: 24px;" Elevation="0">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Subject Context</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+
+        <MudText Style="font-size: 1.15rem; font-weight: 700; color: #1E293B;">@_subjectName</MudText>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px;">
+            @if (_engagementSummary is not null)
+            {
+                <EngagementBadge Label="@_engagementSummary.Label" />
+                <MudText Style="color: #64748B;">Score: @_engagementSummary.Score.ToString("0.##")</MudText>
+            }
+            else if (_msmeStatusChip is not null)
+            {
+                @((MarkupString)_msmeStatusChip)
+            }
+        </div>
+    </MudPaper>
+
+    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
+                @_errorMessage
+            </MudAlert>
+        }
+
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Interaction Details</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" Label="Interaction Type" @bind-Value="_model.InteractionType" Variant="Variant.Outlined">
+                    <MudSelectItem T="string" Value="@("Visit")">Visit</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Call")">Call</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Follow-up")">Follow-up</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Message")">Message</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Meeting")">Meeting</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker Label="Interaction Date" DateFormat="MMMM dd, yyyy" @bind-Date="_interactionDate" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField T="string" Label="Notes" @bind-Value="_model.Notes" Variant="Variant.Outlined" Lines="4" />
+            </MudItem>
+        </MudGrid>
+
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
+            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "homeownerId")]
+    public int? HomeownerId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "msmeId")]
+    public int? MSMEId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    private readonly LogInteractionModel _model = new();
+    private EngagementSummary? _engagementSummary;
+    private string? _subjectName;
+    private string? _contextMessage;
+    private string? _msmeStatusChip;
+    private string? _errorMessage;
+    private DateTime? _interactionDate = DateTime.UtcNow.Date;
+    private bool _isLoading = true;
+
+    private bool HasValidContext => !string.IsNullOrWhiteSpace(_subjectName);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _subjectName = null;
+        _contextMessage = null;
+        _msmeStatusChip = null;
+        _engagementSummary = null;
+        _errorMessage = null;
+        _model.InteractionType = string.IsNullOrWhiteSpace(_model.InteractionType) ? "Visit" : _model.InteractionType;
+
+        if (HomeownerId.HasValue == MSMEId.HasValue)
+        {
+            _contextMessage = "Exactly one homeowner or MSME must be selected.";
+            _isLoading = false;
+            return;
+        }
+
+        if (HomeownerId.HasValue)
+        {
+            var homeowner = await DbContext.Homeowners
+                .AsNoTracking()
+                .SingleOrDefaultAsync(record => record.HomeownerId == HomeownerId.Value && !record.IsDeleted);
+
+            if (homeowner is null)
+            {
+                _contextMessage = "The selected homeowner could not be found.";
+                _isLoading = false;
+                return;
+            }
+
+            _subjectName = GetFullName(homeowner);
+            _engagementSummary = await EngagementService.GetEngagementSummaryAsync(homeowner.HomeownerId);
+        }
+        else if (MSMEId.HasValue)
+        {
+            var msme = await DbContext.MSMEs
+                .AsNoTracking()
+                .SingleOrDefaultAsync(record => record.MSMEId == MSMEId.Value);
+
+            if (msme is null)
+            {
+                _contextMessage = "The selected MSME could not be found.";
+                _isLoading = false;
+                return;
+            }
+
+            _subjectName = msme.BusinessName;
+            _msmeStatusChip = RenderMsmeStatusChip(msme.Status);
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _errorMessage = Validate();
+        if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await InteractionService.AddAsync(new InteractionLog
+            {
+                HomeownerId = HomeownerId,
+                MSMEId = MSMEId,
+                InteractionType = _model.InteractionType,
+                Notes = _model.Notes,
+                InteractionDate = ToIsoDateString(_interactionDate!.Value)
+            }, AuthService.CurrentUser.UserId);
+
+            Snackbar.Add("Interaction logged successfully.", Severity.Success);
+            NavigationManager.NavigateTo(GetReturnUrl());
+        }
+        catch (ArgumentException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo(GetReturnUrl());
+    }
+
+    private string? Validate()
+    {
+        if (!HasValidContext)
+        {
+            return "Select a valid homeowner or MSME first.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.InteractionType))
+        {
+            return "Interaction Type is required.";
+        }
+
+        if (_interactionDate is null)
+        {
+            return "Interaction Date is required.";
+        }
+
+        return null;
+    }
+
+    private string GetReturnUrl() =>
+        string.IsNullOrWhiteSpace(ReturnUrl) ? "/engagement" : ReturnUrl;
+
+    private static string GetFullName(Homeowner homeowner)
+    {
+        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" ", parts);
+    }
+
+    private static string ToIsoDateString(DateTime value) =>
+        DateTime.SpecifyKind(value.Date, DateTimeKind.Utc).ToString("o");
+
+    private static string RenderMsmeStatusChip(string? status)
+    {
+        var (background, foreground) = status switch
+        {
+            "Active" => ("#DCFCE7", "#166534"),
+            "Suspended" => ("#FEF3C7", "#92400E"),
+            "Expired" => ("#FEE2E2", "#991B1B"),
+            "Closed" => ("#E2E8F0", "#475569"),
+            _ => ("#E2E8F0", "#475569")
+        };
+
+        var text = string.IsNullOrWhiteSpace(status) ? "-" : status;
+        return $"<span style=\"display:inline-block;padding:4px 10px;border-radius:4px;background:{background};color:{foreground};font-size:0.75rem;font-weight:600;\">{text}</span>";
+    }
+
+    private sealed class LogInteractionModel
+    {
+        public string InteractionType { get; set; } = "Visit";
+        public string Notes { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,178 @@
+@page "/reports"
+@inject ReportService ReportService
+@inject ISnackbar Snackbar
+
+<PageHeader Title="Reports" />
+
+<MudPaper Class="hrms-page-card" Style="padding: 8px 8px 16px;" Elevation="0">
+    <MudExpansionPanels MultiExpansion="true">
+        <MudExpansionPanel Text="Homeowners" Expanded="true">
+            <MudText Style="color: #64748B; margin-bottom: 16px;">
+                All registered homeowner profiles and status records
+            </MudText>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_isExporting" OnClick="ExportHomeownersPdfAsync">
+                    Export to PDF
+                </MudButton>
+                <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="_isExporting" OnClick="ExportHomeownersExcelAsync">
+                    Export to Excel
+                </MudButton>
+            </div>
+        </MudExpansionPanel>
+
+        <MudExpansionPanel Text="Dues" Expanded="true">
+            <MudText Style="color: #64748B; margin-bottom: 16px;">
+                Monthly dues records with payment status
+            </MudText>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin-bottom: 16px;">
+                <FieldGroup Label="Month" Style="min-width: 180px;">
+                    <MudSelect T="int?"
+                               @bind-Value="_selectedMonth"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="int?" Value="@((int?)null)">All Months</MudSelectItem>
+                        @foreach (var month in Enumerable.Range(1, 12))
+                        {
+                            <MudSelectItem T="int?" Value="@((int?)month)">@GetMonthName(month)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </FieldGroup>
+
+                <FieldGroup Label="Year" Style="min-width: 160px;">
+                    <MudSelect T="int?"
+                               @bind-Value="_selectedYear"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem T="int?" Value="@((int?)null)">All Years</MudSelectItem>
+                        @foreach (var year in _yearOptions)
+                        {
+                            <MudSelectItem T="int?" Value="@((int?)year)">@year</MudSelectItem>
+                        }
+                    </MudSelect>
+                </FieldGroup>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_isExporting" OnClick="ExportDuesPdfAsync">
+                    Export to PDF
+                </MudButton>
+                <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="_isExporting" OnClick="ExportDuesExcelAsync">
+                    Export to Excel
+                </MudButton>
+            </div>
+        </MudExpansionPanel>
+
+        <MudExpansionPanel Text="Violations" Expanded="true">
+            <MudText Style="color: #64748B; margin-bottom: 16px;">
+                Filed violation and incident reports
+            </MudText>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_isExporting" OnClick="ExportViolationsPdfAsync">
+                    Export to PDF
+                </MudButton>
+                <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="_isExporting" OnClick="ExportViolationsExcelAsync">
+                    Export to Excel
+                </MudButton>
+            </div>
+        </MudExpansionPanel>
+
+        <MudExpansionPanel Text="Clearances" Expanded="true">
+            <MudText Style="color: #64748B; margin-bottom: 16px;">
+                HOA clearance and document requests
+            </MudText>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_isExporting" OnClick="ExportClearancesPdfAsync">
+                    Export to PDF
+                </MudButton>
+                <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="_isExporting" OnClick="ExportClearancesExcelAsync">
+                    Export to Excel
+                </MudButton>
+            </div>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+</MudPaper>
+
+@code {
+    private bool _isExporting;
+    private int? _selectedMonth;
+    private int? _selectedYear = DateTime.UtcNow.Year;
+    private List<int> _yearOptions = [];
+
+    protected override void OnInitialized()
+    {
+        var currentYear = DateTime.UtcNow.Year;
+        _yearOptions = Enumerable.Range(currentYear - 4, 7)
+            .OrderByDescending(year => year)
+            .ToList();
+    }
+
+    private async Task ExportHomeownersPdfAsync() =>
+        await ExportAsync(() => ReportService.ExportHomeownersToPdfAsync(), $"homeowners_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
+
+    private async Task ExportHomeownersExcelAsync() =>
+        await ExportAsync(() => ReportService.ExportHomeownersToExcelAsync(), $"homeowners_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
+
+    private async Task ExportDuesPdfAsync() =>
+        await ExportAsync(() => ReportService.ExportDuesToPdfAsync(_selectedMonth, _selectedYear), $"dues_report_{BuildDuesFileSuffix()}.pdf");
+
+    private async Task ExportDuesExcelAsync() =>
+        await ExportAsync(() => ReportService.ExportDuesToExcelAsync(_selectedMonth, _selectedYear), $"dues_report_{BuildDuesFileSuffix()}.xlsx");
+
+    private async Task ExportViolationsPdfAsync() =>
+        await ExportAsync(() => ReportService.ExportViolationsToPdfAsync(), $"violations_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
+
+    private async Task ExportViolationsExcelAsync() =>
+        await ExportAsync(() => ReportService.ExportViolationsToExcelAsync(), $"violations_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
+
+    private async Task ExportClearancesPdfAsync() =>
+        await ExportAsync(() => ReportService.ExportClearancesToPdfAsync(), $"clearances_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
+
+    private async Task ExportClearancesExcelAsync() =>
+        await ExportAsync(() => ReportService.ExportClearancesToExcelAsync(), $"clearances_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
+
+    private async Task ExportAsync(Func<Task<byte[]>> exportFunc, string fileName)
+    {
+        try
+        {
+            _isExporting = true;
+            var bytes = await exportFunc();
+            await SaveAndOpenAsync(bytes, fileName);
+            Snackbar.Add($"Export generated: {fileName}", Severity.Success);
+        }
+        catch (Exception exception)
+        {
+            Snackbar.Add(exception.Message, Severity.Error);
+        }
+        finally
+        {
+            _isExporting = false;
+        }
+    }
+
+    private static async Task SaveAndOpenAsync(byte[] bytes, string fileName)
+    {
+        var filePath = Path.Combine(Microsoft.Maui.Storage.FileSystem.CacheDirectory, fileName);
+        await File.WriteAllBytesAsync(filePath, bytes);
+
+        await Microsoft.Maui.ApplicationModel.Launcher.Default.OpenAsync(
+            new Microsoft.Maui.ApplicationModel.OpenFileRequest(
+                fileName,
+                new Microsoft.Maui.Storage.ReadOnlyFile(filePath)));
+    }
+
+    private string BuildDuesFileSuffix()
+    {
+        var monthPart = _selectedMonth.HasValue ? GetMonthName(_selectedMonth.Value).Replace(" ", string.Empty) : "all-months";
+        var yearPart = _selectedYear.HasValue ? _selectedYear.Value.ToString() : "all-years";
+        return $"{monthPart}_{yearPart}_{DateTime.UtcNow:yyyyMMdd}";
+    }
+
+    private static string GetMonthName(int month)
+    {
+        if (month < 1 || month > 12)
+        {
+            return "-";
+        }
+
+        return System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
+    }
+}

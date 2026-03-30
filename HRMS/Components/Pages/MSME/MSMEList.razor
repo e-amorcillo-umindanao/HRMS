@@ -1,0 +1,232 @@
+@page "/msme"
+@inject MSMEService MSMEService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageHeader Title="MSME Registry" Subtitle="Track registered businesses, owners, and permit status." />
+
+<MudPaper Class="hrms-page-card" Style="padding: 16px; margin-bottom: 24px;" Elevation="0">
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
+        <FieldGroup Label="Business Name" Style="min-width: 220px;">
+            <MudTextField T="string"
+                          Value="_nameFilter"
+                          ValueChanged="OnNameFilterChanged"
+                          Variant="Variant.Outlined"
+                          Immediate="true" />
+        </FieldGroup>
+
+        <FieldGroup Label="Status" Style="min-width: 180px;">
+            <MudSelect T="string"
+                       Value="_statusFilter"
+                       ValueChanged="OnStatusFilterChanged"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@string.Empty">All Statuses</MudSelectItem>
+                @foreach (var status in StatusOptions)
+                {
+                    <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
+                }
+            </MudSelect>
+        </FieldGroup>
+
+        <FieldGroup Label="Business Type" Style="min-width: 220px;">
+            <MudSelect T="string"
+                       Value="_businessTypeFilter"
+                       ValueChanged="OnBusinessTypeFilterChanged"
+                       Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@string.Empty">All Business Types</MudSelectItem>
+                @foreach (var businessType in BusinessTypeOptions)
+                {
+                    <MudSelectItem T="string" Value="@businessType">@businessType</MudSelectItem>
+                }
+            </MudSelect>
+        </FieldGroup>
+
+        <div style="margin-left: auto;">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="/msme/add">
+                Register Business
+            </MudButton>
+        </div>
+    </div>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else if (_msmes.Count == 0)
+{
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <EmptyState Title="No MSMEs found"
+                    Subtitle="Register a business to begin tracking owners and interactions."
+                    Icon="@Icons.Material.Filled.Storefront" />
+    </MudPaper>
+}
+else
+{
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <MudTable T="MSME" Items="_msmes" Hover="false" Striped="false">
+            <HeaderContent>
+                <MudTh>Business Name</MudTh>
+                <MudTh>Business Type</MudTh>
+                <MudTh>Owner</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Registration Date</MudTh>
+                <MudTh>Expiry Date</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Business Name">@DisplayValue(context.BusinessName)</MudTd>
+                <MudTd DataLabel="Business Type">@DisplayValue(context.BusinessType)</MudTd>
+                <MudTd DataLabel="Owner">@DisplayValue(GetFullName(context.Homeowner))</MudTd>
+                <MudTd DataLabel="Status"><StatusChip Label="@context.Status" /></MudTd>
+                <MudTd DataLabel="Registration Date">@FormatDate(context.RegistrationDate)</MudTd>
+                <MudTd DataLabel="Expiry Date">@((MarkupString)RenderExpiryDate(context))</MudTd>
+                <MudTd DataLabel="Actions">
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/msme/{context.MSMEId}"))">
+                            View
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/msme/edit/{context.MSMEId}"))">
+                            Edit
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => PromptDeleteAsync(context))">
+                            Delete
+                        </MudButton>
+                    </div>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+    <TableRecordCount Count="_msmes.Count" EntityLabel="msmes" />
+}
+
+@code {
+    private static readonly string[] StatusOptions = ["Active", "Suspended", "Expired", "Closed"];
+    private static readonly string[] BusinessTypeOptions =
+    [
+        "Sari-sari Store",
+        "Home Salon/Barbershop",
+        "Food Business",
+        "Online Selling",
+        "Repair Shop",
+        "Other"
+    ];
+
+    private List<MSME> _msmes = [];
+    private string _nameFilter = string.Empty;
+    private string _statusFilter = string.Empty;
+    private string _businessTypeFilter = string.Empty;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMsmesAsync();
+    }
+
+    private async Task LoadMsmesAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        _msmes = await MSMEService.SearchAsync(
+            NullIfEmpty(_nameFilter),
+            NullIfEmpty(_statusFilter),
+            NullIfEmpty(_businessTypeFilter));
+
+        _isLoading = false;
+    }
+
+    private async Task OnNameFilterChanged(string value)
+    {
+        _nameFilter = value;
+        await LoadMsmesAsync();
+    }
+
+    private async Task OnStatusFilterChanged(string value)
+    {
+        _statusFilter = value;
+        await LoadMsmesAsync();
+    }
+
+    private async Task OnBusinessTypeFilterChanged(string value)
+    {
+        _businessTypeFilter = value;
+        await LoadMsmesAsync();
+    }
+
+    private async Task PromptDeleteAsync(MSME msme)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ConfirmDialog.Title)] = "Delete MSME",
+            [nameof(ConfirmDialog.Message)] = $"Are you sure you want to delete {msme.BusinessName}?",
+            [nameof(ConfirmDialog.OnConfirm)] = EventCallback.Factory.Create(this, async () => await DeleteAsync(msme.MSMEId))
+        };
+
+        await DialogService.ShowAsync<ConfirmDialog>(string.Empty, parameters);
+    }
+
+    private async Task DeleteAsync(int msmeId)
+    {
+        if (AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        var deleted = await MSMEService.DeleteAsync(msmeId, AuthService.CurrentUser.UserId);
+        if (!deleted)
+        {
+            Snackbar.Add("Unable to delete MSME.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("MSME deleted successfully.", Severity.Success);
+        await LoadMsmesAsync();
+    }
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static string? GetFullName(Homeowner? homeowner)
+    {
+        if (homeowner is null)
+        {
+            return null;
+        }
+
+        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" ", parts);
+    }
+
+    private static string FormatDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed))
+        {
+            return "-";
+        }
+
+        return parsed.ToString("MMMM dd, yyyy");
+    }
+
+    private static string RenderExpiryDate(MSME msme)
+    {
+        if (string.IsNullOrWhiteSpace(msme.ExpiryDate) || !DateTime.TryParse(msme.ExpiryDate, out var expiryDate))
+        {
+            return "-";
+        }
+
+        var formatted = expiryDate.ToString("MMMM dd, yyyy");
+        var isExpiredWhileActive = expiryDate.Date < DateTime.UtcNow.Date && msme.Status == "Active";
+
+        return isExpiredWhileActive
+            ? $"<span style=\"color:#EF4444;font-weight:600;\">{formatted}</span>"
+            : formatted;
+    }
+}

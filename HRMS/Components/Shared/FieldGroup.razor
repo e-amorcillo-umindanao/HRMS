@@ -1,0 +1,21 @@
+<div class="@BuildClassName()" style="@Style">
+    <label class="field-label">@Label</label>
+    @ChildContent
+</div>
+
+@code {
+    [Parameter]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public string? Style { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string BuildClassName() =>
+        string.IsNullOrWhiteSpace(Class) ? "field-group" : $"field-group {Class}";
+}

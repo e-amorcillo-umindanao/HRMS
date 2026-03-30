@@ -1,0 +1,79 @@
+@inherits LayoutComponentBase
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+@inject AuthService AuthService
+@inject SessionHelper SessionHelper
+
+<div class="hrms-main-layout">
+    <TopBar />
+
+    <div class="hrms-main-layout__body">
+        <Sidebar />
+
+        <main class="hrms-content">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    private DotNetObjectReference<MainLayout>? _layoutReference;
+    private bool _isActivityRegistered;
+
+    protected override void OnInitialized()
+    {
+        AuthService.StateChanged += HandleAuthStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _layoutReference = DotNetObjectReference.Create(this);
+        }
+
+        if (AuthService.IsAuthenticated && !_isActivityRegistered && _layoutReference is not null)
+        {
+            await JSRuntime.InvokeVoidAsync("hrmsSession.registerActivity", _layoutReference);
+            _isActivityRegistered = true;
+            SessionHelper.Start();
+        }
+        else if (!AuthService.IsAuthenticated && _isActivityRegistered)
+        {
+            await JSRuntime.InvokeVoidAsync("hrmsSession.unregisterActivity");
+            _isActivityRegistered = false;
+            SessionHelper.Stop();
+        }
+    }
+
+    [JSInvokable]
+    public Task HandleUserActivity()
+    {
+        SessionHelper.RecordActivity();
+        return Task.CompletedTask;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        AuthService.StateChanged -= HandleAuthStateChanged;
+        SessionHelper.Stop();
+
+        if (_isActivityRegistered)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("hrmsSession.unregisterActivity");
+            }
+            catch
+            {
+            }
+        }
+
+        _layoutReference?.Dispose();
+    }
+
+    private void HandleAuthStateChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+}

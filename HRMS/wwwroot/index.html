@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>HRMS</title>
+    <base href="/" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="css/app.css" rel="stylesheet" />
+    <link href="HRMS.styles.css" rel="stylesheet" />
+    <link rel="icon" href="data:," />
+</head>
+<body>
+    <div class="status-bar-safe-area"></div>
+    <div id="app">Loading...</div>
+
+    <div id="blazor-error-ui" data-nosnippet>
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">x</span>
+    </div>
+
+    <script>
+        document.addEventListener('mousedown', function (e) {
+            Blazor.dispatch('mousedown', e);
+        });
+
+        window.hrmsSession = {
+            dotNetRef: null,
+            activityHandler: null,
+            lastDispatchAt: 0,
+            dispatchIntervalMs: 3000,
+            registerActivity: function (dotNetRef) {
+                this.unregisterActivity();
+                this.dotNetRef = dotNetRef;
+                this.lastDispatchAt = 0;
+
+                this.activityHandler = () => {
+                    const now = Date.now();
+                    if (!this.dotNetRef || now - this.lastDispatchAt < this.dispatchIntervalMs) {
+                        return;
+                    }
+
+                    this.lastDispatchAt = now;
+                    this.dotNetRef.invokeMethodAsync('HandleUserActivity');
+                };
+
+                document.addEventListener('mousemove', this.activityHandler);
+                document.addEventListener('keydown', this.activityHandler);
+                document.addEventListener('click', this.activityHandler);
+            },
+            unregisterActivity: function () {
+                if (!this.activityHandler) {
+                    return;
+                }
+
+                document.removeEventListener('mousemove', this.activityHandler);
+                document.removeEventListener('keydown', this.activityHandler);
+                document.removeEventListener('click', this.activityHandler);
+                this.activityHandler = null;
+                this.dotNetRef = null;
+            }
+        };
+    </script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
+</body>
+</html>

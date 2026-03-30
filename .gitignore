@@ -1,0 +1,14 @@
+.vs/
+*.user
+*.suo
+
+HRMS/bin/
+HRMS/obj/
+HRMS/.dotnet/
+HRMS/.nuget/
+
+HRMS/hrms_designtime.db
+HRMS/*.db-shm
+HRMS/*.db-wal
+
+TestResults/

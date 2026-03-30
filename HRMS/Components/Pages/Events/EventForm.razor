@@ -1,0 +1,190 @@
+@page "/events/add"
+@page "/events/edit/{EventId:int}"
+@inject EventService EventService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageHeader Title="@(IsEdit ? "Edit Event" : "Add Event")"
+            Subtitle="Capture event details and prepare attendance tracking." />
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
+                @_errorMessage
+            </MudAlert>
+        }
+
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Event Details</div>
+        <MudDivider Style="margin: 8px 0 20px;" />
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" Label="Title" @bind-Value="_model.Title" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker Label="Event Date" DateFormat="MMMM dd, yyyy" @bind-Date="_eventDate" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" Label="Event Type" @bind-Value="_model.EventType" Variant="Variant.Outlined">
+                    @foreach (var eventType in EventTypes)
+                    {
+                        <MudSelectItem T="string" Value="@eventType">@eventType</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField T="string" Label="Venue" @bind-Value="_model.Venue" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField T="string" Label="Description" @bind-Value="_model.Description" Variant="Variant.Outlined" Lines="4" />
+            </MudItem>
+        </MudGrid>
+
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
+            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    private static readonly string[] EventTypes = ["Assembly", "Livelihood", "Health", "Relief", "Other"];
+
+    [Parameter]
+    public int? EventId { get; set; }
+
+    private readonly EventFormModel _model = new();
+    private DateTime? _eventDate;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    private bool IsEdit => EventId.HasValue;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        if (IsEdit)
+        {
+            var evt = await EventService.GetByIdAsync(EventId.GetValueOrDefault());
+            if (evt is null)
+            {
+                _errorMessage = "Event record not found.";
+                _isLoading = false;
+                return;
+            }
+
+            _model.EventId = evt.EventId;
+            _model.Title = evt.Title;
+            _model.EventType = evt.EventType;
+            _model.Venue = evt.Venue ?? string.Empty;
+            _model.Description = evt.Description ?? string.Empty;
+            _eventDate = ParseDate(evt.EventDate);
+        }
+        else
+        {
+            ResetModel();
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _errorMessage = Validate();
+        if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        var evt = new Event
+        {
+            EventId = _model.EventId ?? 0,
+            Title = _model.Title.Trim(),
+            EventDate = ToIsoDateString(_eventDate!.Value),
+            EventType = _model.EventType,
+            Venue = NullIfEmpty(_model.Venue),
+            Description = NullIfEmpty(_model.Description)
+        };
+
+        if (IsEdit)
+        {
+            var updated = await EventService.UpdateAsync(evt, AuthService.CurrentUser.UserId);
+            if (updated is null)
+            {
+                _errorMessage = "Unable to update event.";
+                return;
+            }
+
+            Snackbar.Add("Event updated successfully.", Severity.Success);
+            NavigationManager.NavigateTo($"/events/{updated.EventId}");
+        }
+        else
+        {
+            var created = await EventService.AddAsync(evt, AuthService.CurrentUser.UserId);
+            Snackbar.Add("Event added successfully.", Severity.Success);
+            NavigationManager.NavigateTo($"/events/{created.EventId}");
+        }
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo(IsEdit ? $"/events/{EventId}" : "/events");
+    }
+
+    private string? Validate()
+    {
+        if (string.IsNullOrWhiteSpace(_model.Title))
+        {
+            return "Title is required.";
+        }
+
+        if (_eventDate is null)
+        {
+            return "Event Date is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.EventType))
+        {
+            return "Event Type is required.";
+        }
+
+        return null;
+    }
+
+    private void ResetModel()
+    {
+        _model.EventId = null;
+        _model.Title = string.Empty;
+        _model.EventType = string.Empty;
+        _model.Venue = string.Empty;
+        _model.Description = string.Empty;
+        _eventDate = null;
+    }
+
+    private static DateTime? ParseDate(string? value) =>
+        DateTime.TryParse(value, out var parsed) ? parsed : null;
+
+    private static string ToIsoDateString(DateTime value) =>
+        DateTime.SpecifyKind(value.Date, DateTimeKind.Utc).ToString("o");
+
+    private static string? NullIfEmpty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class EventFormModel
+    {
+        public int? EventId { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string EventType { get; set; } = string.Empty;
+        public string Venue { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+    }
+}

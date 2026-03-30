@@ -1,0 +1,20 @@
+<MudChip T="string"
+         Size="Size.Small"
+         Style="@($"background:{BackgroundColor};color:{ForegroundColor};font-weight:600;")">
+    @Label
+</MudChip>
+
+@code {
+    [Parameter]
+    public string Label { get; set; } = string.Empty;
+
+    private string BackgroundColor => Label switch
+    {
+        "High Engagement" => "#22C55E",
+        "Medium Engagement" => "#F59E0B",
+        "Low Engagement" => "#EF4444",
+        _ => "#94A3B8"
+    };
+
+    private string ForegroundColor => "#FFFFFF";
+}

@@ -1,0 +1,96 @@
+@inject AuthService AuthService
+
+<aside class="hrms-sidebar">
+    <div class="hrms-sidebar__header">HRMS</div>
+
+    <div class="hrms-sidebar__content">
+        <MudNavMenu Class="hrms-sidebar__nav">
+            <MudNavLink Href="/dashboard" Match="NavLinkMatch.All">
+                Dashboard
+            </MudNavLink>
+
+            @if (AuthService.IsHomeowner())
+            {
+                <MudNavLink Href="/profile" Match="NavLinkMatch.Prefix">
+                    Profile
+                </MudNavLink>
+            }
+            else
+            {
+                @if (AuthService.IsAtLeast("Staff"))
+                {
+                    <MudNavLink Href="/homeowners" Match="NavLinkMatch.Prefix">
+                        Homeowners
+                    </MudNavLink>
+                    <MudNavLink Href="/units" Match="NavLinkMatch.Prefix">
+                        Units
+                    </MudNavLink>
+                }
+
+                @if (AuthService.IsAtLeast("Board Member"))
+                {
+                    <MudNavLink Href="/engagement" Match="NavLinkMatch.Prefix">
+                        Engagement
+                    </MudNavLink>
+                }
+
+                @if (AuthService.IsAtLeast("Staff"))
+                {
+                    <MudNavLink Href="/events" Match="NavLinkMatch.Prefix">
+                        Events
+                    </MudNavLink>
+                }
+
+                @if (AuthService.IsAtLeast("Board Member"))
+                {
+                    <MudNavLink Href="/msme" Match="NavLinkMatch.Prefix">
+                        MSME
+                    </MudNavLink>
+                }
+
+                @if (AuthService.IsAtLeast("Staff"))
+                {
+                    <MudNavLink Href="/dues" Match="NavLinkMatch.Prefix">
+                        Dues
+                    </MudNavLink>
+                }
+
+                @if (AuthService.IsAtLeast("Board Member"))
+                {
+                    <MudNavLink Href="/violations" Match="NavLinkMatch.Prefix">
+                        Violations
+                    </MudNavLink>
+                }
+
+                <MudNavLink Href="/clearance" Match="NavLinkMatch.Prefix">
+                    Clearance
+                </MudNavLink>
+
+                @if (AuthService.IsAtLeast("Staff"))
+                {
+                    <MudNavLink Href="/documents" Match="NavLinkMatch.Prefix">
+                        Documents
+                    </MudNavLink>
+                    <MudNavLink Href="/reports" Match="NavLinkMatch.Prefix">
+                        Reports
+                    </MudNavLink>
+                }
+
+                @if (AuthService.HasRole("Super Admin") || AuthService.HasRole("HOA President"))
+                {
+                    <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix">
+                        Settings
+                    </MudNavLink>
+                }
+            }
+        </MudNavMenu>
+    </div>
+
+    <MudButton Class="hrms-sidebar__logout" Variant="Variant.Text" OnClick="LogoutAsync">
+        Logout
+    </MudButton>
+</aside>
+
+@code {
+    private Task LogoutAsync() => AuthService.LogoutAsync();
+}

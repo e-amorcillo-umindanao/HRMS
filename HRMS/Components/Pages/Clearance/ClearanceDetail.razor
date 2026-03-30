@@ -1,0 +1,187 @@
+@page "/clearance/{Id:int}"
+@inject ClearanceService ClearanceService
+@inject DocumentService DocumentService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+@if (_isLoading)
+{
+    <LoadingSpinner />
+}
+else if (_request is null)
+{
+    <PageHeader Title="Clearance Request" Subtitle="The requested clearance record could not be loaded." />
+    <MudPaper Class="hrms-page-card" Elevation="0">
+        <EmptyState Title="No clearance request available"
+                    Subtitle="The requested clearance request could not be found."
+                    Icon="@Icons.Material.Filled.Description" />
+    </MudPaper>
+}
+else
+{
+    <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap;">
+        <PageHeader Title="@_request.ClearanceType" Subtitle="Clearance request details" />
+        <div style="display: flex; gap: 12px;">
+            <MudButton Variant="Variant.Text" OnClick="GoBack">Back</MudButton>
+            @if (_request.Status == "Approved")
+            {
+                <MudButton Variant="Variant.Outlined" OnClick="GeneratePdfAsync">
+                    Generate PDF
+                </MudButton>
+            }
+        </div>
+    </div>
+
+    <MudPaper Class="hrms-page-card" Style="padding: 24px; margin-bottom: 24px;" Elevation="0">
+        <MudGrid>
+            <MudItem xs="12" sm="4"><MudText><strong>Homeowner:</strong> @GetFullName(_request.Homeowner)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Clearance Type:</strong> @DisplayValue(_request.ClearanceType)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Status:</strong> <StatusChip Label="@_request.Status" /></MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Purpose:</strong> @DisplayValue(_request.Purpose)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Requested At:</strong> @FormatDate(_request.RequestedAt)</MudText></MudItem>
+            <MudItem xs="12" sm="4"><MudText><strong>Processed At:</strong> @FormatDate(_request.ProcessedAt)</MudText></MudItem>
+            <MudItem xs="12" sm="6"><MudText><strong>Remarks:</strong> @DisplayValue(_request.Remarks)</MudText></MudItem>
+            <MudItem xs="12" sm="6"><MudText><strong>Valid Until:</strong> @FormatDate(_request.ValidUntil)</MudText></MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (!AuthService.IsHomeowner() && _request.Status == "Pending")
+    {
+        <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
+                    @_errorMessage
+                </MudAlert>
+            }
+
+            <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Decision</div>
+            <MudDivider Style="margin: 8px 0 20px;" />
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker Label="Valid Until" DateFormat="MMMM dd, yyyy" @bind-Date="_validUntil" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string" Label="Remarks" @bind-Value="_remarks" Variant="Variant.Outlined" Lines="4" />
+                </MudItem>
+            </MudGrid>
+
+            <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
+                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="RejectAsync">Reject</MudButton>
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ApproveAsync">Approve</MudButton>
+            </div>
+        </MudPaper>
+    }
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private ClearanceRequest? _request;
+    private DateTime? _validUntil;
+    private string _remarks = string.Empty;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _request = await ClearanceService.GetByIdAsync(Id);
+
+        if (_request is not null && AuthService.IsHomeowner() && _request.HomeownerId != AuthService.CurrentUser?.HomeownerId)
+        {
+            NavigationManager.NavigateTo("/clearance");
+            return;
+        }
+
+        _isLoading = false;
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/clearance");
+    }
+
+    private async Task ApproveAsync()
+    {
+        if (AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        var approved = await ClearanceService.ApproveAsync(Id, AuthService.CurrentUser.UserId, _remarks, _validUntil);
+        if (approved is null)
+        {
+            _errorMessage = "Unable to approve the request.";
+            return;
+        }
+
+        Snackbar.Add("Clearance request approved.", Severity.Success);
+        _request = await ClearanceService.GetByIdAsync(Id);
+    }
+
+    private async Task RejectAsync()
+    {
+        if (AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_remarks))
+        {
+            _errorMessage = "Remarks are required when rejecting a request.";
+            return;
+        }
+
+        var rejected = await ClearanceService.RejectAsync(Id, AuthService.CurrentUser.UserId, _remarks);
+        if (rejected is null)
+        {
+            _errorMessage = "Unable to reject the request.";
+            return;
+        }
+
+        Snackbar.Add("Clearance request rejected.", Severity.Success);
+        _request = await ClearanceService.GetByIdAsync(Id);
+    }
+
+    private async Task GeneratePdfAsync()
+    {
+        var document = await DocumentService.GenerateHoaClearanceAsync(Id);
+        if (document is null)
+        {
+            Snackbar.Add("Unable to generate clearance PDF.", Severity.Error);
+            return;
+        }
+
+        var filePath = Path.Combine(Microsoft.Maui.Storage.FileSystem.CacheDirectory, document.FileName);
+        await File.WriteAllBytesAsync(filePath, document.Bytes);
+
+        await Microsoft.Maui.ApplicationModel.Launcher.Default.OpenAsync(
+            new Microsoft.Maui.ApplicationModel.OpenFileRequest(
+                document.FileName,
+                new Microsoft.Maui.Storage.ReadOnlyFile(filePath)));
+    }
+
+    private static string GetFullName(Homeowner homeowner)
+    {
+        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" ", parts);
+    }
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string FormatDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed))
+        {
+            return "-";
+        }
+
+        return parsed.ToString("MMMM dd, yyyy");
+    }
+}
