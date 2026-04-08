@@ -1,6 +1,7 @@
 @page "/documents"
 @inject HomeownerService HomeownerService
 @inject DocumentService DocumentService
+@inject AuthService AuthService
 @inject ISnackbar Snackbar
 
 <PageHeader Title="Document Generator" />
@@ -98,9 +99,9 @@
         {
             GeneratedDocumentResult? document = _selectedDocumentType switch
             {
-                "Residency" => await DocumentService.GenerateCertificateOfResidencyAsync(_selectedHomeowner.HomeownerId),
-                "GoodStanding" => await DocumentService.GenerateCertificateOfGoodStandingAsync(_selectedHomeowner.HomeownerId),
-                "OfficialLetter" => await DocumentService.GenerateOfficialLetterAsync(_selectedHomeowner.HomeownerId),
+                "Residency" when AuthService.CurrentRole is not null => await DocumentService.GenerateCertificateOfResidencyAsync(_selectedHomeowner.HomeownerId, AuthService.CurrentRole),
+                "GoodStanding" when AuthService.CurrentRole is not null => await DocumentService.GenerateCertificateOfGoodStandingAsync(_selectedHomeowner.HomeownerId, AuthService.CurrentRole),
+                "OfficialLetter" when AuthService.CurrentRole is not null => await DocumentService.GenerateOfficialLetterAsync(_selectedHomeowner.HomeownerId, AuthService.CurrentRole),
                 _ => null
             };
 
@@ -119,6 +120,11 @@
                     new Microsoft.Maui.Storage.ReadOnlyFile(filePath)));
         }
         catch (InvalidOperationException exception)
+        {
+            _errorMessage = exception.Message;
+            Snackbar.Add(exception.Message, Severity.Error);
+        }
+        catch (UnauthorizedAccessException exception)
         {
             _errorMessage = exception.Message;
             Snackbar.Add(exception.Message, Severity.Error);

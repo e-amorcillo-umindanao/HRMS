@@ -1,12 +1,15 @@
 using HRMS.Services;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace HRMS
 {
     public partial class App : Application
     {
-        public App()
+        private readonly BackupService _backupService;
+        private bool _backupTriggered;
+
+        public App(BackupService backupService)
         {
+            _backupService = backupService;
             InitializeComponent();
         }
 
@@ -17,21 +20,22 @@ namespace HRMS
             return window;
         }
 
-        private static void HandleWindowDestroying(object? sender, EventArgs e)
+        private async void HandleWindowDestroying(object? sender, EventArgs e)
         {
+            if (_backupTriggered)
+            {
+                return;
+            }
+
+            _backupTriggered = true;
+
             try
             {
-                if (sender is not Window window)
-                {
-                    return;
-                }
-
-                var services = window.Page?.Handler?.MauiContext?.Services;
-                var backupService = services?.GetService<BackupService>();
-                backupService?.BackupAsync().GetAwaiter().GetResult();
+                await _backupService.BackupAsync();
             }
             catch
             {
+                // Avoid blocking shutdown if backup fails.
             }
         }
     }

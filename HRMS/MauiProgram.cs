@@ -22,12 +22,14 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
             });
 
-        var dbPath = Path.Combine(FileSystem.AppDataDirectory, "hrms.db");
+        var connectionString = @"Server=(localdb)\mssqllocaldb;Database=HRMS;Trusted_Connection=True;MultipleActiveResultSets=true;";
 
         builder.Services.AddMauiBlazorWebView();
         builder.Services.AddMudServices();
         builder.Services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlite($"Data Source={dbPath}"));
+            options.UseSqlServer(connectionString));
+        builder.Services.AddDbContextFactory<AppDbContext>(options =>
+            options.UseSqlServer(connectionString));
 
         builder.Services.AddScoped<AuthService>();
         builder.Services.AddScoped<HomeownerService>();
@@ -43,8 +45,8 @@ public static class MauiProgram
         builder.Services.AddScoped<DocumentService>();
         builder.Services.AddScoped<ReportService>();
         builder.Services.AddScoped<AuditService>();
-        builder.Services.AddScoped<BackupService>();
         builder.Services.AddScoped<SessionHelper>();
+        builder.Services.AddSingleton(new BackupService(connectionString));
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();

@@ -49,7 +49,7 @@ else
             <HeaderContent>
                 <MudTh>Title</MudTh>
                 <MudTh>Event Type</MudTh>
-                <MudTh>Event Date</MudTh>
+                <MudTh>Event Date &amp; Time</MudTh>
                 <MudTh>Venue</MudTh>
                 <MudTh>Attendee Count</MudTh>
                 <MudTh>Actions</MudTh>
@@ -57,7 +57,7 @@ else
             <RowTemplate>
                 <MudTd DataLabel="Title">@DisplayValue(context.Title)</MudTd>
                 <MudTd DataLabel="Event Type">@DisplayValue(context.EventType)</MudTd>
-                <MudTd DataLabel="Event Date">@FormatDate(context.EventDate)</MudTd>
+                <MudTd DataLabel="Event Date &amp; Time">@FormatDateTime(context.EventDate)</MudTd>
                 <MudTd DataLabel="Venue">@DisplayValue(context.Venue)</MudTd>
                 <MudTd DataLabel="Attendee Count">@GetAttendeeCount(context)</MudTd>
                 <MudTd DataLabel="Actions">
@@ -146,13 +146,13 @@ else
     private static string DisplayValue(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "-" : value;
 
-    private static string FormatDate(string? value)
+    private static string FormatDateTime(string? value)
     {
         if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed))
         {
             return "-";
         }
 
-        return parsed.ToString("MMMM dd, yyyy");
+        return parsed.ToString("MMMM dd, yyyy h:mm tt");
     }
 }

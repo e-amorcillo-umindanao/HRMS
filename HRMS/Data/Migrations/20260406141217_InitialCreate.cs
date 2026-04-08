@@ -14,11 +14,11 @@ namespace HRMS.Data.Migrations
                 name: "Phases",
                 columns: table => new
                 {
-                    PhaseId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Name = table.Column<string>(type: "TEXT", nullable: false),
-                    Description = table.Column<string>(type: "TEXT", nullable: true),
-                    CreatedAt = table.Column<string>(type: "TEXT", nullable: false)
+                    PhaseId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CreatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -29,9 +29,9 @@ namespace HRMS.Data.Migrations
                 name: "Roles",
                 columns: table => new
                 {
-                    RoleId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    RoleName = table.Column<string>(type: "TEXT", nullable: false)
+                    RoleId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    RoleName = table.Column<string>(type: "nvarchar(max)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -42,13 +42,13 @@ namespace HRMS.Data.Migrations
                 name: "Attendances",
                 columns: table => new
                 {
-                    AttendanceId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    EventId = table.Column<int>(type: "INTEGER", nullable: false),
-                    HomeownerId = table.Column<int>(type: "INTEGER", nullable: false),
-                    Status = table.Column<string>(type: "TEXT", nullable: false),
-                    RecordedAt = table.Column<string>(type: "TEXT", nullable: false),
-                    RecordedBy = table.Column<int>(type: "INTEGER", nullable: false)
+                    AttendanceId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    EventId = table.Column<int>(type: "int", nullable: false),
+                    HomeownerId = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    RecordedAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    RecordedBy = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -59,14 +59,14 @@ namespace HRMS.Data.Migrations
                 name: "AuditLogs",
                 columns: table => new
                 {
-                    AuditLogId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    UserId = table.Column<int>(type: "INTEGER", nullable: false),
-                    Action = table.Column<string>(type: "TEXT", nullable: false),
-                    TableAffected = table.Column<string>(type: "TEXT", nullable: false),
-                    RecordId = table.Column<int>(type: "INTEGER", nullable: true),
-                    Details = table.Column<string>(type: "TEXT", nullable: true),
-                    Timestamp = table.Column<string>(type: "TEXT", nullable: false)
+                    AuditLogId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<int>(type: "int", nullable: false),
+                    Action = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TableAffected = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    RecordId = table.Column<int>(type: "int", nullable: true),
+                    Details = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Timestamp = table.Column<string>(type: "nvarchar(max)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -77,17 +77,17 @@ namespace HRMS.Data.Migrations
                 name: "ClearanceRequests",
                 columns: table => new
                 {
-                    ClearanceId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    HomeownerId = table.Column<int>(type: "INTEGER", nullable: false),
-                    ClearanceType = table.Column<string>(type: "TEXT", nullable: false),
-                    Purpose = table.Column<string>(type: "TEXT", nullable: false),
-                    Status = table.Column<string>(type: "TEXT", nullable: false),
-                    RequestedAt = table.Column<string>(type: "TEXT", nullable: false),
-                    ProcessedAt = table.Column<string>(type: "TEXT", nullable: true),
-                    ProcessedBy = table.Column<int>(type: "INTEGER", nullable: true),
-                    Remarks = table.Column<string>(type: "TEXT", nullable: true),
-                    ValidUntil = table.Column<string>(type: "TEXT", nullable: true)
+                    ClearanceId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    HomeownerId = table.Column<int>(type: "int", nullable: false),
+                    ClearanceType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Purpose = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    RequestedAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ProcessedAt = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ProcessedBy = table.Column<int>(type: "int", nullable: true),
+                    Remarks = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ValidUntil = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -98,17 +98,17 @@ namespace HRMS.Data.Migrations
                 name: "DuesRecords",
                 columns: table => new
                 {
-                    DuesId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    HomeownerId = table.Column<int>(type: "INTEGER", nullable: false),
-                    Month = table.Column<int>(type: "INTEGER", nullable: false),
-                    Year = table.Column<int>(type: "INTEGER", nullable: false),
-                    Amount = table.Column<decimal>(type: "TEXT", nullable: false),
-                    DueDate = table.Column<string>(type: "TEXT", nullable: false),
-                    PaidDate = table.Column<string>(type: "TEXT", nullable: true),
-                    Status = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedAt = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedBy = table.Column<int>(type: "INTEGER", nullable: false)
+                    DuesId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    HomeownerId = table.Column<int>(type: "int", nullable: false),
+                    Month = table.Column<int>(type: "int", nullable: false),
+                    Year = table.Column<int>(type: "int", nullable: false),
+                    Amount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    DueDate = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PaidDate = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedBy = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -119,15 +119,15 @@ namespace HRMS.Data.Migrations
                 name: "Events",
                 columns: table => new
                 {
-                    EventId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Title = table.Column<string>(type: "TEXT", nullable: false),
-                    Description = table.Column<string>(type: "TEXT", nullable: true),
-                    EventDate = table.Column<string>(type: "TEXT", nullable: false),
-                    Venue = table.Column<string>(type: "TEXT", nullable: true),
-                    EventType = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedAt = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedBy = table.Column<int>(type: "INTEGER", nullable: false)
+                    EventId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Title = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    EventDate = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Venue = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    EventType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedBy = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -138,19 +138,18 @@ namespace HRMS.Data.Migrations
                 name: "HOASettings",
                 columns: table => new
                 {
-                    SettingId = table.Column<int>(type: "INTEGER", nullable: false, defaultValue: 1)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    HOAName = table.Column<string>(type: "TEXT", nullable: false),
-                    Subdivision = table.Column<string>(type: "TEXT", nullable: false),
-                    City = table.Column<string>(type: "TEXT", nullable: false),
-                    Province = table.Column<string>(type: "TEXT", nullable: false),
-                    PresidentName = table.Column<string>(type: "TEXT", nullable: true),
-                    SecretaryName = table.Column<string>(type: "TEXT", nullable: true),
-                    TreasurerName = table.Column<string>(type: "TEXT", nullable: true),
-                    ContactNumber = table.Column<string>(type: "TEXT", nullable: true),
-                    LogoPath = table.Column<string>(type: "TEXT", nullable: true),
-                    UpdatedAt = table.Column<string>(type: "TEXT", nullable: false),
-                    UpdatedBy = table.Column<int>(type: "INTEGER", nullable: false)
+                    SettingId = table.Column<int>(type: "int", nullable: false, defaultValue: 1),
+                    HOAName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Subdivision = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    City = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Province = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PresidentName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    SecretaryName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    TreasurerName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ContactNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    LogoPath = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UpdatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedBy = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -161,25 +160,25 @@ namespace HRMS.Data.Migrations
                 name: "Homeowners",
                 columns: table => new
                 {
-                    HomeownerId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    FirstName = table.Column<string>(type: "TEXT", nullable: false),
-                    MiddleName = table.Column<string>(type: "TEXT", nullable: true),
-                    LastName = table.Column<string>(type: "TEXT", nullable: false),
-                    BirthDate = table.Column<string>(type: "TEXT", nullable: false),
-                    Gender = table.Column<string>(type: "TEXT", nullable: false),
-                    CivilStatus = table.Column<string>(type: "TEXT", nullable: true),
-                    ContactNumber = table.Column<string>(type: "TEXT", nullable: true),
-                    Email = table.Column<string>(type: "TEXT", nullable: true),
-                    Address = table.Column<string>(type: "TEXT", nullable: true),
-                    PhaseId = table.Column<int>(type: "INTEGER", nullable: true),
-                    UnitId = table.Column<int>(type: "INTEGER", nullable: true),
-                    Status = table.Column<string>(type: "TEXT", nullable: false),
-                    Categories = table.Column<string>(type: "TEXT", nullable: true),
-                    ResidencySince = table.Column<string>(type: "TEXT", nullable: false),
-                    IsDeleted = table.Column<bool>(type: "INTEGER", nullable: false),
-                    CreatedAt = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedBy = table.Column<int>(type: "INTEGER", nullable: false)
+                    HomeownerId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    FirstName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    MiddleName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    LastName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    BirthDate = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Gender = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CivilStatus = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ContactNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Email = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Address = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PhaseId = table.Column<int>(type: "int", nullable: true),
+                    UnitId = table.Column<int>(type: "int", nullable: true),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Categories = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ResidencySince = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedBy = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -196,15 +195,15 @@ namespace HRMS.Data.Migrations
                 name: "Users",
                 columns: table => new
                 {
-                    UserId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Username = table.Column<string>(type: "TEXT", nullable: false),
-                    PasswordHash = table.Column<string>(type: "TEXT", nullable: false),
-                    RoleId = table.Column<int>(type: "INTEGER", nullable: false),
-                    HomeownerId = table.Column<int>(type: "INTEGER", nullable: true),
-                    IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
-                    CreatedAt = table.Column<string>(type: "TEXT", nullable: false),
-                    LastLoginAt = table.Column<string>(type: "TEXT", nullable: true)
+                    UserId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Username = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    RoleId = table.Column<int>(type: "int", nullable: false),
+                    HomeownerId = table.Column<int>(type: "int", nullable: true),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    LastLoginAt = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -227,14 +226,14 @@ namespace HRMS.Data.Migrations
                 name: "Units",
                 columns: table => new
                 {
-                    UnitId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    UnitNumber = table.Column<string>(type: "TEXT", nullable: false),
-                    Address = table.Column<string>(type: "TEXT", nullable: false),
-                    PhaseId = table.Column<int>(type: "INTEGER", nullable: true),
-                    HeadHomeownerId = table.Column<int>(type: "INTEGER", nullable: true),
-                    CreatedAt = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedBy = table.Column<int>(type: "INTEGER", nullable: false)
+                    UnitId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UnitNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Address = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PhaseId = table.Column<int>(type: "int", nullable: true),
+                    HeadHomeownerId = table.Column<int>(type: "int", nullable: true),
+                    CreatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedBy = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -263,20 +262,20 @@ namespace HRMS.Data.Migrations
                 name: "ViolationRecords",
                 columns: table => new
                 {
-                    ViolationId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    ViolationNumber = table.Column<string>(type: "TEXT", nullable: false),
-                    HomeownerId = table.Column<int>(type: "INTEGER", nullable: true),
-                    HomeownerName = table.Column<string>(type: "TEXT", nullable: false),
-                    ViolationType = table.Column<string>(type: "TEXT", nullable: false),
-                    ViolationDate = table.Column<string>(type: "TEXT", nullable: false),
-                    Details = table.Column<string>(type: "TEXT", nullable: false),
-                    Status = table.Column<string>(type: "TEXT", nullable: false),
-                    Resolution = table.Column<string>(type: "TEXT", nullable: true),
-                    FiledAt = table.Column<string>(type: "TEXT", nullable: false),
-                    FiledBy = table.Column<int>(type: "INTEGER", nullable: false),
-                    UpdatedAt = table.Column<string>(type: "TEXT", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "INTEGER", nullable: true)
+                    ViolationId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ViolationNumber = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    HomeownerId = table.Column<int>(type: "int", nullable: true),
+                    HomeownerName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ViolationType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ViolationDate = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Details = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Resolution = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    FiledAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    FiledBy = table.Column<int>(type: "int", nullable: false),
+                    UpdatedAt = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UpdatedBy = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -305,19 +304,19 @@ namespace HRMS.Data.Migrations
                 name: "MSMEs",
                 columns: table => new
                 {
-                    MSMEId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    BusinessName = table.Column<string>(type: "TEXT", nullable: false),
-                    BusinessType = table.Column<string>(type: "TEXT", nullable: false),
-                    HomeownerId = table.Column<int>(type: "INTEGER", nullable: false),
-                    UnitId = table.Column<int>(type: "INTEGER", nullable: true),
-                    ContactNumber = table.Column<string>(type: "TEXT", nullable: true),
-                    Description = table.Column<string>(type: "TEXT", nullable: true),
-                    RegistrationDate = table.Column<string>(type: "TEXT", nullable: false),
-                    ExpiryDate = table.Column<string>(type: "TEXT", nullable: true),
-                    Status = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedAt = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedBy = table.Column<int>(type: "INTEGER", nullable: false)
+                    MSMEId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    BusinessName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    BusinessType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    HomeownerId = table.Column<int>(type: "int", nullable: false),
+                    UnitId = table.Column<int>(type: "int", nullable: true),
+                    ContactNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RegistrationDate = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ExpiryDate = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedBy = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -346,15 +345,15 @@ namespace HRMS.Data.Migrations
                 name: "InteractionLogs",
                 columns: table => new
                 {
-                    InteractionLogId = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    HomeownerId = table.Column<int>(type: "INTEGER", nullable: true),
-                    MSMEId = table.Column<int>(type: "INTEGER", nullable: true),
-                    InteractionType = table.Column<string>(type: "TEXT", nullable: false),
-                    Notes = table.Column<string>(type: "TEXT", nullable: false),
-                    InteractionDate = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedAt = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedBy = table.Column<int>(type: "INTEGER", nullable: false)
+                    InteractionLogId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    HomeownerId = table.Column<int>(type: "int", nullable: true),
+                    MSMEId = table.Column<int>(type: "int", nullable: true),
+                    InteractionType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    InteractionDate = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedBy = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -495,7 +494,8 @@ namespace HRMS.Data.Migrations
                 name: "IX_Users_HomeownerId",
                 table: "Users",
                 column: "HomeownerId",
-                unique: true);
+                unique: true,
+                filter: "[HomeownerId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_RoleId",

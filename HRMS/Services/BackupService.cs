@@ -1,40 +1,42 @@
+using Microsoft.Data.SqlClient;
+
 namespace HRMS.Services;
 
 public class BackupService
 {
-    public Task BackupAsync()
-    {
-        var sourcePath = Path.Combine(FileSystem.AppDataDirectory, "hrms.db");
-        if (!File.Exists(sourcePath))
-        {
-            return Task.CompletedTask;
-        }
+    private readonly string _connectionString;
 
-        var backupDirectory = Path.Combine(FileSystem.AppDataDirectory, "Backups");
+    public BackupService(string connectionString)
+    {
+        _connectionString = connectionString;
+    }
+
+    public async Task BackupAsync()
+    {
+        var backupDirectory = Path.Combine(AppContext.BaseDirectory, "Backups");
         Directory.CreateDirectory(backupDirectory);
 
-        var backupFileName = $"hrms_backup_{DateTime.UtcNow:yyyy-MM-dd_HH-mm-ss}.db";
-        var backupPath = Path.Combine(backupDirectory, backupFileName);
+        var backupPath = Path.Combine(backupDirectory, $"HRMS_{DateTime.Now:yyyyMMdd_HHmmss}.bak");
+        var escapedBackupPath = backupPath.Replace("'", "''", StringComparison.Ordinal);
+        var commandText = $"BACKUP DATABASE [HRMS] TO DISK = N'{escapedBackupPath}' WITH COPY_ONLY, INIT, FORMAT";
 
-        File.Copy(sourcePath, backupPath, overwrite: false);
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
 
-        var oldBackups = Directory.GetFiles(backupDirectory, "hrms_backup_*.db")
-            .Select(path => new FileInfo(path))
-            .OrderByDescending(file => file.LastWriteTimeUtc)
-            .Skip(5)
-            .ToList();
-
-        foreach (var backup in oldBackups)
+        await using (var command = new SqlCommand(commandText, connection))
         {
-            try
-            {
-                backup.Delete();
-            }
-            catch
-            {
-            }
+            command.CommandTimeout = 300;
+            await command.ExecuteNonQueryAsync();
         }
 
-        return Task.CompletedTask;
+        var filesToDelete = new DirectoryInfo(backupDirectory)
+            .GetFiles("HRMS_*.bak")
+            .OrderByDescending(file => file.CreationTimeUtc)
+            .Skip(5);
+
+        foreach (var file in filesToDelete)
+        {
+            file.Delete();
+        }
     }
 }

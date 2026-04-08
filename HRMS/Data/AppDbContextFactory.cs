@@ -8,7 +8,7 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
     public AppDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-        optionsBuilder.UseSqlite("Data Source=hrms_designtime.db");
+        optionsBuilder.UseSqlServer(@"Server=(localdb)\mssqllocaldb;Database=HRMS;Trusted_Connection=True;MultipleActiveResultSets=true;");
 
         return new AppDbContext(optionsBuilder.Options);
     }

@@ -1,5 +1,5 @@
 @implements IDisposable
-@inject AppDbContext DbContext
+@inject IDbContextFactory<AppDbContext> DbContextFactory
 @inject AuthService AuthService
 
 <header class="hrms-topbar">
@@ -26,7 +26,8 @@
     {
         AuthService.StateChanged += HandleStateChanged;
 
-        var settings = await DbContext.HOASettings.AsNoTracking().FirstOrDefaultAsync();
+        await using var dbContext = await DbContextFactory.CreateDbContextAsync();
+        var settings = await dbContext.HOASettings.AsNoTracking().FirstOrDefaultAsync();
         if (settings is not null && !string.IsNullOrWhiteSpace(settings.HOAName))
         {
             _hoaName = settings.HOAName;

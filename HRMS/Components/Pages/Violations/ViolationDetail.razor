@@ -1,6 +1,7 @@
 @page "/violations/{Id:int}"
 @inject ViolationService ViolationService
 @inject DocumentService DocumentService
+@inject AuthService AuthService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 
@@ -23,9 +24,12 @@ else
         <PageHeader Title="@_violation.ViolationNumber" Subtitle="Violation record" />
         <div style="display: flex; gap: 12px;">
             <MudButton Variant="Variant.Text" OnClick="GoBack">Back</MudButton>
-            <MudButton Variant="Variant.Outlined" OnClick="GeneratePdfAsync">
-                Generate PDF Report
-            </MudButton>
+            @if (CanGenerateViolationPdf)
+            {
+                <MudButton Variant="Variant.Outlined" OnClick="GeneratePdfAsync">
+                    Generate PDF Report
+                </MudButton>
+            }
             <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => NavigationManager.NavigateTo($"/violations/edit/{_violation.ViolationId}"))">
                 Edit
             </MudButton>
@@ -52,6 +56,7 @@ else
 
     private ViolationRecord? _violation;
     private bool _isLoading = true;
+    private bool CanGenerateViolationPdf => AuthService.IsAtLeast("HOA President");
 
     protected override async Task OnParametersSetAsync()
     {
@@ -67,20 +72,32 @@ else
 
     private async Task GeneratePdfAsync()
     {
-        var document = await DocumentService.GenerateViolationReportAsync(Id);
-        if (document is null)
+        if (AuthService.CurrentRole is null)
         {
-            Snackbar.Add("Unable to generate violation report.", Severity.Error);
             return;
         }
 
-        var filePath = Path.Combine(Microsoft.Maui.Storage.FileSystem.CacheDirectory, document.FileName);
-        await File.WriteAllBytesAsync(filePath, document.Bytes);
+        try
+        {
+            var document = await DocumentService.GenerateViolationReportAsync(Id, AuthService.CurrentRole);
+            if (document is null)
+            {
+                Snackbar.Add("Unable to generate violation report.", Severity.Error);
+                return;
+            }
 
-        await Microsoft.Maui.ApplicationModel.Launcher.Default.OpenAsync(
-            new Microsoft.Maui.ApplicationModel.OpenFileRequest(
-                document.FileName,
-                new Microsoft.Maui.Storage.ReadOnlyFile(filePath)));
+            var filePath = Path.Combine(Microsoft.Maui.Storage.FileSystem.CacheDirectory, document.FileName);
+            await File.WriteAllBytesAsync(filePath, document.Bytes);
+
+            await Microsoft.Maui.ApplicationModel.Launcher.Default.OpenAsync(
+                new Microsoft.Maui.ApplicationModel.OpenFileRequest(
+                    document.FileName,
+                    new Microsoft.Maui.Storage.ReadOnlyFile(filePath)));
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            Snackbar.Add(exception.Message, Severity.Error);
+        }
     }
 
     private static string DisplayValue(string? value) =>

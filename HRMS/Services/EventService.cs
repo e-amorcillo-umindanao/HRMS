@@ -112,7 +112,7 @@ public class EventService
     {
         if (DateTime.TryParse(value, out var parsed))
         {
-            return DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc).ToString("o");
+            return DateTime.SpecifyKind(parsed, DateTimeKind.Utc).ToString("o");
         }
 
         return DateTime.UtcNow.ToString("o");

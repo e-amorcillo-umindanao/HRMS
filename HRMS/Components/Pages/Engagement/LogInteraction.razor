@@ -54,19 +54,25 @@ else
 
         <MudGrid>
             <MudItem xs="12" sm="6">
-                <MudSelect T="string" Label="Interaction Type" @bind-Value="_model.InteractionType" Variant="Variant.Outlined">
-                    <MudSelectItem T="string" Value="@("Visit")">Visit</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Call")">Call</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Follow-up")">Follow-up</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Message")">Message</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Meeting")">Meeting</MudSelectItem>
-                </MudSelect>
+                <FieldGroup Label="Interaction Type">
+                    <MudSelect T="string" @bind-Value="_model.InteractionType" Variant="Variant.Outlined">
+                        <MudSelectItem T="string" Value="@("Visit")">Visit</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Call")">Call</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Follow-up")">Follow-up</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Message")">Message</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("Meeting")">Meeting</MudSelectItem>
+                    </MudSelect>
+                </FieldGroup>
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudDatePicker Label="Interaction Date" DateFormat="MMMM dd, yyyy" @bind-Date="_interactionDate" Variant="Variant.Outlined" />
+                <FieldGroup Label="Interaction Date">
+                    <MudDatePicker DateFormat="MMMM dd, yyyy" @bind-Date="_interactionDate" Variant="Variant.Outlined" />
+                </FieldGroup>
             </MudItem>
             <MudItem xs="12">
-                <MudTextField T="string" Label="Notes" @bind-Value="_model.Notes" Variant="Variant.Outlined" Lines="4" />
+                <FieldGroup Label="Notes">
+                    <MudTextField T="string" @bind-Value="_model.Notes" Variant="Variant.Outlined" Lines="4" />
+                </FieldGroup>
             </MudItem>
         </MudGrid>
 
@@ -107,6 +113,12 @@ else
         _engagementSummary = null;
         _errorMessage = null;
         _model.InteractionType = string.IsNullOrWhiteSpace(_model.InteractionType) ? "Visit" : _model.InteractionType;
+
+        if (!AuthService.IsAtLeast("Board Member"))
+        {
+            NavigationManager.NavigateTo("/dashboard");
+            return;
+        }
 
         if (HomeownerId.HasValue == MSMEId.HasValue)
         {

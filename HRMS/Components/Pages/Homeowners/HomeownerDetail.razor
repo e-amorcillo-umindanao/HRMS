@@ -5,6 +5,7 @@
 @inject DuesService DuesService
 @inject ViolationService ViolationService
 @inject ClearanceService ClearanceService
+@inject InteractionService InteractionService
 @inject DocumentService DocumentService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
@@ -114,6 +115,7 @@ else
                             <MudTd DataLabel="Status">@((MarkupString)RenderAttendanceStatusChip(context.Status))</MudTd>
                         </RowTemplate>
                     </MudTable>
+                    <TableRecordCount Count="_attendanceHistory.Count" EntityLabel="attendance records" />
                 }
             </MudTabPanel>
             <MudTabPanel Text="Dues History">
@@ -139,6 +141,7 @@ else
                             <MudTd DataLabel="Status">@((MarkupString)RenderDuesStatusChip(context.Status))</MudTd>
                         </RowTemplate>
                     </MudTable>
+                    <TableRecordCount Count="_duesHistory.Count" EntityLabel="dues records" />
                 }
             </MudTabPanel>
             <MudTabPanel Text="Violations">
@@ -162,6 +165,7 @@ else
                             <MudTd DataLabel="Status">@((MarkupString)RenderViolationStatusChip(context.Status))</MudTd>
                         </RowTemplate>
                     </MudTable>
+                    <TableRecordCount Count="_violations.Count" EntityLabel="violations" />
                 }
             </MudTabPanel>
             <MudTabPanel Text="Clearance Requests">
@@ -187,10 +191,20 @@ else
                             <MudTd DataLabel="Processed At">@FormatDate(context.ProcessedAt)</MudTd>
                         </RowTemplate>
                     </MudTable>
+                    <TableRecordCount Count="_clearanceRequests.Count" EntityLabel="clearance requests" />
                 }
             </MudTabPanel>
             <MudTabPanel Text="Interaction History">
-                <MudText>No records yet.</MudText>
+                @if (!AuthService.IsHomeowner() && _homeowner is not null && AuthService.IsAtLeast("Board Member"))
+                {
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="NavigateToLogInteraction">
+                            Log Interaction
+                        </MudButton>
+                    </div>
+                }
+
+                <InteractionTimeline Logs="_interactionLogs" />
             </MudTabPanel>
         </MudTabs>
     </MudPaper>
@@ -205,6 +219,7 @@ else
     private List<DuesRecord> _duesHistory = [];
     private List<ViolationRecord> _violations = [];
     private List<ClearanceRequest> _clearanceRequests = [];
+    private List<InteractionLog> _interactionLogs = [];
     private bool _isLoading = true;
 
     protected override async Task OnParametersSetAsync()
@@ -237,6 +252,10 @@ else
             ? await ClearanceService.GetByHomeownerAsync(targetId.Value)
             : [];
 
+        _interactionLogs = targetId.HasValue
+            ? await InteractionService.GetByHomeownerAsync(targetId.Value)
+            : [];
+
         _isLoading = false;
     }
 
@@ -266,6 +285,16 @@ else
     private void GoBack()
     {
         NavigationManager.NavigateTo(AuthService.IsHomeowner() ? "/dashboard" : "/homeowners");
+    }
+
+    private void NavigateToLogInteraction()
+    {
+        if (_homeowner is null)
+        {
+            return;
+        }
+
+        NavigationManager.NavigateTo($"/engagement/log?homeownerId={_homeowner.HomeownerId}&returnUrl=/homeowners/{_homeowner.HomeownerId}");
     }
 
     private static string GetFullName(Homeowner homeowner)

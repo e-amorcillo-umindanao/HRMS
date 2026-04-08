@@ -91,13 +91,13 @@ else
                         <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/clearance/{context.ClearanceId}"))">
                             View
                         </MudButton>
-                        @if (!AuthService.IsHomeowner() && context.Status == "Pending")
+                        @if (CanManageOfficialClearances && context.Status == "Pending")
                         {
                             <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/clearance/{context.ClearanceId}"))">
                                 Approve / Reject
                             </MudButton>
                         }
-                        @if (context.Status == "Approved")
+                        @if (CanManageOfficialClearances && context.Status == "Approved")
                         {
                             <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => GeneratePdfAsync(context.ClearanceId))">
                                 Generate PDF
@@ -120,6 +120,7 @@ else
     private string _statusFilter = string.Empty;
     private string _clearanceTypeFilter = string.Empty;
     private bool _isLoading = true;
+    private bool CanManageOfficialClearances => AuthService.IsAtLeast("HOA President");
 
     protected override async Task OnInitializedAsync()
     {
@@ -160,20 +161,32 @@ else
 
     private async Task GeneratePdfAsync(int clearanceId)
     {
-        var document = await DocumentService.GenerateHoaClearanceAsync(clearanceId);
-        if (document is null)
+        if (AuthService.CurrentRole is null)
         {
-            Snackbar.Add("Unable to generate clearance PDF.", Severity.Error);
             return;
         }
 
-        var filePath = Path.Combine(Microsoft.Maui.Storage.FileSystem.CacheDirectory, document.FileName);
-        await File.WriteAllBytesAsync(filePath, document.Bytes);
+        try
+        {
+            var document = await DocumentService.GenerateHoaClearanceAsync(clearanceId, AuthService.CurrentRole);
+            if (document is null)
+            {
+                Snackbar.Add("Unable to generate clearance PDF.", Severity.Error);
+                return;
+            }
 
-        await Microsoft.Maui.ApplicationModel.Launcher.Default.OpenAsync(
-            new Microsoft.Maui.ApplicationModel.OpenFileRequest(
-                document.FileName,
-                new Microsoft.Maui.Storage.ReadOnlyFile(filePath)));
+            var filePath = Path.Combine(Microsoft.Maui.Storage.FileSystem.CacheDirectory, document.FileName);
+            await File.WriteAllBytesAsync(filePath, document.Bytes);
+
+            await Microsoft.Maui.ApplicationModel.Launcher.Default.OpenAsync(
+                new Microsoft.Maui.ApplicationModel.OpenFileRequest(
+                    document.FileName,
+                    new Microsoft.Maui.Storage.ReadOnlyFile(filePath)));
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            Snackbar.Add(exception.Message, Severity.Error);
+        }
     }
 
     private static string? NullIfEmpty(string? value) =>

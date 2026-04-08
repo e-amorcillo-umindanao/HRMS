@@ -66,17 +66,21 @@
                     Clearance
                 </MudNavLink>
 
-                @if (AuthService.IsAtLeast("Staff"))
+                @if (AuthService.IsAtLeast("HOA President"))
                 {
                     <MudNavLink Href="/documents" Match="NavLinkMatch.Prefix">
                         Documents
                     </MudNavLink>
+                }
+
+                @if (AuthService.IsAtLeast("Staff"))
+                {
                     <MudNavLink Href="/reports" Match="NavLinkMatch.Prefix">
                         Reports
                     </MudNavLink>
                 }
 
-                @if (AuthService.HasRole("Super Admin") || AuthService.HasRole("HOA President"))
+                @if (AuthService.HasRole("Super Admin"))
                 {
                     <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix">
                         Settings

@@ -44,8 +44,10 @@ public class DocumentService
         };
     }
 
-    public async Task<GeneratedDocumentResult?> GenerateHoaClearanceAsync(int clearanceId)
+    public async Task<GeneratedDocumentResult?> GenerateHoaClearanceAsync(int clearanceId, string actorRole)
     {
+        EnsurePresidentOrAbove(actorRole, "Only the HOA President and Super Admin can generate HOA clearance PDFs.");
+
         var request = await _context.ClearanceRequests
             .AsNoTracking()
             .Include(record => record.Homeowner)
@@ -64,8 +66,10 @@ public class DocumentService
         return CreatePdfResult(fileName, bytes);
     }
 
-    public async Task<GeneratedDocumentResult?> GenerateCertificateOfResidencyAsync(int homeownerId)
+    public async Task<GeneratedDocumentResult?> GenerateCertificateOfResidencyAsync(int homeownerId, string actorRole)
     {
+        EnsurePresidentOrAbove(actorRole, "Only the HOA President and Super Admin can generate official documents.");
+
         var homeowner = await GetHomeownerAsync(homeownerId);
         if (homeowner is null)
         {
@@ -79,8 +83,10 @@ public class DocumentService
         return CreatePdfResult(fileName, bytes);
     }
 
-    public async Task<GeneratedDocumentResult?> GenerateCertificateOfGoodStandingAsync(int homeownerId)
+    public async Task<GeneratedDocumentResult?> GenerateCertificateOfGoodStandingAsync(int homeownerId, string actorRole)
     {
+        EnsurePresidentOrAbove(actorRole, "Only the HOA President and Super Admin can generate official documents.");
+
         var homeowner = await GetHomeownerAsync(homeownerId);
         if (homeowner is null)
         {
@@ -108,8 +114,10 @@ public class DocumentService
         return CreatePdfResult(fileName, bytes);
     }
 
-    public async Task<GeneratedDocumentResult?> GenerateOfficialLetterAsync(int homeownerId, string? purpose = null)
+    public async Task<GeneratedDocumentResult?> GenerateOfficialLetterAsync(int homeownerId, string actorRole, string? purpose = null)
     {
+        EnsurePresidentOrAbove(actorRole, "Only the HOA President and Super Admin can generate official documents.");
+
         var homeowner = await GetHomeownerAsync(homeownerId);
         if (homeowner is null)
         {
@@ -124,8 +132,10 @@ public class DocumentService
         return CreatePdfResult(fileName, bytes);
     }
 
-    public async Task<GeneratedDocumentResult?> GenerateViolationReportAsync(int violationId)
+    public async Task<GeneratedDocumentResult?> GenerateViolationReportAsync(int violationId, string actorRole)
     {
+        EnsurePresidentOrAbove(actorRole, "Only the HOA President and Super Admin can generate violation report PDFs.");
+
         var violation = await _context.ViolationRecords
             .AsNoTracking()
             .Include(record => record.Homeowner)
@@ -189,6 +199,16 @@ public class DocumentService
             .Where(value => !string.IsNullOrWhiteSpace(value));
 
         return string.Join(" ", parts);
+    }
+
+    private static void EnsurePresidentOrAbove(string actorRole, string message)
+    {
+        if (actorRole is "HOA President" or "Super Admin")
+        {
+            return;
+        }
+
+        throw new UnauthorizedAccessException(message);
     }
 }
 

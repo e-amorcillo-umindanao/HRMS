@@ -112,7 +112,7 @@ public class AuthService
 
         if (normalized.StartsWith("/settings", StringComparison.Ordinal))
         {
-            return HasRole("Super Admin") || HasRole("HOA President");
+            return HasRole("Super Admin");
         }
 
         if (normalized.StartsWith("/engagement", StringComparison.Ordinal) ||
@@ -126,10 +126,14 @@ public class AuthService
             normalized.StartsWith("/units", StringComparison.Ordinal) ||
             normalized.StartsWith("/events", StringComparison.Ordinal) ||
             normalized.StartsWith("/dues", StringComparison.Ordinal) ||
-            normalized.StartsWith("/documents", StringComparison.Ordinal) ||
             normalized.StartsWith("/reports", StringComparison.Ordinal))
         {
             return IsAtLeast("Staff");
+        }
+
+        if (normalized.StartsWith("/documents", StringComparison.Ordinal))
+        {
+            return IsAtLeast("HOA President");
         }
 
         return false;

@@ -89,6 +89,8 @@ public class ClearanceService
 
     public async Task<ClearanceRequest?> ApproveAsync(int id, int actorUserId, string? remarks, DateTime? validUntil)
     {
+        EnsurePresidentOrAbove(await GetActorRoleAsync(actorUserId));
+
         var existing = await _context.ClearanceRequests
             .SingleOrDefaultAsync(request => request.ClearanceId == id);
 
@@ -114,6 +116,8 @@ public class ClearanceService
 
     public async Task<ClearanceRequest?> RejectAsync(int id, int actorUserId, string remarks)
     {
+        EnsurePresidentOrAbove(await GetActorRoleAsync(actorUserId));
+
         var existing = await _context.ClearanceRequests
             .SingleOrDefaultAsync(request => request.ClearanceId == id);
 
@@ -164,4 +168,23 @@ public class ClearanceService
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task<string?> GetActorRoleAsync(int actorUserId)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.Role.RoleName)
+            .SingleOrDefaultAsync();
+    }
+
+    private static void EnsurePresidentOrAbove(string? role)
+    {
+        if (role is "HOA President" or "Super Admin")
+        {
+            return;
+        }
+
+        throw new UnauthorizedAccessException("Only the HOA President and Super Admin can approve or reject clearance requests.");
+    }
 }

@@ -24,7 +24,7 @@ else
         <PageHeader Title="@_request.ClearanceType" Subtitle="Clearance request details" />
         <div style="display: flex; gap: 12px;">
             <MudButton Variant="Variant.Text" OnClick="GoBack">Back</MudButton>
-            @if (_request.Status == "Approved")
+            @if (CanManageOfficialClearances && _request.Status == "Approved")
             {
                 <MudButton Variant="Variant.Outlined" OnClick="GeneratePdfAsync">
                     Generate PDF
@@ -46,7 +46,7 @@ else
         </MudGrid>
     </MudPaper>
 
-    @if (!AuthService.IsHomeowner() && _request.Status == "Pending")
+    @if (CanManageOfficialClearances && _request.Status == "Pending")
     {
         <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
             @if (!string.IsNullOrWhiteSpace(_errorMessage))
@@ -60,10 +60,14 @@ else
             <MudDivider Style="margin: 8px 0 20px;" />
             <MudGrid>
                 <MudItem xs="12" sm="6">
-                    <MudDatePicker Label="Valid Until" DateFormat="MMMM dd, yyyy" @bind-Date="_validUntil" Variant="Variant.Outlined" />
+                    <FieldGroup Label="Valid Until">
+                        <MudDatePicker DateFormat="MMMM dd, yyyy" @bind-Date="_validUntil" Variant="Variant.Outlined" />
+                    </FieldGroup>
                 </MudItem>
                 <MudItem xs="12">
-                    <MudTextField T="string" Label="Remarks" @bind-Value="_remarks" Variant="Variant.Outlined" Lines="4" />
+                    <FieldGroup Label="Remarks">
+                        <MudTextField T="string" @bind-Value="_remarks" Variant="Variant.Outlined" Lines="4" />
+                    </FieldGroup>
                 </MudItem>
             </MudGrid>
 
@@ -84,6 +88,7 @@ else
     private string _remarks = string.Empty;
     private bool _isLoading = true;
     private string? _errorMessage;
+    private bool CanManageOfficialClearances => AuthService.IsAtLeast("HOA President");
 
     protected override async Task OnParametersSetAsync()
     {
@@ -111,15 +116,22 @@ else
             return;
         }
 
-        var approved = await ClearanceService.ApproveAsync(Id, AuthService.CurrentUser.UserId, _remarks, _validUntil);
-        if (approved is null)
+        try
         {
-            _errorMessage = "Unable to approve the request.";
-            return;
-        }
+            var approved = await ClearanceService.ApproveAsync(Id, AuthService.CurrentUser.UserId, _remarks, _validUntil);
+            if (approved is null)
+            {
+                _errorMessage = "Unable to approve the request.";
+                return;
+            }
 
-        Snackbar.Add("Clearance request approved.", Severity.Success);
-        _request = await ClearanceService.GetByIdAsync(Id);
+            Snackbar.Add("Clearance request approved.", Severity.Success);
+            _request = await ClearanceService.GetByIdAsync(Id);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            _errorMessage = exception.Message;
+        }
     }
 
     private async Task RejectAsync()
@@ -135,33 +147,52 @@ else
             return;
         }
 
-        var rejected = await ClearanceService.RejectAsync(Id, AuthService.CurrentUser.UserId, _remarks);
-        if (rejected is null)
+        try
         {
-            _errorMessage = "Unable to reject the request.";
-            return;
-        }
+            var rejected = await ClearanceService.RejectAsync(Id, AuthService.CurrentUser.UserId, _remarks);
+            if (rejected is null)
+            {
+                _errorMessage = "Unable to reject the request.";
+                return;
+            }
 
-        Snackbar.Add("Clearance request rejected.", Severity.Success);
-        _request = await ClearanceService.GetByIdAsync(Id);
+            Snackbar.Add("Clearance request rejected.", Severity.Success);
+            _request = await ClearanceService.GetByIdAsync(Id);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            _errorMessage = exception.Message;
+        }
     }
 
     private async Task GeneratePdfAsync()
     {
-        var document = await DocumentService.GenerateHoaClearanceAsync(Id);
-        if (document is null)
+        if (AuthService.CurrentRole is null)
         {
-            Snackbar.Add("Unable to generate clearance PDF.", Severity.Error);
             return;
         }
 
-        var filePath = Path.Combine(Microsoft.Maui.Storage.FileSystem.CacheDirectory, document.FileName);
-        await File.WriteAllBytesAsync(filePath, document.Bytes);
+        try
+        {
+            var document = await DocumentService.GenerateHoaClearanceAsync(Id, AuthService.CurrentRole);
+            if (document is null)
+            {
+                Snackbar.Add("Unable to generate clearance PDF.", Severity.Error);
+                return;
+            }
 
-        await Microsoft.Maui.ApplicationModel.Launcher.Default.OpenAsync(
-            new Microsoft.Maui.ApplicationModel.OpenFileRequest(
-                document.FileName,
-                new Microsoft.Maui.Storage.ReadOnlyFile(filePath)));
+            var filePath = Path.Combine(Microsoft.Maui.Storage.FileSystem.CacheDirectory, document.FileName);
+            await File.WriteAllBytesAsync(filePath, document.Bytes);
+
+            await Microsoft.Maui.ApplicationModel.Launcher.Default.OpenAsync(
+                new Microsoft.Maui.ApplicationModel.OpenFileRequest(
+                    document.FileName,
+                    new Microsoft.Maui.Storage.ReadOnlyFile(filePath)));
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            Snackbar.Add(exception.Message, Severity.Error);
+        }
     }
 
     private static string GetFullName(Homeowner homeowner)

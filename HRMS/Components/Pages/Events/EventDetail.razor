@@ -37,7 +37,7 @@ else
         <MudGrid>
             <MudItem xs="12" sm="3"><MudText><strong>Title:</strong> @DisplayValue(_event.Title)</MudText></MudItem>
             <MudItem xs="12" sm="3"><MudText><strong>Event Type:</strong> @DisplayValue(_event.EventType)</MudText></MudItem>
-            <MudItem xs="12" sm="3"><MudText><strong>Event Date:</strong> @FormatDate(_event.EventDate)</MudText></MudItem>
+            <MudItem xs="12" sm="3"><MudText><strong>Event Date:</strong> @FormatDateTime(_event.EventDate)</MudText></MudItem>
             <MudItem xs="12" sm="3"><MudText><strong>Venue:</strong> @DisplayValue(_event.Venue)</MudText></MudItem>
             <MudItem xs="12"><MudText><strong>Description:</strong> @DisplayValue(_event.Description)</MudText></MudItem>
         </MudGrid>
@@ -85,6 +85,7 @@ else
                     </MudTd>
                 </RowTemplate>
             </MudTable>
+            <TableRecordCount Count="_rows.Count" EntityLabel="attendance records" />
 
             <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
                 <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAttendanceAsync">
@@ -193,14 +194,14 @@ else
     private static string DisplayValue(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "-" : value;
 
-    private static string FormatDate(string? value)
+    private static string FormatDateTime(string? value)
     {
         if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed))
         {
             return "-";
         }
 
-        return parsed.ToString("MMMM dd, yyyy");
+        return parsed.ToString("MMMM dd, yyyy h:mm tt");
     }
 
     private static string RenderSummaryChip(string label, int count)

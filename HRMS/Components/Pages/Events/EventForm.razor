@@ -26,24 +26,42 @@ else
         <MudDivider Style="margin: 8px 0 20px;" />
         <MudGrid>
             <MudItem xs="12" sm="6">
-                <MudTextField T="string" Label="Title" @bind-Value="_model.Title" Variant="Variant.Outlined" Required="true" />
+                <FieldGroup Label="Title">
+                    <MudTextField T="string" @bind-Value="_model.Title" Variant="Variant.Outlined" Required="true" />
+                </FieldGroup>
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudDatePicker Label="Event Date" DateFormat="MMMM dd, yyyy" @bind-Date="_eventDate" Variant="Variant.Outlined" />
+                <FieldGroup Label="Event Date">
+                    <MudDatePicker DateFormat="MMMM dd, yyyy" @bind-Date="_eventDate" Variant="Variant.Outlined" />
+                </FieldGroup>
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudSelect T="string" Label="Event Type" @bind-Value="_model.EventType" Variant="Variant.Outlined">
-                    @foreach (var eventType in EventTypes)
-                    {
-                        <MudSelectItem T="string" Value="@eventType">@eventType</MudSelectItem>
-                    }
-                </MudSelect>
+                <FieldGroup Label="Event Time">
+                    <MudTimePicker Time="_eventTime"
+                                   TimeChanged="OnEventTimeChanged"
+                                   Variant="Variant.Outlined"
+                                   AmPm="true" />
+                </FieldGroup>
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudTextField T="string" Label="Venue" @bind-Value="_model.Venue" Variant="Variant.Outlined" />
+                <FieldGroup Label="Event Type">
+                    <MudSelect T="string" @bind-Value="_model.EventType" Variant="Variant.Outlined">
+                        @foreach (var eventType in EventTypes)
+                        {
+                            <MudSelectItem T="string" Value="@eventType">@eventType</MudSelectItem>
+                        }
+                    </MudSelect>
+                </FieldGroup>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <FieldGroup Label="Venue">
+                    <MudTextField T="string" @bind-Value="_model.Venue" Variant="Variant.Outlined" />
+                </FieldGroup>
             </MudItem>
             <MudItem xs="12">
-                <MudTextField T="string" Label="Description" @bind-Value="_model.Description" Variant="Variant.Outlined" Lines="4" />
+                <FieldGroup Label="Description">
+                    <MudTextField T="string" @bind-Value="_model.Description" Variant="Variant.Outlined" Lines="4" />
+                </FieldGroup>
             </MudItem>
         </MudGrid>
 
@@ -62,6 +80,7 @@ else
 
     private readonly EventFormModel _model = new();
     private DateTime? _eventDate;
+    private TimeSpan? _eventTime;
     private bool _isLoading = true;
     private string? _errorMessage;
 
@@ -87,7 +106,9 @@ else
             _model.EventType = evt.EventType;
             _model.Venue = evt.Venue ?? string.Empty;
             _model.Description = evt.Description ?? string.Empty;
-            _eventDate = ParseDate(evt.EventDate);
+            var parsed = ParseDate(evt.EventDate);
+            _eventDate = parsed?.Date;
+            _eventTime = parsed?.TimeOfDay;
         }
         else
         {
@@ -109,7 +130,7 @@ else
         {
             EventId = _model.EventId ?? 0,
             Title = _model.Title.Trim(),
-            EventDate = ToIsoDateString(_eventDate!.Value),
+            EventDate = ToIsoDateTimeString(_eventDate!.Value, _eventTime),
             EventType = _model.EventType,
             Venue = NullIfEmpty(_model.Venue),
             Description = NullIfEmpty(_model.Description)
@@ -168,16 +189,26 @@ else
         _model.Venue = string.Empty;
         _model.Description = string.Empty;
         _eventDate = null;
+        _eventTime = null;
     }
 
     private static DateTime? ParseDate(string? value) =>
         DateTime.TryParse(value, out var parsed) ? parsed : null;
 
-    private static string ToIsoDateString(DateTime value) =>
-        DateTime.SpecifyKind(value.Date, DateTimeKind.Utc).ToString("o");
+    private static string ToIsoDateTimeString(DateTime date, TimeSpan? time)
+    {
+        var combined = date.Date.Add(time ?? TimeSpan.Zero);
+        return DateTime.SpecifyKind(combined, DateTimeKind.Utc).ToString("o");
+    }
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private Task OnEventTimeChanged(TimeSpan? value)
+    {
+        _eventTime = value;
+        return Task.CompletedTask;
+    }
 
     private sealed class EventFormModel
     {

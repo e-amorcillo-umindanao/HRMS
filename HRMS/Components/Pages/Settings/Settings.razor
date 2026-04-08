@@ -159,38 +159,83 @@ else
                         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddUserAsync">Create User</MudButton>
                     </div>
                 }
+
+                <MudDivider Style="margin: 16px 0;" />
+                <MudGrid>
+                    <MudItem xs="12" sm="4">
+                        <FieldGroup Label="Username">
+                            <MudTextField T="string"
+                                          @bind-Value="_filterUsername"
+                                          Variant="Variant.Outlined"
+                                          Immediate="true" />
+                        </FieldGroup>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <FieldGroup Label="Role">
+                            <MudSelect T="string" @bind-Value="_filterRole" Variant="Variant.Outlined">
+                                <MudSelectItem T="string" Value="@string.Empty">All Roles</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Super Admin")">Super Admin</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("HOA President")">HOA President</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Board Member")">Board Member</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Staff")">Staff</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Homeowner")">Homeowner</MudSelectItem>
+                            </MudSelect>
+                        </FieldGroup>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <FieldGroup Label="Status">
+                            <MudSelect T="string" @bind-Value="_filterStatus" Variant="Variant.Outlined">
+                                <MudSelectItem T="string" Value="@string.Empty">All Statuses</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Active")">Active</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Inactive")">Inactive</MudSelectItem>
+                            </MudSelect>
+                        </FieldGroup>
+                    </MudItem>
+                </MudGrid>
             </MudPaper>
 
-            <MudPaper Class="hrms-page-card" Elevation="0">
-                <MudTable T="User" Items="_users" Hover="false" Striped="false">
-                    <HeaderContent>
-                        <MudTh>Username</MudTh>
-                        <MudTh>Role</MudTh>
-                        <MudTh>Status</MudTh>
-                        <MudTh>Last Login</MudTh>
-                        <MudTh>Actions</MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="Username">@context.Username</MudTd>
-                        <MudTd DataLabel="Role">@DisplayValue(context.Role?.RoleName)</MudTd>
-                        <MudTd DataLabel="Status"><StatusChip Label="@(context.IsActive ? "Active" : "Inactive")" /></MudTd>
-                        <MudTd DataLabel="Last Login">@FormatDate(context.LastLoginAt)</MudTd>
-                        <MudTd DataLabel="Actions">
-                            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                @if (context.IsActive)
-                                {
-                                    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeactivateUserAsync(context.UserId))">
-                                        Deactivate
+            @if (!FilteredUsers.Any())
+            {
+                <MudPaper Class="hrms-page-card" Elevation="0">
+                    <EmptyState Title="No users found"
+                                Subtitle="No users match the current filters"
+                                Icon="@Icons.Material.Filled.PersonSearch" />
+                </MudPaper>
+            }
+            else
+            {
+                <MudPaper Class="hrms-page-card" Elevation="0">
+                    <MudTable T="User" Items="FilteredUsers" Hover="false" Striped="false">
+                        <HeaderContent>
+                            <MudTh>Username</MudTh>
+                            <MudTh>Role</MudTh>
+                            <MudTh>Status</MudTh>
+                            <MudTh>Last Login</MudTh>
+                            <MudTh>Actions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Username">@context.Username</MudTd>
+                            <MudTd DataLabel="Role">@DisplayValue(context.Role?.RoleName)</MudTd>
+                            <MudTd DataLabel="Status"><StatusChip Label="@(context.IsActive ? "Active" : "Inactive")" /></MudTd>
+                            <MudTd DataLabel="Last Login">@FormatDate(context.LastLoginAt)</MudTd>
+                            <MudTd DataLabel="Actions">
+                                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    @if (context.IsActive)
+                                    {
+                                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeactivateUserAsync(context.UserId))">
+                                            Deactivate
+                                        </MudButton>
+                                    }
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginPasswordReset(context))">
+                                        Reset Password
                                     </MudButton>
-                                }
-                                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginPasswordReset(context))">
-                                    Reset Password
-                                </MudButton>
-                            </div>
-                        </MudTd>
-                    </RowTemplate>
-                </MudTable>
-            </MudPaper>
+                                </div>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            }
+            <TableRecordCount Count="FilteredUsers.Count()" EntityLabel="users" />
 
             @if (_resetPasswordUser is not null)
             {
@@ -277,6 +322,7 @@ else
                     </RowTemplate>
                 </MudTable>
             </MudPaper>
+            <TableRecordCount Count="_phases.Count" EntityLabel="phases" />
         </MudTabPanel>
 
         <MudTabPanel Text="Audit Log">
@@ -347,6 +393,7 @@ else
                     </RowTemplate>
                 </MudTable>
             </MudPaper>
+            <TableRecordCount Count="FilteredAuditLogs.Count()" EntityLabel="audit logs" />
         </MudTabPanel>
     </MudTabs>
 }
@@ -385,11 +432,23 @@ else
     private bool _showAddUserForm;
     private bool _showPhaseForm;
     private int? _editingPhaseId;
+    private string _filterUsername = string.Empty;
+    private string _filterRole = string.Empty;
+    private string _filterStatus = string.Empty;
     private string _auditUsernameFilter = string.Empty;
     private string _auditActionFilter = string.Empty;
     private string _auditTableFilter = string.Empty;
     private DateTime? _auditFromDate;
     private DateTime? _auditToDate;
+
+    private IEnumerable<User> FilteredUsers => _users
+        .Where(user =>
+            (string.IsNullOrEmpty(_filterUsername) ||
+             user.Username.Contains(_filterUsername, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrEmpty(_filterRole) ||
+             user.Role.RoleName == _filterRole) &&
+            (string.IsNullOrEmpty(_filterStatus) ||
+             (user.IsActive ? "Active" : "Inactive") == _filterStatus));
 
     private IEnumerable<AuditLog> FilteredAuditLogs => _auditLogs
         .Where(log => string.IsNullOrWhiteSpace(_auditUsernameFilter) ||
