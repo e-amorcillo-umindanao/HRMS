@@ -3,7 +3,7 @@
 @inject HomeownerService HomeownerService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 @if (_isLoading)
 {
@@ -12,84 +12,100 @@
 else if (_unit is null)
 {
     <PageHeader Title="Unit" Subtitle="The requested unit could not be loaded." />
-    <MudPaper Class="hrms-page-card" Elevation="0">
+    <div class="card border border-base-300 bg-base-100 shadow-none">
         <EmptyState Title="No unit available"
                     Subtitle="The requested unit record could not be found."
-                    Icon="@Icons.Material.Filled.HomeWork" />
-    </MudPaper>
+                    Icon="○" />
+    </div>
 }
 else
 {
-    <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap;">
-        <PageHeader Title="@_unit.UnitNumber" Subtitle="Unit details and occupant assignments" />
-        <div style="display: flex; gap: 12px;">
-            <MudButton Variant="Variant.Text" OnClick="GoBack">Back</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => NavigationManager.NavigateTo($"/units/edit/{_unit.UnitId}"))">
+    <PageHeader Title="@_unit.UnitNumber" Subtitle="Unit details and occupant assignments.">
+        <Actions>
+            <button class="btn btn-ghost btn-sm" @onclick="GoBack">Back</button>
+            <button class="btn btn-primary btn-sm"
+                    @onclick='() => NavigationManager.NavigateTo($"/units/{_unit.UnitId}/edit")'>
                 Edit
-            </MudButton>
+            </button>
+        </Actions>
+    </PageHeader>
+
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div class="card border border-base-300 bg-base-100 shadow-none xl:col-span-1">
+            <div class="card-body p-0">
+                <div class="border-b border-base-300 p-5">
+                    <p class="text-sm font-semibold text-base-content">Unit Information</p>
+                </div>
+                <div class="space-y-3 p-5">
+                    @DetailField("Unit Number", DisplayValue(_unit.UnitNumber))
+                    @DetailField("Address", DisplayValue(_unit.Address))
+                    @DetailField("Phase", DisplayValue(_unit.Phase?.Name))
+                    @DetailField("Head Homeowner", DisplayValue(GetFullName(_unit.HeadHomeowner)))
+                </div>
+            </div>
+        </div>
+
+        <div class="card border border-base-300 bg-base-100 shadow-none xl:col-span-2">
+            <div class="card-body p-0">
+                <div class="border-b border-base-300 p-5">
+                    <p class="text-sm font-semibold text-base-content">Occupants</p>
+                    <p class="mt-0.5 text-xs text-base-content/40">Assign existing homeowners to this unit.</p>
+                </div>
+
+                <div class="border-b border-base-300 p-5">
+                    <div class="flex flex-wrap items-end gap-3">
+                        <div class="form-control min-w-[260px] flex-1">
+                            <label class="label py-0 pb-1">
+                                <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Add Occupant</span>
+                            </label>
+                            <select class="select select-bordered w-full" @bind="_selectedOccupantId">
+                                <option value="">Select homeowner...</option>
+                                @foreach (var homeowner in AssignableHomeowners)
+                                {
+                                    <option value="@homeowner.HomeownerId">@GetHomeownerDisplay(homeowner)</option>
+                                }
+                            </select>
+                        </div>
+                        <button class="btn btn-primary btn-sm" @onclick="AssignOccupantAsync">Assign Homeowner</button>
+                    </div>
+                </div>
+
+                <div class="p-5">
+                    @if (_occupants.Count == 0)
+                    {
+                        <EmptyState Title="No occupants assigned"
+                                    Subtitle="Assign an existing homeowner to start tracking unit occupancy."
+                                    Icon="○" />
+                    }
+                    else
+                    {
+                        <div class="overflow-x-auto">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                        <th>Homeowner</th>
+                                        <th>Status</th>
+                                        <th>Contact Number</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var occupant in _occupants)
+                                    {
+                                        <tr class="h-[52px] hover">
+                                            <td class="text-sm text-base-content">@GetFullName(occupant)</td>
+                                            <td><StatusChip Status="@occupant.Status" /></td>
+                                            <td class="text-sm text-base-content/60">@DisplayValue(occupant.ContactNumber)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <TableRecordCount From="1" To="@_occupants.Count" Total="@_occupants.Count" Entity="occupants" />
+                    }
+                </div>
+            </div>
         </div>
     </div>
-
-    <MudPaper Class="hrms-page-card" Style="padding: 24px; margin-bottom: 24px;" Elevation="0">
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Unit Information</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="3"><MudText><strong>Unit Number:</strong> @DisplayValue(_unit.UnitNumber)</MudText></MudItem>
-            <MudItem xs="12" sm="3"><MudText><strong>Address:</strong> @DisplayValue(_unit.Address)</MudText></MudItem>
-            <MudItem xs="12" sm="3"><MudText><strong>Phase:</strong> @DisplayValue(_unit.Phase?.Name)</MudText></MudItem>
-            <MudItem xs="12" sm="3"><MudText><strong>Head Homeowner:</strong> @DisplayValue(GetFullName(_unit.HeadHomeowner))</MudText></MudItem>
-        </MudGrid>
-    </MudPaper>
-
-    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-        <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px;">
-            <div>
-                <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Occupants</div>
-                <MudText Style="color: #64748B;">Assign existing homeowners to this unit.</MudText>
-            </div>
-
-            <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
-                <MudAutocomplete T="Homeowner"
-                                 Label="Add Occupant"
-                                 Value="_selectedOccupant"
-                                 ValueChanged="OnSelectedOccupantChanged"
-                                 SearchFunc="SearchAssignableHomeownersAsync"
-                                 ToStringFunc="GetHomeownerDisplay"
-                                 Variant="Variant.Outlined"
-                                 Clearable="true"
-                                 ResetValueOnEmptyText="true"
-                                 MaxItems="8"
-                                 Dense="true"
-                                 Style="min-width: 280px;" />
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AssignOccupantAsync">
-                    Assign Homeowner
-                </MudButton>
-            </div>
-        </div>
-
-        @if (_occupants.Count == 0)
-        {
-            <EmptyState Title="No occupants assigned"
-                        Subtitle="Assign an existing homeowner to start tracking unit occupancy."
-                        Icon="@Icons.Material.Filled.PeopleOutline" />
-        }
-        else
-        {
-            <MudTable T="Homeowner" Items="_occupants" Hover="false" Striped="false">
-                <HeaderContent>
-                    <MudTh>Homeowner</MudTh>
-                    <MudTh>Status</MudTh>
-                    <MudTh>Contact Number</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Homeowner">@GetFullName(context)</MudTd>
-                    <MudTd DataLabel="Status"><StatusChip Label="@context.Status" /></MudTd>
-                    <MudTd DataLabel="Contact Number">@DisplayValue(context.ContactNumber)</MudTd>
-                </RowTemplate>
-            </MudTable>
-            <TableRecordCount Count="_occupants.Count" EntityLabel="occupants" />
-        }
-    </MudPaper>
 }
 
 @code {
@@ -99,8 +115,20 @@ else
     private Unit? _unit;
     private List<Homeowner> _occupants = [];
     private List<Homeowner> _activeHomeowners = [];
-    private Homeowner? _selectedOccupant;
+    private int? _selectedOccupantId;
     private bool _isLoading = true;
+
+    private IEnumerable<Homeowner> AssignableHomeowners
+    {
+        get
+        {
+            var occupantIds = _occupants.Select(homeowner => homeowner.HomeownerId).ToHashSet();
+            return _activeHomeowners
+                .Where(homeowner => !occupantIds.Contains(homeowner.HomeownerId))
+                .OrderBy(homeowner => homeowner.LastName)
+                .ThenBy(homeowner => homeowner.FirstName);
+        }
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -113,7 +141,7 @@ else
         _unit = await UnitService.GetByIdAsync(Id);
         _occupants = await UnitService.GetOccupantsAsync(Id);
         _activeHomeowners = await HomeownerService.GetAllActiveAsync();
-        _selectedOccupant = null;
+        _selectedOccupantId = null;
         _isLoading = false;
     }
 
@@ -122,17 +150,11 @@ else
         NavigationManager.NavigateTo("/units");
     }
 
-    private Task OnSelectedOccupantChanged(Homeowner? homeowner)
-    {
-        _selectedOccupant = homeowner;
-        return Task.CompletedTask;
-    }
-
     private async Task AssignOccupantAsync()
     {
-        if (_selectedOccupant is null)
+        if (!_selectedOccupantId.HasValue)
         {
-            Snackbar.Add("Select a homeowner to assign.", Severity.Warning);
+            await JS.InvokeVoidAsync("hrms.showToast", "Select a homeowner to assign.", "warning");
             return;
         }
 
@@ -141,35 +163,15 @@ else
             return;
         }
 
-        var result = await UnitService.AssignHomeownerAsync(Id, _selectedOccupant.HomeownerId, AuthService.CurrentUser.UserId);
+        var result = await UnitService.AssignHomeownerAsync(Id, _selectedOccupantId.Value, AuthService.CurrentUser.UserId);
         if (!result.Success)
         {
-            Snackbar.Add(result.ErrorMessage ?? "Unable to assign homeowner.", Severity.Error);
+            await JS.InvokeVoidAsync("hrms.showToast", result.ErrorMessage ?? "Unable to assign homeowner.", "error");
             return;
         }
 
-        Snackbar.Add("Homeowner assigned successfully.", Severity.Success);
+        await JS.InvokeVoidAsync("hrms.showToast", "Homeowner assigned successfully.", "success");
         await LoadAsync();
-    }
-
-    private Task<IEnumerable<Homeowner>> SearchAssignableHomeownersAsync(string value, CancellationToken cancellationToken)
-    {
-        var occupantIds = _occupants
-            .Select(homeowner => homeowner.HomeownerId)
-            .ToHashSet();
-
-        IEnumerable<Homeowner> matches = _activeHomeowners
-            .Where(homeowner => !occupantIds.Contains(homeowner.HomeownerId))
-            .OrderBy(homeowner => homeowner.LastName)
-            .ThenBy(homeowner => homeowner.FirstName);
-
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            matches = matches.Where(homeowner =>
-                GetHomeownerDisplay(homeowner).Contains(value, StringComparison.OrdinalIgnoreCase));
-        }
-
-        return Task.FromResult(matches.Take(8));
     }
 
     private static string DisplayValue(string? value) =>
@@ -188,13 +190,8 @@ else
         return string.Join(" ", parts);
     }
 
-    private static string GetHomeownerDisplay(Homeowner? homeowner)
+    private static string GetHomeownerDisplay(Homeowner homeowner)
     {
-        if (homeowner is null)
-        {
-            return string.Empty;
-        }
-
         var fullName = GetFullName(homeowner);
         var unitNumber = string.IsNullOrWhiteSpace(homeowner.Unit?.UnitNumber) ? null : homeowner.Unit.UnitNumber;
 
@@ -202,4 +199,18 @@ else
             ? fullName
             : $"{fullName} ({unitNumber})";
     }
+
+    private static RenderFragment DetailField(string label, string value) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.OpenElement(1, "p");
+        builder.AddAttribute(2, "class", "text-[10.5px] font-semibold uppercase tracking-wide text-base-content/40");
+        builder.AddContent(3, label);
+        builder.CloseElement();
+        builder.OpenElement(4, "p");
+        builder.AddAttribute(5, "class", "mt-0.5 text-sm text-base-content");
+        builder.AddContent(6, value);
+        builder.CloseElement();
+        builder.CloseElement();
+    };
 }

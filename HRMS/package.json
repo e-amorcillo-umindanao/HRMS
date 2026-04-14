@@ -1,0 +1,21 @@
+{
+  "name": "hrms",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "css:build": "tailwindcss -i ./wwwroot/css/input.css -o ./wwwroot/css/output.css",
+    "css:watch": "tailwindcss -i ./wwwroot/css/input.css -o ./wwwroot/css/output.css --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "autoprefixer": "^10.5.0",
+    "chart.js": "^4.5.1",
+    "daisyui": "^4.12.24",
+    "tailwindcss": "^3.4.19"
+  }
+}

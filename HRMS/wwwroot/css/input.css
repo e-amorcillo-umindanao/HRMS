@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sidebar-width: 220px;
+  --topbar-height: 52px;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(var(--bc) / 0.2);
+  border-radius: 3px;
+}
+
+.violation-pill {
+  font-family: monospace;
+  font-size: 12px;
+  background: oklch(var(--b2));
+  color: oklch(var(--bc) / 0.6);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+.engagement-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: oklch(var(--b3));
+  overflow: hidden;
+}
+
+.engagement-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.kpi-card {
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.record-count {
+  font-size: 12.5px;
+  color: oklch(var(--bc) / 0.5);
+  margin-top: 0.75rem;
+}
+
+.record-count strong {
+  color: oklch(var(--bc));
+  font-weight: 500;
+}
+
+@layer components {
+  .nav-link {
+    @apply flex items-center gap-2 rounded-md px-2 py-2 text-sm text-neutral-content/70 transition-colors hover:bg-base-content/10 hover:text-neutral-content;
+  }
+
+  .nav-link.active {
+    @apply bg-base-content/10 text-neutral-content;
+  }
+}
+
+*, *::before, *::after {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.15s ease;
+}
+
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-sun {
+  display: none;
+}
+
+.icon-moon {
+  display: block;
+}
+
+[data-theme="business"] .icon-sun {
+  display: block;
+}
+
+[data-theme="business"] .icon-moon {
+  display: none;
+}

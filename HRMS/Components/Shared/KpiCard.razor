@@ -1,20 +1,13 @@
-<MudPaper Class="hrms-page-card" Style="@GetCardStyle()" Elevation="0">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-        <div>
-            <MudText Style="color: #64748B; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
-                @Title
-            </MudText>
-            <MudText Style="color: #1E293B; font-size: 1.75rem; font-weight: 700;">
-                @Value
-            </MudText>
-        </div>
-
-        @if (!string.IsNullOrWhiteSpace(Icon))
+<div class="card kpi-card border border-base-300 bg-base-100 shadow-none @ResolveAccentClass()">
+    <div class="card-body p-5">
+        <p class="text-xs font-semibold uppercase tracking-wide text-base-content/50">@DisplayLabel</p>
+        <p class="mt-1 text-3xl font-bold text-base-content">@DisplayValue</p>
+        @if (!string.IsNullOrWhiteSpace(DisplaySubtitle))
         {
-            <MudIcon Icon="@Icon" Size="Size.Large" Style="@($"color: {ResolveColor()};")" />
+            <p class="mt-0.5 text-xs text-base-content/40">@DisplaySubtitle</p>
         }
     </div>
-</MudPaper>
+</div>
 
 @code {
     [Parameter]
@@ -24,13 +17,45 @@
     public string Value { get; set; } = string.Empty;
 
     [Parameter]
-    public string? Icon { get; set; }
+    public string Subtitle { get; set; } = string.Empty;
 
     [Parameter]
-    public string? Color { get; set; }
+    public string AccentColor { get; set; } = "#3B5BDB";
 
-    private string GetCardStyle() => "padding: 16px;";
+    [Parameter]
+    public string Label { get; set; } = string.Empty;
 
-    private string ResolveColor() =>
-        string.IsNullOrWhiteSpace(Color) ? "#3B5BDB" : Color;
+    [Parameter]
+    public string Sub { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Accent { get; set; } = string.Empty;
+
+    private string DisplayLabel => string.IsNullOrWhiteSpace(Label) ? Title : Label;
+    private string DisplayValue => Value;
+    private string DisplaySubtitle => string.IsNullOrWhiteSpace(Sub) ? Subtitle : Sub;
+
+    private string ResolveAccentClass()
+    {
+        if (!string.IsNullOrWhiteSpace(Accent))
+        {
+            return Accent switch
+            {
+                "success" => "border-l-success",
+                "error" => "border-l-error",
+                "warning" => "border-l-warning",
+                "ghost" => "border-l-base-300",
+                _ => "border-l-primary"
+            };
+        }
+
+        return AccentColor switch
+        {
+            "#22C55E" => "border-l-success",
+            "#EF4444" => "border-l-error",
+            "#F59E0B" => "border-l-warning",
+            "#94A3B8" => "border-l-base-300",
+            _ => "border-l-primary"
+        };
+    }
 }

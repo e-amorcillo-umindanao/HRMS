@@ -10,65 +10,69 @@
 else if (_msme is null)
 {
     <PageHeader Title="MSME" Subtitle="The requested business could not be loaded." />
-    <MudPaper Class="hrms-page-card" Elevation="0">
+    <div class="card border border-base-300 bg-base-100 shadow-none">
         <EmptyState Title="No MSME available"
                     Subtitle="The requested business record could not be found."
-                    Icon="@Icons.Material.Filled.Storefront" />
-    </MudPaper>
+                    Icon="O" />
+    </div>
 }
 else
 {
-    <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap;">
-        <PageHeader Title="@_msme.BusinessName" Subtitle="MSME profile and interaction history" />
-        <div style="display: flex; gap: 12px;">
-            <MudButton Variant="Variant.Text" OnClick="GoBack">Back</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => NavigationManager.NavigateTo($"/msme/edit/{_msme.MSMEId}"))">
+    <PageHeader Title="@_msme.BusinessName" Subtitle="MSME profile and interaction history.">
+        <Actions>
+            <button class="btn btn-ghost btn-sm" @onclick="GoBack">Back</button>
+            <button class="btn btn-primary btn-sm"
+                    @onclick='() => NavigationManager.NavigateTo($"/msme/edit/{_msme.MSMEId}")'>
                 Edit
-            </MudButton>
+            </button>
+        </Actions>
+    </PageHeader>
+
+    <div class="mb-4 card border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-5">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                @DetailField("Business Name", DisplayValue(_msme.BusinessName))
+                @DetailField("Business Type", DisplayValue(_msme.BusinessType))
+                @DetailField("Status", DisplayValue(_msme.Status))
+                @DetailField("Unit", DisplayValue(_msme.Unit?.UnitNumber))
+                @DetailField("Contact Number", DisplayValue(_msme.ContactNumber))
+                @DetailField("Registration Date", FormatDate(_msme.RegistrationDate))
+                @DetailField("Expiry Date", FormatDate(_msme.ExpiryDate))
+                @DetailField("Description", DisplayValue(_msme.Description))
+                <div>
+                    <p class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/40">Owner</p>
+                    @if (_msme.Homeowner is null)
+                    {
+                        <p class="mt-0.5 text-sm text-base-content">-</p>
+                    }
+                    else
+                    {
+                        <button class="btn btn-ghost btn-xs h-auto min-h-0 px-0 text-primary"
+                                @onclick='() => NavigationManager.NavigateTo($"/homeowners/{_msme.HomeownerId}")'>
+                            @GetFullName(_msme.Homeowner)
+                        </button>
+                    }
+                </div>
+            </div>
         </div>
     </div>
 
-    <MudPaper Class="hrms-page-card" Style="padding: 24px; margin-bottom: 24px;" Elevation="0">
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Business Information</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="4"><MudText><strong>Business Name:</strong> @DisplayValue(_msme.BusinessName)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Business Type:</strong> @DisplayValue(_msme.BusinessType)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Status:</strong> <StatusChip Label="@_msme.Status" /></MudText></MudItem>
-            <MudItem xs="12" sm="4">
-                <MudText><strong>Owner:</strong></MudText>
-                @if (_msme.Homeowner is null)
-                {
-                    <MudText>-</MudText>
-                }
-                else
-                {
-                    <MudButton Variant="Variant.Text" Style="padding: 0; min-width: 0;" OnClick="@(() => NavigationManager.NavigateTo($"/homeowners/{_msme.HomeownerId}"))">
-                        @GetFullName(_msme.Homeowner)
-                    </MudButton>
-                }
-            </MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Unit:</strong> @DisplayValue(_msme.Unit?.UnitNumber)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Contact Number:</strong> @DisplayValue(_msme.ContactNumber)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Registration Date:</strong> @FormatDate(_msme.RegistrationDate)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Expiry Date:</strong> @FormatDate(_msme.ExpiryDate)</MudText></MudItem>
-            <MudItem xs="12"><MudText><strong>Description:</strong> @DisplayValue(_msme.Description)</MudText></MudItem>
-        </MudGrid>
-    </MudPaper>
-
-    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-        <div style="display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
-            <div>
-                <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Interaction History</div>
-                <MudText Style="color: #64748B;">Review all CRM touchpoints logged against this business.</MudText>
+    <div class="card border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-0">
+            <div class="border-b border-base-300 p-5">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <p class="text-sm font-semibold text-base-content">Interaction History</p>
+                        <p class="mt-0.5 text-xs text-base-content/40">Review all CRM touchpoints logged against this business.</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm" @onclick="LogInteraction">Log Interaction</button>
+                </div>
             </div>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LogInteraction">
-                Log Interaction
-            </MudButton>
+            <div class="p-5">
+                <InteractionTimeline Logs="_logs" />
+            </div>
         </div>
-
-        <InteractionTimeline Logs="_logs" />
-    </MudPaper>
+    </div>
 }
 
 @code {
@@ -117,4 +121,18 @@ else
 
         return parsed.ToString("MMMM dd, yyyy");
     }
+
+    private static RenderFragment DetailField(string label, string value) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.OpenElement(1, "p");
+        builder.AddAttribute(2, "class", "text-[10.5px] font-semibold uppercase tracking-wide text-base-content/40");
+        builder.AddContent(3, label);
+        builder.CloseElement();
+        builder.OpenElement(4, "p");
+        builder.AddAttribute(5, "class", "mt-0.5 text-sm text-base-content");
+        builder.AddContent(6, value);
+        builder.CloseElement();
+        builder.CloseElement();
+    };
 }

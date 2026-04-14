@@ -1,0 +1,352 @@
+@page "/profile"
+@using HRMS.Models
+@using HRMS.Services
+@inject AuthService AuthService
+@inject HomeownerService HomeownerService
+@inject DuesService DuesService
+@inject ViolationService ViolationService
+@inject ClearanceService ClearanceService
+
+<PageTitle>My Profile - HRMS</PageTitle>
+
+<PageHeader Title="My Profile"
+            Subtitle="Your personal records and account information." />
+
+@if (_loading)
+{
+    <LoadingSpinner />
+}
+else if (_homeowner is null)
+{
+    <div class="card border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body">
+            <EmptyState Title="Profile not linked"
+                        Subtitle="Your account has not been linked to a homeowner record yet. Please contact the HOA staff."
+                        Icon="!" />
+        </div>
+    </div>
+}
+else
+{
+    <div class="flex flex-col gap-4">
+        <div class="card border border-base-300 bg-base-100 shadow-none">
+            <div class="card-body p-0">
+                <div class="border-b border-base-300 p-5">
+                    <p class="text-sm font-semibold text-base-content">Personal Information</p>
+                    <p class="mt-0.5 text-xs text-base-content/40">Your registered profile and contact details.</p>
+                </div>
+
+                <div class="p-5">
+                    <div class="mb-5 flex flex-wrap items-center gap-5">
+                        <div class="avatar placeholder">
+                            <div class="w-14 rounded-full bg-primary text-primary-content">
+                                <span class="text-xl font-semibold">@GetInitials(_homeowner)</span>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-[15px] font-semibold text-base-content">@GetFullName(_homeowner)</p>
+                            <div class="mt-1.5">
+                                <StatusChip Status="@_homeowner.Status" />
+                            </div>
+                            <p class="mt-1 text-xs text-base-content/40">Resident since @FormatDate(_homeowner.ResidencySince)</p>
+                        </div>
+                    </div>
+
+                    <div class="divider my-0 mb-4"></div>
+
+                    <div class="grid grid-cols-1 gap-x-10 gap-y-5 md:grid-cols-2">
+                        @ProfileField("Birth Date", FormatDate(_homeowner.BirthDate))
+                        @ProfileField("Gender", DisplayValue(_homeowner.Gender))
+                        @ProfileField("Civil Status", DisplayValue(_homeowner.CivilStatus))
+                        @ProfileField("Contact", DisplayValue(_homeowner.ContactNumber))
+                        @ProfileField("Email", DisplayValue(_homeowner.Email))
+                        @ProfileField("Address", DisplayValue(_homeowner.Address))
+                        @ProfileField("Phase", DisplayValue(_homeowner.Phase?.Name))
+                        @ProfileField("Unit", DisplayValue(_homeowner.Unit?.UnitNumber))
+                        <div class="md:col-span-2">
+                            <p class="mb-2 text-[10.5px] font-semibold uppercase tracking-wide text-base-content/40">Categories</p>
+                            @if (GetCategories(_homeowner).Count == 0)
+                            {
+                                <span class="text-sm text-base-content/40">-</span>
+                            }
+                            else
+                            {
+                                @foreach (var category in GetCategories(_homeowner))
+                                {
+                                    <span class="badge badge-info badge-sm mr-1">@category</span>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border border-base-300 bg-base-100 shadow-none">
+            <div class="card-body p-0">
+                <div class="border-b border-base-300 p-5">
+                    <p class="text-sm font-semibold text-base-content">My Dues</p>
+                    <p class="mt-0.5 text-xs text-base-content/40">Your monthly dues and payment history.</p>
+                </div>
+
+                @if (_dues.Count == 0)
+                {
+                    <EmptyState Title="No dues records"
+                                Subtitle="No dues have been recorded for your account yet."
+                                Icon="O" />
+                }
+                else
+                {
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                    <th>Month & Year</th>
+                                    <th>Amount</th>
+                                    <th>Due Date</th>
+                                    <th>Paid Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var due in _dues)
+                                {
+                                    <tr class="h-[52px] hover">
+                                        <td class="text-sm text-base-content">@FormatMonthYear(due.Month, due.Year)</td>
+                                        <td class="text-sm font-medium text-base-content">@FormatCurrency(due.Amount)</td>
+                                        <td class="text-sm text-base-content/60">@FormatDate(due.DueDate)</td>
+                                        <td class="text-sm text-base-content/60">@FormatDate(due.PaidDate)</td>
+                                        <td><StatusChip Status="@due.Status" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="px-4 pb-4">
+                        <TableRecordCount From="1" To="@_dues.Count" Total="@_dues.Count" Entity="dues records" />
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card border border-base-300 bg-base-100 shadow-none">
+            <div class="card-body p-0">
+                <div class="border-b border-base-300 p-5">
+                    <p class="text-sm font-semibold text-base-content">My Violations</p>
+                    <p class="mt-0.5 text-xs text-base-content/40">Violation and incident records filed against your account.</p>
+                </div>
+
+                @if (_violations.Count == 0)
+                {
+                    <EmptyState Title="No violations on record"
+                                Subtitle="No violations have been filed against your account."
+                                Icon="O" />
+                }
+                else
+                {
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                    <th>Violation No.</th>
+                                    <th>Type</th>
+                                    <th>Date</th>
+                                    <th>Details</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var violation in _violations)
+                                {
+                                    <tr class="h-[52px] hover">
+                                        <td><span class="violation-pill">@DisplayValue(violation.ViolationNumber)</span></td>
+                                        <td><span class="badge badge-sm @GetViolationTypeBadge(violation.ViolationType)">@DisplayValue(violation.ViolationType)</span></td>
+                                        <td class="text-sm text-base-content/60">@FormatDate(violation.ViolationDate)</td>
+                                        <td class="max-w-[280px] overflow-hidden text-ellipsis whitespace-nowrap text-sm text-base-content/60">
+                                            @TruncateText(violation.Details, 60)
+                                        </td>
+                                        <td><StatusChip Status="@violation.Status" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="px-4 pb-4">
+                        <TableRecordCount From="1" To="@_violations.Count" Total="@_violations.Count" Entity="violations" />
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card border border-base-300 bg-base-100 shadow-none">
+            <div class="card-body p-0">
+                <div class="border-b border-base-300 p-5">
+                    <p class="text-sm font-semibold text-base-content">My Clearance Requests</p>
+                    <p class="mt-0.5 text-xs text-base-content/40">Your clearance and document request history.</p>
+                </div>
+
+                @if (_clearances.Count == 0)
+                {
+                    <EmptyState Title="No clearance requests"
+                                Subtitle="You have not filed any clearance or document requests yet."
+                                Icon="O" />
+                }
+                else
+                {
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                    <th>Type</th>
+                                    <th>Purpose</th>
+                                    <th>Requested</th>
+                                    <th>Processed</th>
+                                    <th>Valid Until</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var clearance in _clearances)
+                                {
+                                    <tr class="h-[52px] hover">
+                                        <td><span class="badge badge-sm @GetClearanceTypeBadge(clearance.ClearanceType)">@DisplayValue(clearance.ClearanceType)</span></td>
+                                        <td class="text-sm text-base-content/60">@DisplayValue(clearance.Purpose)</td>
+                                        <td class="text-sm text-base-content/60">@FormatDate(clearance.RequestedAt)</td>
+                                        <td class="text-sm text-base-content/60">@FormatDate(clearance.ProcessedAt)</td>
+                                        <td class="text-sm text-base-content/60">@FormatDate(clearance.ValidUntil)</td>
+                                        <td><StatusChip Status="@clearance.Status" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="px-4 pb-4">
+                        <TableRecordCount From="1" To="@_clearances.Count" Total="@_clearances.Count" Entity="requests" />
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private Homeowner? _homeowner;
+    private List<DuesRecord> _dues = [];
+    private List<ViolationRecord> _violations = [];
+    private List<ClearanceRequest> _clearances = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var homeownerId = AuthService.CurrentHomeownerId;
+
+        if (!homeownerId.HasValue)
+        {
+            _loading = false;
+            return;
+        }
+
+        var homeownerTask = HomeownerService.GetByIdAsync(homeownerId.Value);
+        var duesTask = DuesService.GetByHomeownerIdAsync(homeownerId.Value);
+        var violationsTask = ViolationService.GetByHomeownerIdAsync(homeownerId.Value);
+        var clearancesTask = ClearanceService.GetByHomeownerIdAsync(homeownerId.Value);
+
+        await Task.WhenAll(homeownerTask, duesTask, violationsTask, clearancesTask);
+
+        _homeowner = await homeownerTask;
+        _dues = await duesTask;
+        _violations = await violationsTask;
+        _clearances = await clearancesTask;
+        _loading = false;
+    }
+
+    private static string GetInitials(Homeowner homeowner)
+    {
+        var first = string.IsNullOrWhiteSpace(homeowner.FirstName) ? string.Empty : homeowner.FirstName[..1];
+        var last = string.IsNullOrWhiteSpace(homeowner.LastName) ? string.Empty : homeowner.LastName[..1];
+        return (first + last).ToUpperInvariant();
+    }
+
+    private static string GetFullName(Homeowner homeowner)
+    {
+        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
+            .Where(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.Join(" ", parts);
+    }
+
+    private static string DisplayValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string FormatDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed))
+        {
+            return "-";
+        }
+
+        return parsed.ToString("MMMM dd, yyyy");
+    }
+
+    private static string FormatMonthYear(int month, int year)
+    {
+        if (month < 1 || month > 12)
+        {
+            return "-";
+        }
+
+        return new DateTime(year, month, 1).ToString("MMMM yyyy");
+    }
+
+    private static string FormatCurrency(decimal amount) => $"PHP {amount:N2}";
+
+    private static List<string> GetCategories(Homeowner homeowner) =>
+        string.IsNullOrWhiteSpace(homeowner.Categories)
+            ? []
+            : homeowner.Categories
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+    private static string TruncateText(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "-";
+        }
+
+        return value.Length > maxLength ? $"{value[..maxLength]}..." : value;
+    }
+
+    private static string GetViolationTypeBadge(string? violationType) => violationType switch
+    {
+        "Noise Complaint" => "badge-warning",
+        "Unauthorized Construction" => "badge-error",
+        "Unpaid Dues" => "badge-error",
+        "Pet Violation" => "badge-success",
+        "Parking Violation" => "badge-info",
+        _ => "badge-ghost"
+    };
+
+    private static string GetClearanceTypeBadge(string? clearanceType) => clearanceType switch
+    {
+        "HOA Clearance" => "badge-info",
+        "Certificate of Residency" => "badge-success",
+        "Certificate of Good Standing" => "badge-success",
+        "Official Letter" => "badge-warning",
+        _ => "badge-ghost"
+    };
+
+    private static RenderFragment ProfileField(string label, string value) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.OpenElement(1, "p");
+        builder.AddAttribute(2, "class", "mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-base-content/40");
+        builder.AddContent(3, label);
+        builder.CloseElement();
+        builder.OpenElement(4, "p");
+        builder.AddAttribute(5, "class", "text-[13.5px] text-base-content");
+        builder.AddContent(6, value);
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+}

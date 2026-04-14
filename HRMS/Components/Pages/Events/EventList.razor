@@ -2,82 +2,115 @@
 @inject EventService EventService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
-<PageHeader Title="Events & Programs" Subtitle="Manage activities, programs, and attendance tracking." />
+<PageHeader Title="Events & Programs"
+            Subtitle="Manage activities, programs, and attendance tracking.">
+    <Actions>
+        <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/events/add")'>
+            Add Event
+        </button>
+    </Actions>
+</PageHeader>
 
-<MudPaper Class="hrms-page-card" Style="padding: 16px; margin-bottom: 24px;" Elevation="0">
-    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
-        <FieldGroup Label="Event Type" Style="min-width: 220px;">
-            <MudSelect T="string"
-                       Value="_eventTypeFilter"
-                       ValueChanged="OnEventTypeFilterChanged"
-                       Variant="Variant.Outlined">
-                <MudSelectItem T="string" Value="@string.Empty">All Event Types</MudSelectItem>
-                @foreach (var eventType in EventTypes)
-                {
-                    <MudSelectItem T="string" Value="@eventType">@eventType</MudSelectItem>
-                }
-            </MudSelect>
-        </FieldGroup>
-
-        <div style="margin-left: auto;">
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="/events/add">
-                Add Event
-            </MudButton>
+<div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
+    <div class="card-body p-4">
+        <div class="flex flex-wrap items-end gap-3">
+            <div class="form-control min-w-[200px]">
+                <label class="label py-0 pb-1">
+                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Event Type</span>
+                </label>
+                <select class="select select-bordered select-sm" value="@_eventTypeFilter" @onchange="OnEventTypeChanged">
+                    <option value="">All Event Types</option>
+                    @foreach (var eventType in EventTypes)
+                    {
+                        <option value="@eventType">@eventType</option>
+                    }
+                </select>
+            </div>
         </div>
     </div>
-</MudPaper>
+</div>
 
-@if (_isLoading)
-{
-    <LoadingSpinner />
-}
-else if (_events.Count == 0)
-{
-    <MudPaper Class="hrms-page-card" Elevation="0">
-        <EmptyState Title="No events found"
-                    Subtitle="Add an event to begin attendance tracking."
-                    Icon="@Icons.Material.Filled.EventBusy" />
-    </MudPaper>
-}
-else
-{
-    <MudPaper Class="hrms-page-card" Elevation="0">
-        <MudTable T="Event" Items="_events" Hover="false" Striped="false">
-            <HeaderContent>
-                <MudTh>Title</MudTh>
-                <MudTh>Event Type</MudTh>
-                <MudTh>Event Date &amp; Time</MudTh>
-                <MudTh>Venue</MudTh>
-                <MudTh>Attendee Count</MudTh>
-                <MudTh>Actions</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Title">@DisplayValue(context.Title)</MudTd>
-                <MudTd DataLabel="Event Type">@DisplayValue(context.EventType)</MudTd>
-                <MudTd DataLabel="Event Date &amp; Time">@FormatDateTime(context.EventDate)</MudTd>
-                <MudTd DataLabel="Venue">@DisplayValue(context.Venue)</MudTd>
-                <MudTd DataLabel="Attendee Count">@GetAttendeeCount(context)</MudTd>
-                <MudTd DataLabel="Actions">
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/events/{context.EventId}"))">
-                            View
-                        </MudButton>
-                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/events/edit/{context.EventId}"))">
-                            Edit
-                        </MudButton>
-                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => PromptDeleteAsync(context))">
-                            Delete
-                        </MudButton>
-                    </div>
-                </MudTd>
-            </RowTemplate>
-        </MudTable>
-    </MudPaper>
-    <TableRecordCount Count="_events.Count" EntityLabel="events" />
-}
+<div class="card border border-base-300 bg-base-100 shadow-none">
+    <div class="card-body p-0">
+        @if (_isLoading)
+        {
+            <LoadingSpinner />
+        }
+        else if (_events.Count == 0)
+        {
+            <EmptyState Title="No events found"
+                        Subtitle="Add an event to begin attendance tracking."
+                        Icon="○" />
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                            <th>Title</th>
+                            <th>Event Type</th>
+                            <th>Event Date</th>
+                            <th>Venue</th>
+                            <th>Attendance</th>
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var evt in _events)
+                        {
+                            <tr class="h-[52px] hover">
+                                <td class="text-sm text-base-content">@DisplayValue(evt.Title)</td>
+                                <td>
+                                    @if (string.IsNullOrWhiteSpace(evt.EventType))
+                                    {
+                                        <span class="text-sm text-base-content/30">-</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-sm @GetEventTypeBadge(evt.EventType)">@evt.EventType</span>
+                                    }
+                                </td>
+                                <td class="text-sm text-base-content/60">@FormatDateTime(evt.EventDate)</td>
+                                <td class="text-sm text-base-content/60">@DisplayValue(evt.Venue)</td>
+                                <td class="text-sm text-base-content/60">@GetAttendeeCount(evt)</td>
+                                <td class="text-right">
+                                    <button class="btn btn-ghost btn-xs"
+                                            @onclick='() => NavigationManager.NavigateTo($"/events/{evt.EventId}")'>
+                                        View
+                                    </button>
+                                    <button class="btn btn-ghost btn-xs"
+                                            @onclick='() => NavigationManager.NavigateTo($"/events/edit/{evt.EventId}")'>
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-ghost btn-xs text-error"
+                                            @onclick='() => AskDelete(evt)'>
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-4 pb-4">
+                <TableRecordCount From="@(_events.Count == 0 ? 0 : 1)"
+                                  To="@_events.Count"
+                                  Total="@_events.Count"
+                                  Entity="events" />
+            </div>
+        }
+    </div>
+</div>
+
+<ConfirmDialog IsVisible="@_showConfirm"
+               Title="Delete Event"
+               Message="@_confirmMessage"
+               ConfirmLabel="Delete"
+               OnConfirm="DeleteConfirmedAsync"
+               OnCancel="CancelDelete" />
 
 @code {
     private static readonly string[] EventTypes = ["Assembly", "Livelihood", "Health", "Relief", "Other"];
@@ -85,6 +118,9 @@ else
     private List<Event> _events = [];
     private string _eventTypeFilter = string.Empty;
     private bool _isLoading = true;
+    private bool _showConfirm;
+    private int? _pendingDeleteId;
+    private string _confirmMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -104,39 +140,45 @@ else
         _isLoading = false;
     }
 
-    private async Task OnEventTypeFilterChanged(string value)
+    private async Task OnEventTypeChanged(ChangeEventArgs args)
     {
-        _eventTypeFilter = value;
+        _eventTypeFilter = args.Value?.ToString() ?? string.Empty;
         await LoadEventsAsync();
     }
 
-    private async Task PromptDeleteAsync(Event evt)
+    private void AskDelete(Event evt)
     {
-        var parameters = new DialogParameters
-        {
-            [nameof(ConfirmDialog.Title)] = "Delete Event",
-            [nameof(ConfirmDialog.Message)] = $"Are you sure you want to delete '{evt.Title}'?",
-            [nameof(ConfirmDialog.OnConfirm)] = EventCallback.Factory.Create(this, async () => await DeleteAsync(evt.EventId))
-        };
-
-        await DialogService.ShowAsync<ConfirmDialog>(string.Empty, parameters);
+        _pendingDeleteId = evt.EventId;
+        _confirmMessage = $"Are you sure you want to delete '{evt.Title}'?";
+        _showConfirm = true;
     }
 
-    private async Task DeleteAsync(int eventId)
+    private Task CancelDelete()
     {
-        if (AuthService.CurrentUser is null)
+        _showConfirm = false;
+        _pendingDeleteId = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteConfirmedAsync()
+    {
+        _showConfirm = false;
+
+        if (!_pendingDeleteId.HasValue || AuthService.CurrentUser is null)
         {
             return;
         }
 
-        var deleted = await EventService.DeleteAsync(eventId, AuthService.CurrentUser.UserId);
+        var deleted = await EventService.DeleteAsync(_pendingDeleteId.Value, AuthService.CurrentUser.UserId);
+        _pendingDeleteId = null;
+
         if (!deleted)
         {
-            Snackbar.Add("Unable to delete event.", Severity.Error);
+            await JS.InvokeVoidAsync("hrms.showToast", "Unable to delete event.", "error");
             return;
         }
 
-        Snackbar.Add("Event deleted successfully.", Severity.Success);
+        await JS.InvokeVoidAsync("hrms.showToast", "Event deleted successfully.", "success");
         await LoadEventsAsync();
     }
 
@@ -155,4 +197,13 @@ else
 
         return parsed.ToString("MMMM dd, yyyy h:mm tt");
     }
+
+    private static string GetEventTypeBadge(string? eventType) => eventType switch
+    {
+        "Assembly" => "badge-info",
+        "Livelihood" => "badge-success",
+        "Health" => "badge-success",
+        "Relief" => "badge-warning",
+        _ => "badge-ghost"
+    };
 }

@@ -1,97 +1,78 @@
 @page "/reports"
 @inject ReportService ReportService
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
-<PageHeader Title="Reports" />
+<PageHeader Title="Reports"
+            Subtitle="Export homeowner, dues, violation, and clearance data to PDF or Excel." />
 
-<MudPaper Class="hrms-page-card" Style="padding: 8px 8px 16px;" Elevation="0">
-    <MudExpansionPanels MultiExpansion="true">
-        <MudExpansionPanel Text="Homeowners" Expanded="true">
-            <MudText Style="color: #64748B; margin-bottom: 16px;">
-                All registered homeowner profiles and status records
-            </MudText>
-            <div style="display: flex; flex-wrap: wrap; gap: 12px;">
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_isExporting" OnClick="ExportHomeownersPdfAsync">
-                    Export to PDF
-                </MudButton>
-                <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="_isExporting" OnClick="ExportHomeownersExcelAsync">
-                    Export to Excel
-                </MudButton>
-            </div>
-        </MudExpansionPanel>
-
-        <MudExpansionPanel Text="Dues" Expanded="true">
-            <MudText Style="color: #64748B; margin-bottom: 16px;">
-                Monthly dues records with payment status
-            </MudText>
-
-            <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin-bottom: 16px;">
-                <FieldGroup Label="Month" Style="min-width: 180px;">
-                    <MudSelect T="int?"
-                               @bind-Value="_selectedMonth"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="int?" Value="@((int?)null)">All Months</MudSelectItem>
-                        @foreach (var month in Enumerable.Range(1, 12))
-                        {
-                            <MudSelectItem T="int?" Value="@((int?)month)">@GetMonthName(month)</MudSelectItem>
-                        }
-                    </MudSelect>
-                </FieldGroup>
-
-                <FieldGroup Label="Year" Style="min-width: 160px;">
-                    <MudSelect T="int?"
-                               @bind-Value="_selectedYear"
-                               Variant="Variant.Outlined">
-                        <MudSelectItem T="int?" Value="@((int?)null)">All Years</MudSelectItem>
-                        @foreach (var year in _yearOptions)
-                        {
-                            <MudSelectItem T="int?" Value="@((int?)year)">@year</MudSelectItem>
-                        }
-                    </MudSelect>
-                </FieldGroup>
+<div class="flex flex-col gap-4">
+@foreach (var reportItem in ReportSections)
+{
+    <div class="card border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-0">
+            <div class="border-b border-base-300 p-5">
+                <p class="text-sm font-semibold text-base-content">@reportItem.Title</p>
+                <p class="mt-0.5 text-xs text-base-content/40">@reportItem.Description</p>
             </div>
 
-            <div style="display: flex; flex-wrap: wrap; gap: 12px;">
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_isExporting" OnClick="ExportDuesPdfAsync">
-                    Export to PDF
-                </MudButton>
-                <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="_isExporting" OnClick="ExportDuesExcelAsync">
-                    Export to Excel
-                </MudButton>
-            </div>
-        </MudExpansionPanel>
+            @if (reportItem.Key == "dues")
+            {
+                    <div class="px-5 pt-5">
+                        <div class="flex flex-wrap gap-3">
+                            <div class="form-control min-w-[160px]">
+                                <label class="label py-0 pb-1">
+                                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Month</span>
+                                </label>
+                                <select class="select select-bordered select-sm" value="@GetNullableIntValue(_selectedMonth)" @onchange="OnMonthChanged">
+                                    <option value="">All Months</option>
+                                    @foreach (var month in Enumerable.Range(1, 12))
+                                    {
+                                        <option value="@month">@GetMonthName(month)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="form-control min-w-[140px]">
+                                <label class="label py-0 pb-1">
+                                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Year</span>
+                                </label>
+                                <select class="select select-bordered select-sm" value="@GetNullableIntValue(_selectedYear)" @onchange="OnYearChanged">
+                                    <option value="">All Years</option>
+                                    @foreach (var year in _yearOptions)
+                                    {
+                                        <option value="@year">@year</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                }
 
-        <MudExpansionPanel Text="Violations" Expanded="true">
-            <MudText Style="color: #64748B; margin-bottom: 16px;">
-                Filed violation and incident reports
-            </MudText>
-            <div style="display: flex; flex-wrap: wrap; gap: 12px;">
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_isExporting" OnClick="ExportViolationsPdfAsync">
-                    Export to PDF
-                </MudButton>
-                <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="_isExporting" OnClick="ExportViolationsExcelAsync">
-                    Export to Excel
-                </MudButton>
+                <div class="flex gap-3 p-5">
+                    <button class="btn btn-primary btn-sm"
+                            disabled="@_isExporting"
+                            @onclick="() => ExportPdfAsync(reportItem.Key)">
+                        Export to PDF
+                    </button>
+                    <button class="btn btn-outline btn-primary btn-sm"
+                            disabled="@_isExporting"
+                            @onclick="() => ExportExcelAsync(reportItem.Key)">
+                        Export to Excel
+                    </button>
+                </div>
             </div>
-        </MudExpansionPanel>
-
-        <MudExpansionPanel Text="Clearances" Expanded="true">
-            <MudText Style="color: #64748B; margin-bottom: 16px;">
-                HOA clearance and document requests
-            </MudText>
-            <div style="display: flex; flex-wrap: wrap; gap: 12px;">
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_isExporting" OnClick="ExportClearancesPdfAsync">
-                    Export to PDF
-                </MudButton>
-                <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="_isExporting" OnClick="ExportClearancesExcelAsync">
-                    Export to Excel
-                </MudButton>
-            </div>
-        </MudExpansionPanel>
-    </MudExpansionPanels>
-</MudPaper>
+        </div>
+    }
+</div>
 
 @code {
+    private static readonly ReportSection[] ReportSections =
+    [
+        new("homeowners", "Homeowners", "All registered homeowner profiles and status records."),
+        new("dues", "Dues", "Monthly dues records with payment status."),
+        new("violations", "Violations", "Filed violation and incident reports."),
+        new("clearances", "Clearances", "HOA clearance and document requests.")
+    ];
+
     private bool _isExporting;
     private int? _selectedMonth;
     private int? _selectedYear = DateTime.UtcNow.Year;
@@ -105,29 +86,43 @@
             .ToList();
     }
 
-    private async Task ExportHomeownersPdfAsync() =>
-        await ExportAsync(() => ReportService.ExportHomeownersToPdfAsync(), $"homeowners_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
+    private async Task ExportPdfAsync(string key)
+    {
+        switch (key)
+        {
+            case "homeowners":
+                await ExportAsync(() => ReportService.ExportHomeownersToPdfAsync(), $"homeowners_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
+                break;
+            case "dues":
+                await ExportAsync(() => ReportService.ExportDuesToPdfAsync(_selectedMonth, _selectedYear), $"dues_report_{BuildDuesFileSuffix()}.pdf");
+                break;
+            case "violations":
+                await ExportAsync(() => ReportService.ExportViolationsToPdfAsync(), $"violations_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
+                break;
+            case "clearances":
+                await ExportAsync(() => ReportService.ExportClearancesToPdfAsync(), $"clearances_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
+                break;
+        }
+    }
 
-    private async Task ExportHomeownersExcelAsync() =>
-        await ExportAsync(() => ReportService.ExportHomeownersToExcelAsync(), $"homeowners_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
-
-    private async Task ExportDuesPdfAsync() =>
-        await ExportAsync(() => ReportService.ExportDuesToPdfAsync(_selectedMonth, _selectedYear), $"dues_report_{BuildDuesFileSuffix()}.pdf");
-
-    private async Task ExportDuesExcelAsync() =>
-        await ExportAsync(() => ReportService.ExportDuesToExcelAsync(_selectedMonth, _selectedYear), $"dues_report_{BuildDuesFileSuffix()}.xlsx");
-
-    private async Task ExportViolationsPdfAsync() =>
-        await ExportAsync(() => ReportService.ExportViolationsToPdfAsync(), $"violations_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
-
-    private async Task ExportViolationsExcelAsync() =>
-        await ExportAsync(() => ReportService.ExportViolationsToExcelAsync(), $"violations_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
-
-    private async Task ExportClearancesPdfAsync() =>
-        await ExportAsync(() => ReportService.ExportClearancesToPdfAsync(), $"clearances_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
-
-    private async Task ExportClearancesExcelAsync() =>
-        await ExportAsync(() => ReportService.ExportClearancesToExcelAsync(), $"clearances_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
+    private async Task ExportExcelAsync(string key)
+    {
+        switch (key)
+        {
+            case "homeowners":
+                await ExportAsync(() => ReportService.ExportHomeownersToExcelAsync(), $"homeowners_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
+                break;
+            case "dues":
+                await ExportAsync(() => ReportService.ExportDuesToExcelAsync(_selectedMonth, _selectedYear), $"dues_report_{BuildDuesFileSuffix()}.xlsx");
+                break;
+            case "violations":
+                await ExportAsync(() => ReportService.ExportViolationsToExcelAsync(), $"violations_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
+                break;
+            case "clearances":
+                await ExportAsync(() => ReportService.ExportClearancesToExcelAsync(), $"clearances_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
+                break;
+        }
+    }
 
     private async Task ExportAsync(Func<Task<byte[]>> exportFunc, string fileName)
     {
@@ -136,11 +131,11 @@
             _isExporting = true;
             var bytes = await exportFunc();
             await SaveAndOpenAsync(bytes, fileName);
-            Snackbar.Add($"Export generated: {fileName}", Severity.Success);
+            await JS.InvokeVoidAsync("hrms.showToast", $"Export generated: {fileName}", "success");
         }
         catch (Exception exception)
         {
-            Snackbar.Add(exception.Message, Severity.Error);
+            await JS.InvokeVoidAsync("hrms.showToast", exception.Message, "error");
         }
         finally
         {
@@ -159,12 +154,20 @@
                 new Microsoft.Maui.Storage.ReadOnlyFile(filePath)));
     }
 
+    private void OnMonthChanged(ChangeEventArgs args) =>
+        _selectedMonth = int.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
+
+    private void OnYearChanged(ChangeEventArgs args) =>
+        _selectedYear = int.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
+
     private string BuildDuesFileSuffix()
     {
         var monthPart = _selectedMonth.HasValue ? GetMonthName(_selectedMonth.Value).Replace(" ", string.Empty) : "all-months";
         var yearPart = _selectedYear.HasValue ? _selectedYear.Value.ToString() : "all-years";
         return $"{monthPart}_{yearPart}_{DateTime.UtcNow:yyyyMMdd}";
     }
+
+    private static string GetNullableIntValue(int? value) => value?.ToString() ?? string.Empty;
 
     private static string GetMonthName(int month)
     {
@@ -175,4 +178,6 @@
 
         return System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
     }
+
+    private sealed record ReportSection(string Key, string Title, string Description);
 }

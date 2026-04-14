@@ -1,11 +1,13 @@
 @page "/msme/add"
+@page "/msme/new"
 @page "/msme/edit/{MSMEId:int}"
+@page "/msme/{MSMEId:int}/edit"
 @inject MSMEService MSMEService
 @inject HomeownerService HomeownerService
 @inject UnitService UnitService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageHeader Title="@(IsEdit ? "Edit MSME" : "Register Business")"
             Subtitle="Capture business, owner, and registration details." />
@@ -16,87 +18,99 @@
 }
 else
 {
-    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-        @if (!string.IsNullOrWhiteSpace(_errorMessage))
-        {
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
-                @_errorMessage
-            </MudAlert>
-        }
+    <div class="card max-w-3xl border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-6">
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div role="alert" class="alert alert-error mb-4">
+                    <span>@_errorMessage</span>
+                </div>
+            }
 
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Business Information</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudTextField T="string" Label="Business Name" @bind-Value="_model.BusinessName" Variant="Variant.Outlined" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="string" Label="Business Type" @bind-Value="_model.BusinessType" Variant="Variant.Outlined">
-                    @foreach (var businessType in BusinessTypeOptions)
-                    {
-                        <MudSelectItem T="string" Value="@businessType">@businessType</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudAutocomplete T="Homeowner"
-                                 Label="Owner"
-                                 Value="_selectedOwner"
-                                 ValueChanged="OnOwnerChanged"
-                                 SearchFunc="SearchOwnersAsync"
-                                 ToStringFunc="GetHomeownerDisplay"
-                                 Variant="Variant.Outlined"
-                                 Clearable="true"
-                                 ResetValueOnEmptyText="true"
-                                 MaxItems="8"
-                                 Dense="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="int?" Label="Unit" @bind-Value="_model.UnitId" Variant="Variant.Outlined">
-                    <MudSelectItem T="int?" Value="@((int?)null)">-</MudSelectItem>
-                    @foreach (var unit in _units)
-                    {
-                        <MudSelectItem T="int?" Value="@unit.UnitId">@($"{unit.UnitNumber} - {unit.Address}")</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-        </MudGrid>
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-base-content/40">Business Information</p>
+            <div class="divider my-0 mb-4"></div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FieldGroup Label="Business Name">
+                    <input type="text" class="input input-bordered w-full" @bind="_model.BusinessName" />
+                </FieldGroup>
+                <FieldGroup Label="Business Type">
+                    <select class="select select-bordered w-full" @bind="_model.BusinessType">
+                        <option value="">Select business type</option>
+                        @foreach (var businessType in BusinessTypeOptions)
+                        {
+                            <option value="@businessType">@businessType</option>
+                        }
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Owner">
+                    <select class="select select-bordered w-full" @bind="_selectedOwnerId">
+                        <option value="">Select owner...</option>
+                        @foreach (var homeowner in _activeHomeowners.OrderBy(GetHomeownerDisplay))
+                        {
+                            <option value="@homeowner.HomeownerId">@GetHomeownerDisplay(homeowner)</option>
+                        }
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Unit">
+                    <select class="select select-bordered w-full" @bind="_model.UnitId">
+                        <option value="">-</option>
+                        @foreach (var unit in _units)
+                        {
+                            <option value="@unit.UnitId">@($"{unit.UnitNumber} - {unit.Address}")</option>
+                        }
+                    </select>
+                </FieldGroup>
+            </div>
 
-        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Registration Details</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="4">
-                <MudDatePicker Label="Registration Date" DateFormat="MMMM dd, yyyy" @bind-Date="_registrationDate" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="4">
-                <MudDatePicker Label="Expiry Date" DateFormat="MMMM dd, yyyy" @bind-Date="_expiryDate" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="4">
-                <MudSelect T="string" Label="Status" @bind-Value="_model.Status" Variant="Variant.Outlined">
-                    @foreach (var status in StatusOptions)
-                    {
-                        <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-        </MudGrid>
+            <p class="mb-2 mt-8 text-xs font-semibold uppercase tracking-wide text-base-content/40">Registration Details</p>
+            <div class="divider my-0 mb-4"></div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <FieldGroup Label="Registration Date">
+                    <input type="date"
+                           class="input input-bordered w-full"
+                           value="@FormatHtmlDate(_registrationDate)"
+                           @onchange="OnRegistrationDateChanged" />
+                </FieldGroup>
+                <FieldGroup Label="Expiry Date">
+                    <input type="date"
+                           class="input input-bordered w-full"
+                           value="@FormatHtmlDate(_expiryDate)"
+                           @onchange="OnExpiryDateChanged" />
+                </FieldGroup>
+                <FieldGroup Label="Status">
+                    <select class="select select-bordered w-full" @bind="_model.Status">
+                        @foreach (var status in StatusOptions)
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
+                </FieldGroup>
+            </div>
 
-        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Additional Information</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudTextField T="string" Label="Contact Number" @bind-Value="_model.ContactNumber" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField T="string" Label="Description" @bind-Value="_model.Description" Variant="Variant.Outlined" Lines="4" />
-            </MudItem>
-        </MudGrid>
-
-        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
-            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+            <p class="mb-2 mt-8 text-xs font-semibold uppercase tracking-wide text-base-content/40">Additional Information</p>
+            <div class="divider my-0 mb-4"></div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FieldGroup Label="Contact Number">
+                    <input type="text" class="input input-bordered w-full" @bind="_model.ContactNumber" />
+                </FieldGroup>
+                <div class="md:col-span-2">
+                    <FieldGroup Label="Description">
+                        <textarea class="textarea textarea-bordered h-28 w-full resize-none" @bind="_model.Description"></textarea>
+                    </FieldGroup>
+                </div>
+            </div>
         </div>
-    </MudPaper>
+        <div class="flex justify-end gap-3 border-t border-base-300 px-6 py-4">
+            <button class="btn btn-ghost btn-sm" @onclick="Cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveAsync" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="loading loading-spinner loading-xs"></span>
+                }
+                Save
+            </button>
+        </div>
+    </div>
 }
 
 @code {
@@ -118,10 +132,11 @@ else
     private readonly MSMEFormModel _model = new();
     private List<Homeowner> _activeHomeowners = [];
     private List<Unit> _units = [];
-    private Homeowner? _selectedOwner;
+    private int? _selectedOwnerId;
     private DateTime? _registrationDate;
     private DateTime? _expiryDate;
     private bool _isLoading = true;
+    private bool _isSaving;
     private string? _errorMessage;
 
     private bool IsEdit => MSMEId.HasValue;
@@ -153,8 +168,7 @@ else
             _model.Description = msme.Description ?? string.Empty;
             _registrationDate = ParseDate(msme.RegistrationDate);
             _expiryDate = ParseDate(msme.ExpiryDate);
-
-            _selectedOwner = _activeHomeowners.FirstOrDefault(homeowner => homeowner.HomeownerId == msme.HomeownerId);
+            _selectedOwnerId = msme.HomeownerId;
         }
         else
         {
@@ -167,17 +181,19 @@ else
     private async Task SaveAsync()
     {
         _errorMessage = Validate();
-        if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null || _selectedOwner is null)
+        if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null || !_selectedOwnerId.HasValue)
         {
             return;
         }
+
+        _isSaving = true;
 
         var msme = new MSME
         {
             MSMEId = _model.MSMEId ?? 0,
             BusinessName = _model.BusinessName.Trim(),
             BusinessType = _model.BusinessType,
-            HomeownerId = _selectedOwner.HomeownerId,
+            HomeownerId = _selectedOwnerId.Value,
             UnitId = _model.UnitId,
             ContactNumber = NullIfEmpty(_model.ContactNumber),
             Description = NullIfEmpty(_model.Description),
@@ -189,21 +205,23 @@ else
         if (IsEdit)
         {
             var updated = await MSMEService.UpdateAsync(msme, AuthService.CurrentUser.UserId);
+            _isSaving = false;
+
             if (updated is null)
             {
                 _errorMessage = "Unable to update MSME.";
                 return;
             }
 
-            Snackbar.Add("MSME updated successfully.", Severity.Success);
+            await JS.InvokeVoidAsync("hrms.showToast", "MSME updated successfully.", "success");
             NavigationManager.NavigateTo($"/msme/{updated.MSMEId}");
+            return;
         }
-        else
-        {
-            var created = await MSMEService.AddAsync(msme, AuthService.CurrentUser.UserId);
-            Snackbar.Add("MSME registered successfully.", Severity.Success);
-            NavigationManager.NavigateTo($"/msme/{created.MSMEId}");
-        }
+
+        var created = await MSMEService.AddAsync(msme, AuthService.CurrentUser.UserId);
+        _isSaving = false;
+        await JS.InvokeVoidAsync("hrms.showToast", "MSME registered successfully.", "success");
+        NavigationManager.NavigateTo($"/msme/{created.MSMEId}");
     }
 
     private void Cancel()
@@ -223,7 +241,7 @@ else
             return "Business Type is required.";
         }
 
-        if (_selectedOwner is null)
+        if (!_selectedOwnerId.HasValue)
         {
             return "Owner is required.";
         }
@@ -250,39 +268,19 @@ else
         _model.Status = "Active";
         _model.ContactNumber = string.Empty;
         _model.Description = string.Empty;
-        _selectedOwner = null;
+        _selectedOwnerId = null;
         _registrationDate = null;
         _expiryDate = null;
     }
 
-    private Task OnOwnerChanged(Homeowner? homeowner)
+    private void OnRegistrationDateChanged(ChangeEventArgs args) =>
+        _registrationDate = DateTime.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
+
+    private void OnExpiryDateChanged(ChangeEventArgs args) =>
+        _expiryDate = DateTime.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
+
+    private static string GetHomeownerDisplay(Homeowner homeowner)
     {
-        _selectedOwner = homeowner;
-        return Task.CompletedTask;
-    }
-
-    private Task<IEnumerable<Homeowner>> SearchOwnersAsync(string value, CancellationToken cancellationToken)
-    {
-        IEnumerable<Homeowner> matches = _activeHomeowners
-            .OrderBy(homeowner => homeowner.LastName)
-            .ThenBy(homeowner => homeowner.FirstName);
-
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            matches = matches.Where(homeowner =>
-                GetHomeownerDisplay(homeowner).Contains(value, StringComparison.OrdinalIgnoreCase));
-        }
-
-        return Task.FromResult(matches.Take(8));
-    }
-
-    private static string GetHomeownerDisplay(Homeowner? homeowner)
-    {
-        if (homeowner is null)
-        {
-            return string.Empty;
-        }
-
         var fullName = GetFullName(homeowner);
         var unitNumber = string.IsNullOrWhiteSpace(homeowner.Unit?.UnitNumber) ? null : homeowner.Unit.UnitNumber;
 
@@ -304,6 +302,9 @@ else
 
     private static string ToIsoDateString(DateTime value) =>
         DateTime.SpecifyKind(value.Date, DateTimeKind.Utc).ToString("o");
+
+    private static string FormatHtmlDate(DateTime? value) =>
+        value?.ToString("yyyy-MM-dd") ?? string.Empty;
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

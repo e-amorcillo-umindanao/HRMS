@@ -4,7 +4,7 @@
 @inject HomeownerService HomeownerService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 @if (_isLoading)
 {
@@ -13,87 +13,97 @@
 else if (_event is null)
 {
     <PageHeader Title="Event" Subtitle="The requested event could not be loaded." />
-    <MudPaper Class="hrms-page-card" Elevation="0">
+    <div class="card border border-base-300 bg-base-100 shadow-none">
         <EmptyState Title="No event available"
                     Subtitle="The requested event record could not be found."
-                    Icon="@Icons.Material.Filled.EventBusy" />
-    </MudPaper>
+                    Icon="O" />
+    </div>
 }
 else
 {
-    <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap;">
-        <PageHeader Title="@_event.Title" Subtitle="Event details and attendance recording" />
-        <div style="display: flex; gap: 12px;">
-            <MudButton Variant="Variant.Text" OnClick="GoBack">Back</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => NavigationManager.NavigateTo($"/events/edit/{_event.EventId}"))">
+    <PageHeader Title="@_event.Title" Subtitle="Event details and attendance recording.">
+        <Actions>
+            <button class="btn btn-ghost btn-sm" @onclick="GoBack">Back</button>
+            <button class="btn btn-primary btn-sm"
+                    @onclick='() => NavigationManager.NavigateTo($"/events/edit/{_event.EventId}")'>
                 Edit
-            </MudButton>
+            </button>
+        </Actions>
+    </PageHeader>
+
+    <div class="mb-4 card border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-5">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                @DetailField("Title", DisplayValue(_event.Title))
+                @DetailField("Event Type", DisplayValue(_event.EventType))
+                @DetailField("Event Date", FormatDateTime(_event.EventDate))
+                @DetailField("Venue", DisplayValue(_event.Venue))
+                @DetailField("Description", DisplayValue(_event.Description))
+            </div>
         </div>
     </div>
 
-    <MudPaper Class="hrms-page-card" Style="padding: 24px; margin-bottom: 24px;" Elevation="0">
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Event Information</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="3"><MudText><strong>Title:</strong> @DisplayValue(_event.Title)</MudText></MudItem>
-            <MudItem xs="12" sm="3"><MudText><strong>Event Type:</strong> @DisplayValue(_event.EventType)</MudText></MudItem>
-            <MudItem xs="12" sm="3"><MudText><strong>Event Date:</strong> @FormatDateTime(_event.EventDate)</MudText></MudItem>
-            <MudItem xs="12" sm="3"><MudText><strong>Venue:</strong> @DisplayValue(_event.Venue)</MudText></MudItem>
-            <MudItem xs="12"><MudText><strong>Description:</strong> @DisplayValue(_event.Description)</MudText></MudItem>
-        </MudGrid>
-    </MudPaper>
-
-    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-        <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap;">
-            <div>
-                <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Attendance</div>
-                <MudText Style="color: #64748B;">Record Present, Absent, or Excused for each active homeowner.</MudText>
+    <div class="card border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-0">
+            <div class="border-b border-base-300 p-5">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <p class="text-sm font-semibold text-base-content">Attendance</p>
+                        <p class="mt-0.5 text-xs text-base-content/40">Record Present, Absent, or Excused for each active homeowner.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="badge badge-success badge-sm">Present: @PresentCount</span>
+                        <span class="badge badge-error badge-sm">Absent: @AbsentCount</span>
+                        <span class="badge badge-warning badge-sm">Excused: @ExcusedCount</span>
+                    </div>
+                </div>
             </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                @((MarkupString)RenderSummaryChip("Present", PresentCount))
-                @((MarkupString)RenderSummaryChip("Absent", AbsentCount))
-                @((MarkupString)RenderSummaryChip("Excused", ExcusedCount))
+
+            <div class="p-5">
+                @if (_rows.Count == 0)
+                {
+                    <EmptyState Title="No active homeowners"
+                                Subtitle="Add active homeowners before recording event attendance."
+                                Icon="O" />
+                }
+                else
+                {
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                    <th>Homeowner</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in _rows)
+                                {
+                                    <tr class="h-[52px] hover">
+                                        <td class="text-sm text-base-content">@GetFullName(row.Homeowner)</td>
+                                        <td>
+                                            <select class="select select-bordered select-sm max-w-[180px]"
+                                                    value="@row.Status"
+                                                    @onchange='args => OnStatusChanged(row.Homeowner.HomeownerId, args.Value?.ToString() ?? "Absent")'>
+                                                @foreach (var status in AttendanceStatuses)
+                                                {
+                                                    <option value="@status">@status</option>
+                                                }
+                                            </select>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <TableRecordCount From="1" To="@_rows.Count" Total="@_rows.Count" Entity="attendance records" />
+                    <div class="mt-6 flex justify-end">
+                        <button class="btn btn-primary btn-sm" @onclick="SaveAttendanceAsync">Save Attendance</button>
+                    </div>
+                }
             </div>
         </div>
-
-        @if (_rows.Count == 0)
-        {
-            <EmptyState Title="No active homeowners"
-                        Subtitle="Add active homeowners before recording event attendance."
-                        Icon="@Icons.Material.Filled.Groups" />
-        }
-        else
-        {
-            <MudTable T="AttendanceRow" Items="_rows" Hover="false" Striped="false">
-                <HeaderContent>
-                    <MudTh>Homeowner</MudTh>
-                    <MudTh>Status</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Homeowner">@GetFullName(context.Homeowner)</MudTd>
-                    <MudTd DataLabel="Status">
-                        <MudSelect T="string"
-                                   Value="context.Status"
-                                   ValueChanged="@(value => OnStatusChanged(context.Homeowner.HomeownerId, value))"
-                                   Variant="Variant.Outlined"
-                                   Style="max-width: 180px;">
-                            @foreach (var status in AttendanceStatuses)
-                            {
-                                <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
-                            }
-                        </MudSelect>
-                    </MudTd>
-                </RowTemplate>
-            </MudTable>
-            <TableRecordCount Count="_rows.Count" EntityLabel="attendance records" />
-
-            <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAttendanceAsync">
-                    Save Attendance
-                </MudButton>
-            </div>
-        }
-    </MudPaper>
+    </div>
 }
 
 @code {
@@ -146,15 +156,13 @@ else
     private int AbsentCount => _rows.Count(row => row.Status == "Absent");
     private int ExcusedCount => _rows.Count(row => row.Status == "Excused");
 
-    private Task OnStatusChanged(int homeownerId, string value)
+    private void OnStatusChanged(int homeownerId, string value)
     {
         var row = _rows.FirstOrDefault(record => record.Homeowner.HomeownerId == homeownerId);
         if (row is not null)
         {
             row.Status = value;
         }
-
-        return Task.CompletedTask;
     }
 
     private async Task SaveAttendanceAsync()
@@ -174,7 +182,7 @@ else
             .ToList();
 
         await AttendanceService.BulkRecordAsync(attendances, AuthService.CurrentUser.UserId);
-        Snackbar.Add("Attendance saved successfully.", Severity.Success);
+        await JS.InvokeVoidAsync("hrms.showToast", "Attendance saved successfully.", "success");
         await LoadAsync();
     }
 
@@ -204,18 +212,19 @@ else
         return parsed.ToString("MMMM dd, yyyy h:mm tt");
     }
 
-    private static string RenderSummaryChip(string label, int count)
+    private static RenderFragment DetailField(string label, string value) => builder =>
     {
-        var (background, foreground) = label switch
-        {
-            "Present" => ("#DCFCE7", "#166534"),
-            "Absent" => ("#FEE2E2", "#991B1B"),
-            "Excused" => ("#FEF3C7", "#92400E"),
-            _ => ("#E2E8F0", "#475569")
-        };
-
-        return $"<span style=\"display:inline-block;padding:4px 10px;border-radius:4px;background:{background};color:{foreground};font-size:0.75rem;font-weight:600;\">{label}: {count}</span>";
-    }
+        builder.OpenElement(0, "div");
+        builder.OpenElement(1, "p");
+        builder.AddAttribute(2, "class", "text-[10.5px] font-semibold uppercase tracking-wide text-base-content/40");
+        builder.AddContent(3, label);
+        builder.CloseElement();
+        builder.OpenElement(4, "p");
+        builder.AddAttribute(5, "class", "mt-0.5 text-sm text-base-content");
+        builder.AddContent(6, value);
+        builder.CloseElement();
+        builder.CloseElement();
+    };
 
     private sealed class AttendanceRow
     {

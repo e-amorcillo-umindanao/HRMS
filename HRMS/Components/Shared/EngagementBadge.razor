@@ -1,20 +1,41 @@
-<MudChip T="string"
-         Size="Size.Small"
-         Style="@($"background:{BackgroundColor};color:{ForegroundColor};font-weight:600;")">
-    @Label
-</MudChip>
+<div class="flex min-w-[120px] items-center gap-2">
+    <div class="engagement-bar flex-1">
+        <div class="engagement-fill @GetFillClass()" style="width: @(GetWidth())"></div>
+    </div>
+    <span class="whitespace-nowrap text-[11.5px] text-base-content/50">@GetLabel()</span>
+</div>
 
 @code {
     [Parameter]
     public string Label { get; set; } = string.Empty;
 
-    private string BackgroundColor => Label switch
-    {
-        "High Engagement" => "#22C55E",
-        "Medium Engagement" => "#F59E0B",
-        "Low Engagement" => "#EF4444",
-        _ => "#94A3B8"
-    };
+    [Parameter]
+    public double? Score { get; set; }
 
-    private string ForegroundColor => "#FFFFFF";
+    private string GetLabel()
+    {
+        if (Score.HasValue)
+        {
+            return $"{Math.Round(Score.Value)}%";
+        }
+
+        return string.IsNullOrWhiteSpace(Label) ? "-" : Label;
+    }
+
+    private string GetFillClass()
+    {
+        var value = Score ?? 0;
+        return value switch
+        {
+            >= 75 => "bg-success",
+            >= 40 => "bg-warning",
+            _ => "bg-error"
+        };
+    }
+
+    private string GetWidth()
+    {
+        var value = Math.Clamp(Score ?? 0, 0, 100);
+        return $"{value.ToString(System.Globalization.CultureInfo.InvariantCulture)}%";
+    }
 }

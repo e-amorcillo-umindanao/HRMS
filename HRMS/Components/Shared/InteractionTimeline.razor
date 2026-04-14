@@ -1,39 +1,51 @@
-@if (Logs.Count == 0)
+@using HRMS.Models
+
+@if (TimelineItems.Count == 0)
 {
-    <EmptyState Title="No interactions recorded yet"
-                Subtitle="Add an interaction to start building the timeline."
-                Icon="@Icons.Material.Filled.Forum" />
+    <EmptyState Icon="○"
+                Title="No interactions logged"
+                Subtitle="No interactions have been recorded yet." />
 }
 else
 {
-    <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Right">
-        @foreach (var log in SortedLogs)
+    <ul class="timeline timeline-vertical timeline-compact">
+        @foreach (var log in TimelineItems)
         {
-            <MudTimelineItem Icon="@Icons.Material.Filled.Forum" Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
-                <MudPaper Class="hrms-page-card" Style="padding: 16px;" Elevation="0">
-                    <div style="display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap;">
-                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
-                            @DisplayValue(log.InteractionType)
-                        </MudChip>
-                        <MudText Style="color: #64748B;">@FormatDate(log.InteractionDate)</MudText>
-                    </div>
-                    <MudText Style="margin-top: 12px; color: #1E293B;">@DisplayValue(log.Notes)</MudText>
-                    <MudText Style="margin-top: 8px; color: #64748B; font-size: 0.875rem;">
+            <li>
+                <div class="timeline-start whitespace-nowrap pr-4 text-xs text-base-content/40">
+                    @FormatDate(log.InteractionDate)
+                </div>
+                <div class="timeline-middle">
+                    <div class="h-2.5 w-2.5 rounded-full bg-primary"></div>
+                </div>
+                <div class="timeline-end timeline-box ml-3 mb-4 border border-base-300 bg-base-100 shadow-none">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-base-content">
+                        @DisplayValue(log.InteractionType)
+                    </p>
+                    <p class="mt-1 text-sm leading-relaxed text-base-content/70">
+                        @DisplayValue(log.Notes)
+                    </p>
+                    <p class="mt-1 text-xs text-base-content/40">
                         Logged by @DisplayValue(log.CreatedByUser?.Username)
-                    </MudText>
-                </MudPaper>
-            </MudTimelineItem>
+                    </p>
+                </div>
+                <hr class="bg-base-300" />
+            </li>
         }
-    </MudTimeline>
+    </ul>
 }
 
 @code {
     [Parameter]
-    public List<InteractionLog> Logs { get; set; } = [];
+    public List<InteractionLog>? Logs { get; set; }
 
-    private IEnumerable<InteractionLog> SortedLogs => Logs
+    [Parameter]
+    public List<InteractionLog>? Interactions { get; set; }
+
+    private List<InteractionLog> TimelineItems => (Interactions ?? Logs ?? [])
         .OrderByDescending(log => ParseDate(log.InteractionDate) ?? DateTime.MinValue)
-        .ThenByDescending(log => ParseDate(log.CreatedAt) ?? DateTime.MinValue);
+        .ThenByDescending(log => ParseDate(log.CreatedAt) ?? DateTime.MinValue)
+        .ToList();
 
     private static DateTime? ParseDate(string? value) =>
         DateTime.TryParse(value, out var parsed) ? parsed : null;

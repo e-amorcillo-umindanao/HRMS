@@ -1,10 +1,12 @@
 @page "/violations/add"
+@page "/violations/new"
 @page "/violations/edit/{ViolationId:int}"
+@page "/violations/{ViolationId:int}/edit"
 @inject ViolationService ViolationService
 @inject HomeownerService HomeownerService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageHeader Title="@(IsEdit ? "Edit Violation" : "File Violation")"
             Subtitle="Capture incident details, parties involved, and status updates." />
@@ -15,81 +17,89 @@
 }
 else
 {
-    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-        @if (!string.IsNullOrWhiteSpace(_errorMessage))
-        {
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
-                @_errorMessage
-            </MudAlert>
-        }
+    <div class="card max-w-3xl border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-6">
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div role="alert" class="alert alert-error mb-4">
+                    <span>@_errorMessage</span>
+                </div>
+            }
 
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Parties Involved</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudAutocomplete T="Homeowner"
-                                 Label="Homeowner"
-                                 Value="_selectedHomeowner"
-                                 ValueChanged="OnHomeownerChanged"
-                                 SearchFunc="SearchHomeownersAsync"
-                                 ToStringFunc="GetHomeownerDisplay"
-                                 Variant="Variant.Outlined"
-                                 Clearable="true"
-                                 ResetValueOnEmptyText="true"
-                                 MaxItems="8"
-                                 Dense="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField T="string" Label="Homeowner Name" @bind-Value="_model.HomeownerName" Variant="Variant.Outlined" Required="true" />
-            </MudItem>
-        </MudGrid>
-
-        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Incident Information</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="string" Label="Violation Type" @bind-Value="_model.ViolationType" Variant="Variant.Outlined">
-                    @foreach (var type in ViolationTypes)
-                    {
-                        <MudSelectItem T="string" Value="@type">@type</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudDatePicker Label="Violation Date" DateFormat="MMMM dd, yyyy" @bind-Date="_violationDate" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField T="string" Label="Details" @bind-Value="_model.Details" Variant="Variant.Outlined" Lines="4" />
-            </MudItem>
-        </MudGrid>
-
-        @if (IsEdit)
-        {
-            <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Status Update</div>
-            <MudDivider Style="margin: 8px 0 20px;" />
-            <MudGrid>
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="string" @bind-Value="_model.Status" Label="Status" Variant="Variant.Outlined">
-                        @foreach (var status in StatusOptions)
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-base-content/40">Parties Involved</p>
+            <div class="divider my-0 mb-4"></div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FieldGroup Label="Homeowner">
+                    <select class="select select-bordered w-full" @bind="_selectedHomeownerId" @bind:after="OnHomeownerChanged">
+                        <option value="">-</option>
+                        @foreach (var homeowner in _homeowners.OrderBy(GetHomeownerDisplay))
                         {
-                            <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
+                            <option value="@homeowner.HomeownerId">@GetHomeownerDisplay(homeowner)</option>
                         }
-                    </MudSelect>
-                </MudItem>
-                @if (_model.Status != "Open")
-                {
-                    <MudItem xs="12">
-                        <MudTextField T="string" Label="Resolution" @bind-Value="_model.Resolution" Variant="Variant.Outlined" Lines="4" />
-                    </MudItem>
-                }
-            </MudGrid>
-        }
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Homeowner Name">
+                    <input type="text" class="input input-bordered w-full" @bind="_model.HomeownerName" />
+                </FieldGroup>
+            </div>
 
-        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
-            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+            <p class="mb-2 mt-8 text-xs font-semibold uppercase tracking-wide text-base-content/40">Incident Information</p>
+            <div class="divider my-0 mb-4"></div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FieldGroup Label="Violation Type">
+                    <select class="select select-bordered w-full" @bind="_model.ViolationType">
+                        <option value="">Select violation type</option>
+                        @foreach (var type in ViolationTypes)
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Violation Date">
+                    <input type="date" class="input input-bordered w-full" value="@FormatHtmlDate(_violationDate)" @onchange="OnViolationDateChanged" />
+                </FieldGroup>
+                <div class="md:col-span-2">
+                    <FieldGroup Label="Details">
+                        <textarea class="textarea textarea-bordered h-28 w-full resize-none" @bind="_model.Details"></textarea>
+                    </FieldGroup>
+                </div>
+            </div>
+
+            @if (IsEdit)
+            {
+                <p class="mb-2 mt-8 text-xs font-semibold uppercase tracking-wide text-base-content/40">Status Update</p>
+                <div class="divider my-0 mb-4"></div>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <FieldGroup Label="Status">
+                        <select class="select select-bordered w-full" @bind="_model.Status">
+                            @foreach (var status in StatusOptions)
+                            {
+                                <option value="@status">@status</option>
+                            }
+                        </select>
+                    </FieldGroup>
+                    @if (_model.Status != "Open")
+                    {
+                        <div class="md:col-span-2">
+                            <FieldGroup Label="Resolution">
+                                <textarea class="textarea textarea-bordered h-28 w-full resize-none" @bind="_model.Resolution"></textarea>
+                            </FieldGroup>
+                        </div>
+                    }
+                </div>
+            }
         </div>
-    </MudPaper>
+        <div class="flex justify-end gap-3 border-t border-base-300 px-6 py-4">
+            <button class="btn btn-ghost btn-sm" @onclick="Cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveAsync" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="loading loading-spinner loading-xs"></span>
+                }
+                Save
+            </button>
+        </div>
+    </div>
 }
 
 @code {
@@ -101,9 +111,10 @@ else
 
     private readonly ViolationFormModel _model = new();
     private List<Homeowner> _homeowners = [];
-    private Homeowner? _selectedHomeowner;
+    private int? _selectedHomeownerId;
     private DateTime? _violationDate;
     private bool _isLoading = true;
+    private bool _isSaving;
     private string? _errorMessage;
 
     private bool IsEdit => ViolationId.HasValue;
@@ -132,7 +143,7 @@ else
             _model.Status = violation.Status;
             _model.Resolution = violation.Resolution ?? string.Empty;
             _violationDate = ParseDate(violation.ViolationDate);
-            _selectedHomeowner = _homeowners.FirstOrDefault(homeowner => homeowner.HomeownerId == violation.HomeownerId);
+            _selectedHomeownerId = violation.HomeownerId;
         }
         else
         {
@@ -150,10 +161,12 @@ else
             return;
         }
 
+        _isSaving = true;
+
         var record = new ViolationRecord
         {
             ViolationId = _model.ViolationId ?? 0,
-            HomeownerId = _selectedHomeowner?.HomeownerId,
+            HomeownerId = _selectedHomeownerId,
             HomeownerName = _model.HomeownerName.Trim(),
             ViolationType = _model.ViolationType,
             ViolationDate = ToIsoDateString(_violationDate!.Value),
@@ -165,19 +178,22 @@ else
         if (IsEdit)
         {
             var updated = await ViolationService.UpdateAsync(record, AuthService.CurrentUser.UserId);
+            _isSaving = false;
+
             if (updated is null)
             {
                 _errorMessage = "Unable to update violation.";
                 return;
             }
 
-            Snackbar.Add("Violation updated successfully.", Severity.Success);
+            await JS.InvokeVoidAsync("hrms.showToast", "Violation updated successfully.", "success");
             NavigationManager.NavigateTo($"/violations/{updated.ViolationId}");
         }
         else
         {
             var created = await ViolationService.AddAsync(record, AuthService.CurrentUser.UserId);
-            Snackbar.Add("Violation filed successfully.", Severity.Success);
+            _isSaving = false;
+            await JS.InvokeVoidAsync("hrms.showToast", "Violation filed successfully.", "success");
             NavigationManager.NavigateTo($"/violations/{created.ViolationId}");
         }
     }
@@ -220,45 +236,28 @@ else
         _model.Details = string.Empty;
         _model.Status = "Open";
         _model.Resolution = string.Empty;
-        _selectedHomeowner = null;
+        _selectedHomeownerId = null;
         _violationDate = DateTime.UtcNow.Date;
     }
 
-    private Task OnHomeownerChanged(Homeowner? homeowner)
+    private Task OnHomeownerChanged()
     {
-        _selectedHomeowner = homeowner;
-        if (homeowner is not null)
+        if (_selectedHomeownerId.HasValue)
         {
-            _model.HomeownerName = GetFullName(homeowner);
+            var homeowner = _homeowners.FirstOrDefault(item => item.HomeownerId == _selectedHomeownerId.Value);
+            if (homeowner is not null)
+            {
+                _model.HomeownerName = GetFullName(homeowner);
+            }
         }
 
         return Task.CompletedTask;
     }
 
-    private Task<IEnumerable<Homeowner>> SearchHomeownersAsync(string value, CancellationToken cancellationToken)
-    {
-        IEnumerable<Homeowner> matches = _homeowners
-            .OrderBy(homeowner => homeowner.LastName)
-            .ThenBy(homeowner => homeowner.FirstName);
+    private void OnViolationDateChanged(ChangeEventArgs args) =>
+        _violationDate = DateTime.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
 
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            matches = matches.Where(homeowner =>
-                GetHomeownerDisplay(homeowner).Contains(value, StringComparison.OrdinalIgnoreCase));
-        }
-
-        return Task.FromResult(matches.Take(8));
-    }
-
-    private static string GetHomeownerDisplay(Homeowner? homeowner)
-    {
-        if (homeowner is null)
-        {
-            return string.Empty;
-        }
-
-        return GetFullName(homeowner);
-    }
+    private static string GetHomeownerDisplay(Homeowner homeowner) => GetFullName(homeowner);
 
     private static string GetFullName(Homeowner homeowner)
     {
@@ -273,6 +272,9 @@ else
 
     private static string ToIsoDateString(DateTime value) =>
         DateTime.SpecifyKind(value.Date, DateTimeKind.Utc).ToString("o");
+
+    private static string FormatHtmlDate(DateTime? value) =>
+        value?.ToString("yyyy-MM-dd") ?? string.Empty;
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

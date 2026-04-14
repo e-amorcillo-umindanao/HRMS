@@ -1,6 +1,5 @@
 using HRMS.Services;
 using Microsoft.Maui.ApplicationModel;
-using MudBlazor;
 
 namespace HRMS.Helpers;
 
@@ -10,13 +9,12 @@ public class SessionHelper : IDisposable
     private static readonly TimeSpan LogoutDelay = TimeSpan.FromMinutes(15);
 
     private readonly AuthService _authService;
-    private readonly ISnackbar _snackbar;
     private CancellationTokenSource? _timerCancellationTokenSource;
+    public event Action? SessionWarningRaised;
 
-    public SessionHelper(AuthService authService, ISnackbar snackbar)
+    public SessionHelper(AuthService authService)
     {
         _authService = authService;
-        _snackbar = snackbar;
     }
 
     public void Start()
@@ -78,17 +76,7 @@ public class SessionHelper : IDisposable
                 return;
             }
 
-            await MainThread.InvokeOnMainThreadAsync(() =>
-            {
-                _snackbar.Add(
-                    "Session will lock in 2 minutes due to inactivity.",
-                    Severity.Warning,
-                    configuration =>
-                    {
-                        configuration.VisibleStateDuration = 5000;
-                        configuration.SnackbarVariant = Variant.Filled;
-                    });
-            });
+            await MainThread.InvokeOnMainThreadAsync(() => SessionWarningRaised?.Invoke());
         }
         catch (TaskCanceledException)
         {

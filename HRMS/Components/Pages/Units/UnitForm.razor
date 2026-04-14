@@ -1,11 +1,13 @@
 @page "/units/add"
+@page "/units/new"
 @page "/units/edit/{UnitId:int}"
+@page "/units/{UnitId:int}/edit"
 @inject AppDbContext DbContext
 @inject UnitService UnitService
 @inject HomeownerService HomeownerService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageHeader Title="@(IsEdit ? "Edit Unit" : "Add Unit")"
             Subtitle="Capture unit details and optionally assign a head homeowner." />
@@ -16,52 +18,56 @@
 }
 else
 {
-    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-        @if (!string.IsNullOrWhiteSpace(_errorMessage))
-        {
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
-                @_errorMessage
-            </MudAlert>
-        }
+    <div class="card max-w-3xl border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-6">
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div role="alert" class="alert alert-error mb-4">
+                    <span>@_errorMessage</span>
+                </div>
+            }
 
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Unit Information</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudTextField T="string" Label="Unit Number" @bind-Value="_model.UnitNumber" Variant="Variant.Outlined" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField T="string" Label="Address" @bind-Value="_model.Address" Variant="Variant.Outlined" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="int?" Label="Phase" @bind-Value="_model.PhaseId" Variant="Variant.Outlined">
-                    <MudSelectItem T="int?" Value="@((int?)null)">-</MudSelectItem>
-                    @foreach (var phase in _phases)
-                    {
-                        <MudSelectItem T="int?" Value="@phase.PhaseId">@phase.Name</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudAutocomplete T="Homeowner"
-                                 Label="Head Homeowner"
-                                 Value="_selectedHeadHomeowner"
-                                 ValueChanged="OnHeadHomeownerChanged"
-                                 SearchFunc="SearchHeadHomeownersAsync"
-                                 ToStringFunc="GetHomeownerDisplay"
-                                 Variant="Variant.Outlined"
-                                 Clearable="true"
-                                 ResetValueOnEmptyText="true"
-                                 MaxItems="8"
-                                 Dense="true" />
-            </MudItem>
-        </MudGrid>
-
-        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
-            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-base-content/40">Unit Information</p>
+            <div class="divider my-0 mb-4"></div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FieldGroup Label="Unit Number">
+                    <input type="text" class="input input-bordered w-full" @bind="_model.UnitNumber" />
+                </FieldGroup>
+                <FieldGroup Label="Address">
+                    <input type="text" class="input input-bordered w-full" @bind="_model.Address" />
+                </FieldGroup>
+                <FieldGroup Label="Phase">
+                    <select class="select select-bordered w-full" @bind="_model.PhaseId">
+                        <option value="">-</option>
+                        @foreach (var phase in _phases)
+                        {
+                            <option value="@phase.PhaseId">@phase.Name</option>
+                        }
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Head Homeowner">
+                    <select class="select select-bordered w-full" @bind="_selectedHeadHomeownerId">
+                        <option value="">-</option>
+                        @foreach (var homeowner in _activeHomeowners.OrderBy(GetHomeownerDisplay))
+                        {
+                            <option value="@homeowner.HomeownerId">@GetHomeownerDisplay(homeowner)</option>
+                        }
+                    </select>
+                </FieldGroup>
+            </div>
         </div>
-    </MudPaper>
+
+        <div class="flex justify-end gap-3 border-t border-base-300 px-6 py-4">
+            <button class="btn btn-ghost btn-sm" @onclick="Cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveAsync" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="loading loading-spinner loading-xs"></span>
+                }
+                Save
+            </button>
+        </div>
+    </div>
 }
 
 @code {
@@ -71,8 +77,9 @@ else
     private readonly UnitFormModel _model = new();
     private List<Phase> _phases = [];
     private List<Homeowner> _activeHomeowners = [];
-    private Homeowner? _selectedHeadHomeowner;
+    private int? _selectedHeadHomeownerId;
     private bool _isLoading = true;
+    private bool _isSaving;
     private string? _errorMessage;
 
     private bool IsEdit => UnitId.HasValue;
@@ -109,9 +116,7 @@ else
                 _activeHomeowners.Add(unit.HeadHomeowner);
             }
 
-            _selectedHeadHomeowner = unit.HeadHomeowner is null
-                ? null
-                : _activeHomeowners.FirstOrDefault(homeowner => homeowner.HomeownerId == unit.HeadHomeowner.HomeownerId);
+            _selectedHeadHomeownerId = unit.HeadHomeowner?.HomeownerId;
         }
         else
         {
@@ -129,33 +134,37 @@ else
             return;
         }
 
+        _isSaving = true;
+
         var unit = new Unit
         {
             UnitId = _model.UnitId ?? 0,
             UnitNumber = _model.UnitNumber.Trim(),
             Address = _model.Address.Trim(),
             PhaseId = _model.PhaseId,
-            HeadHomeownerId = _selectedHeadHomeowner?.HomeownerId
+            HeadHomeownerId = _selectedHeadHomeownerId
         };
 
         if (IsEdit)
         {
             var updated = await UnitService.UpdateAsync(unit, AuthService.CurrentUser.UserId);
+            _isSaving = false;
+
             if (updated is null)
             {
                 _errorMessage = "Unable to update unit.";
                 return;
             }
 
-            Snackbar.Add("Unit updated successfully.", Severity.Success);
+            await JS.InvokeVoidAsync("hrms.showToast", "Unit updated successfully.", "success");
             NavigationManager.NavigateTo($"/units/{updated.UnitId}");
+            return;
         }
-        else
-        {
-            var created = await UnitService.AddAsync(unit, AuthService.CurrentUser.UserId);
-            Snackbar.Add("Unit added successfully.", Severity.Success);
-            NavigationManager.NavigateTo($"/units/{created.UnitId}");
-        }
+
+        var created = await UnitService.AddAsync(unit, AuthService.CurrentUser.UserId);
+        _isSaving = false;
+        await JS.InvokeVoidAsync("hrms.showToast", "Unit added successfully.", "success");
+        NavigationManager.NavigateTo($"/units/{created.UnitId}");
     }
 
     private void Cancel()
@@ -184,37 +193,11 @@ else
         _model.UnitNumber = string.Empty;
         _model.Address = string.Empty;
         _model.PhaseId = null;
-        _selectedHeadHomeowner = null;
+        _selectedHeadHomeownerId = null;
     }
 
-    private Task OnHeadHomeownerChanged(Homeowner? homeowner)
+    private static string GetHomeownerDisplay(Homeowner homeowner)
     {
-        _selectedHeadHomeowner = homeowner;
-        return Task.CompletedTask;
-    }
-
-    private Task<IEnumerable<Homeowner>> SearchHeadHomeownersAsync(string value, CancellationToken cancellationToken)
-    {
-        IEnumerable<Homeowner> matches = _activeHomeowners
-            .OrderBy(homeowner => homeowner.LastName)
-            .ThenBy(homeowner => homeowner.FirstName);
-
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            matches = matches.Where(homeowner =>
-                GetHomeownerDisplay(homeowner).Contains(value, StringComparison.OrdinalIgnoreCase));
-        }
-
-        return Task.FromResult(matches.Take(8));
-    }
-
-    private static string GetHomeownerDisplay(Homeowner? homeowner)
-    {
-        if (homeowner is null)
-        {
-            return string.Empty;
-        }
-
         var fullName = GetFullName(homeowner);
         var unitNumber = string.IsNullOrWhiteSpace(homeowner.Unit?.UnitNumber) ? null : homeowner.Unit.UnitNumber;
 

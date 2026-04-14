@@ -1,8 +1,20 @@
-<div class="record-count">
-    Showing <strong>@GetRangeText()</strong> of <strong>@Count</strong> @EntityLabel
-</div>
+<p class="record-count">
+    Showing <strong>@GetRangeText()</strong> of <strong>@GetTotal()</strong> @GetEntity()
+</p>
 
 @code {
+    [Parameter]
+    public int From { get; set; }
+
+    [Parameter]
+    public int To { get; set; }
+
+    [Parameter]
+    public int Total { get; set; }
+
+    [Parameter]
+    public string Entity { get; set; } = string.Empty;
+
     [Parameter]
     public int Count { get; set; }
 
@@ -15,10 +27,28 @@
     [Parameter]
     public int? EndIndex { get; set; }
 
-    private string GetRangeText() =>
-        Count <= 0
-            ? "0"
-            : StartIndex.HasValue && EndIndex.HasValue
-                ? $"{StartIndex.Value}-{EndIndex.Value}"
-                : $"1-{Count}";
+    private int GetTotal() => Total > 0 ? Total : Count;
+
+    private string GetEntity() => string.IsNullOrWhiteSpace(Entity) ? EntityLabel : Entity;
+
+    private string GetRangeText()
+    {
+        if (From > 0 || To > 0)
+        {
+            return From == To || To == 0 ? From.ToString() : $"{From}-{To}";
+        }
+
+        var total = GetTotal();
+        if (total <= 0)
+        {
+            return "0";
+        }
+
+        if (StartIndex.HasValue && EndIndex.HasValue)
+        {
+            return $"{StartIndex.Value}-{EndIndex.Value}";
+        }
+
+        return $"1-{total}";
+    }
 }

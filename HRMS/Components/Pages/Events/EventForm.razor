@@ -1,9 +1,11 @@
 @page "/events/add"
+@page "/events/new"
 @page "/events/edit/{EventId:int}"
+@page "/events/{EventId:int}/edit"
 @inject EventService EventService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageHeader Title="@(IsEdit ? "Edit Event" : "Add Event")"
             Subtitle="Capture event details and prepare attendance tracking." />
@@ -14,62 +16,63 @@
 }
 else
 {
-    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-        @if (!string.IsNullOrWhiteSpace(_errorMessage))
-        {
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
-                @_errorMessage
-            </MudAlert>
-        }
+    <div class="card max-w-3xl border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-6">
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div role="alert" class="alert alert-error mb-4">
+                    <span>@_errorMessage</span>
+                </div>
+            }
 
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Event Details</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="6">
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-base-content/40">Event Details</p>
+            <div class="divider my-0 mb-4"></div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FieldGroup Label="Title">
-                    <MudTextField T="string" @bind-Value="_model.Title" Variant="Variant.Outlined" Required="true" />
+                    <input type="text" class="input input-bordered w-full" @bind="_model.Title" />
                 </FieldGroup>
-            </MudItem>
-            <MudItem xs="12" sm="6">
                 <FieldGroup Label="Event Date">
-                    <MudDatePicker DateFormat="MMMM dd, yyyy" @bind-Date="_eventDate" Variant="Variant.Outlined" />
+                    <input type="date"
+                           class="input input-bordered w-full"
+                           value="@FormatHtmlDate(_eventDate)"
+                           @onchange="OnEventDateChanged" />
                 </FieldGroup>
-            </MudItem>
-            <MudItem xs="12" sm="6">
                 <FieldGroup Label="Event Time">
-                    <MudTimePicker Time="_eventTime"
-                                   TimeChanged="OnEventTimeChanged"
-                                   Variant="Variant.Outlined"
-                                   AmPm="true" />
+                    <input type="time"
+                           class="input input-bordered w-full"
+                           value="@FormatHtmlTime(_eventTime)"
+                           @onchange="OnEventTimeChanged" />
                 </FieldGroup>
-            </MudItem>
-            <MudItem xs="12" sm="6">
                 <FieldGroup Label="Event Type">
-                    <MudSelect T="string" @bind-Value="_model.EventType" Variant="Variant.Outlined">
+                    <select class="select select-bordered w-full" @bind="_model.EventType">
+                        <option value="">Select event type</option>
                         @foreach (var eventType in EventTypes)
                         {
-                            <MudSelectItem T="string" Value="@eventType">@eventType</MudSelectItem>
+                            <option value="@eventType">@eventType</option>
                         }
-                    </MudSelect>
+                    </select>
                 </FieldGroup>
-            </MudItem>
-            <MudItem xs="12" sm="6">
                 <FieldGroup Label="Venue">
-                    <MudTextField T="string" @bind-Value="_model.Venue" Variant="Variant.Outlined" />
+                    <input type="text" class="input input-bordered w-full" @bind="_model.Venue" />
                 </FieldGroup>
-            </MudItem>
-            <MudItem xs="12">
-                <FieldGroup Label="Description">
-                    <MudTextField T="string" @bind-Value="_model.Description" Variant="Variant.Outlined" Lines="4" />
-                </FieldGroup>
-            </MudItem>
-        </MudGrid>
-
-        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
-            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+                <div class="md:col-span-2">
+                    <FieldGroup Label="Description">
+                        <textarea class="textarea textarea-bordered h-28 w-full resize-none" @bind="_model.Description"></textarea>
+                    </FieldGroup>
+                </div>
+            </div>
         </div>
-    </MudPaper>
+        <div class="flex justify-end gap-3 border-t border-base-300 px-6 py-4">
+            <button class="btn btn-ghost btn-sm" @onclick="Cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveAsync" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="loading loading-spinner loading-xs"></span>
+                }
+                Save
+            </button>
+        </div>
+    </div>
 }
 
 @code {
@@ -82,6 +85,7 @@ else
     private DateTime? _eventDate;
     private TimeSpan? _eventTime;
     private bool _isLoading = true;
+    private bool _isSaving;
     private string? _errorMessage;
 
     private bool IsEdit => EventId.HasValue;
@@ -126,6 +130,8 @@ else
             return;
         }
 
+        _isSaving = true;
+
         var evt = new Event
         {
             EventId = _model.EventId ?? 0,
@@ -139,21 +145,23 @@ else
         if (IsEdit)
         {
             var updated = await EventService.UpdateAsync(evt, AuthService.CurrentUser.UserId);
+            _isSaving = false;
+
             if (updated is null)
             {
                 _errorMessage = "Unable to update event.";
                 return;
             }
 
-            Snackbar.Add("Event updated successfully.", Severity.Success);
+            await JS.InvokeVoidAsync("hrms.showToast", "Event updated successfully.", "success");
             NavigationManager.NavigateTo($"/events/{updated.EventId}");
+            return;
         }
-        else
-        {
-            var created = await EventService.AddAsync(evt, AuthService.CurrentUser.UserId);
-            Snackbar.Add("Event added successfully.", Severity.Success);
-            NavigationManager.NavigateTo($"/events/{created.EventId}");
-        }
+
+        var created = await EventService.AddAsync(evt, AuthService.CurrentUser.UserId);
+        _isSaving = false;
+        await JS.InvokeVoidAsync("hrms.showToast", "Event added successfully.", "success");
+        NavigationManager.NavigateTo($"/events/{created.EventId}");
     }
 
     private void Cancel()
@@ -192,6 +200,12 @@ else
         _eventTime = null;
     }
 
+    private void OnEventDateChanged(ChangeEventArgs args) =>
+        _eventDate = DateTime.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
+
+    private void OnEventTimeChanged(ChangeEventArgs args) =>
+        _eventTime = TimeSpan.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
+
     private static DateTime? ParseDate(string? value) =>
         DateTime.TryParse(value, out var parsed) ? parsed : null;
 
@@ -201,14 +215,14 @@ else
         return DateTime.SpecifyKind(combined, DateTimeKind.Utc).ToString("o");
     }
 
+    private static string FormatHtmlDate(DateTime? value) =>
+        value?.ToString("yyyy-MM-dd") ?? string.Empty;
+
+    private static string FormatHtmlTime(TimeSpan? value) =>
+        value?.ToString(@"hh\:mm") ?? string.Empty;
+
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private Task OnEventTimeChanged(TimeSpan? value)
-    {
-        _eventTime = value;
-        return Task.CompletedTask;
-    }
 
     private sealed class EventFormModel
     {

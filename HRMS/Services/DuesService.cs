@@ -40,6 +40,9 @@ public class DuesService
             .ToListAsync();
     }
 
+    public Task<List<DuesRecord>> GetByHomeownerIdAsync(int homeownerId) =>
+        GetByHomeownerAsync(homeownerId);
+
     public async Task<List<DuesRecord>> GetByMonthYearAsync(int month, int year)
     {
         return await BaseQuery()

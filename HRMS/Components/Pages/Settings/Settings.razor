@@ -2,9 +2,9 @@
 @inject AppDbContext DbContext
 @inject AuthService AuthService
 @inject AuditService AuditService
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
-<PageHeader Title="Settings" />
+<PageHeader Title="Settings" Subtitle="System configuration, user management, and audit logs." />
 
 @if (_isLoading)
 {
@@ -12,411 +12,278 @@
 }
 else
 {
-    <MudTabs Rounded="true">
-        <MudTabPanel Text="HOA Configuration">
-            <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-                <MudText Class="hrms-section-heading">General Information</MudText>
-                <MudDivider Style="margin: 8px 0 20px;" />
-                <MudGrid Style="margin-bottom: 24px;">
-                    <MudItem xs="12" sm="6">
-                        <FieldGroup Label="HOA Name">
-                            <MudTextField T="string" @bind-Value="_hoaSettings.HOAName" Variant="Variant.Outlined" />
-                        </FieldGroup>
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <FieldGroup Label="Subdivision Name">
-                            <MudTextField T="string" @bind-Value="_hoaSettings.Subdivision" Variant="Variant.Outlined" />
-                        </FieldGroup>
-                    </MudItem>
-                </MudGrid>
+    <div role="tablist" class="tabs tabs-bordered">
+        <button role="tab" class="tab @(ActiveTab == "hoa" ? "tab-active" : "")" @onclick='() => ActiveTab = "hoa"'>HOA Configuration</button>
+        <button role="tab" class="tab @(ActiveTab == "users" ? "tab-active" : "")" @onclick='() => ActiveTab = "users"'>User Management</button>
+        <button role="tab" class="tab @(ActiveTab == "phases" ? "tab-active" : "")" @onclick='() => ActiveTab = "phases"'>Phase Management</button>
+        <button role="tab" class="tab @(ActiveTab == "audit" ? "tab-active" : "")" @onclick='() => ActiveTab = "audit"'>Audit Log</button>
+    </div>
 
-                <MudText Class="hrms-section-heading">Location & Contact</MudText>
-                <MudDivider Style="margin: 8px 0 20px;" />
-                <MudGrid Style="margin-bottom: 24px;">
-                    <MudItem xs="12" sm="4">
-                        <FieldGroup Label="City">
-                            <MudTextField T="string" @bind-Value="_hoaSettings.City" Variant="Variant.Outlined" />
-                        </FieldGroup>
-                    </MudItem>
-                    <MudItem xs="12" sm="4">
-                        <FieldGroup Label="Province">
-                            <MudTextField T="string" @bind-Value="_hoaSettings.Province" Variant="Variant.Outlined" />
-                        </FieldGroup>
-                    </MudItem>
-                    <MudItem xs="12" sm="4">
-                        <FieldGroup Label="Contact Number">
-                            <MudTextField T="string" @bind-Value="_hoaSettings.ContactNumber" Variant="Variant.Outlined" />
-                        </FieldGroup>
-                    </MudItem>
-                </MudGrid>
+    <div class="card rounded-tl-none border border-base-300 border-t-0 bg-base-100 shadow-none">
+        <div class="card-body p-6">
+            @if (ActiveTab == "hoa")
+            {
+                <div class="space-y-6">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <FieldGroup Label="HOA Name"><input type="text" class="input input-bordered w-full" @bind="_hoaSettings.HOAName" /></FieldGroup>
+                        <FieldGroup Label="Subdivision Name"><input type="text" class="input input-bordered w-full" @bind="_hoaSettings.Subdivision" /></FieldGroup>
+                        <FieldGroup Label="City"><input type="text" class="input input-bordered w-full" @bind="_hoaSettings.City" /></FieldGroup>
+                        <FieldGroup Label="Province"><input type="text" class="input input-bordered w-full" @bind="_hoaSettings.Province" /></FieldGroup>
+                        <FieldGroup Label="Contact Number"><input type="text" class="input input-bordered w-full" @bind="_hoaSettings.ContactNumber" /></FieldGroup>
+                        <div></div>
+                        <FieldGroup Label="President Name"><input type="text" class="input input-bordered w-full" @bind="_hoaSettings.PresidentName" /></FieldGroup>
+                        <FieldGroup Label="Secretary Name"><input type="text" class="input input-bordered w-full" @bind="_hoaSettings.SecretaryName" /></FieldGroup>
+                        <FieldGroup Label="Treasurer Name"><input type="text" class="input input-bordered w-full" @bind="_hoaSettings.TreasurerName" /></FieldGroup>
+                    </div>
 
-                <MudText Class="hrms-section-heading">Board Leadership</MudText>
-                <MudDivider Style="margin: 8px 0 20px;" />
-                <MudGrid Style="margin-bottom: 24px;">
-                    <MudItem xs="12" sm="4">
-                        <FieldGroup Label="President Name">
-                            <MudTextField T="string" @bind-Value="_hoaSettings.PresidentName" Variant="Variant.Outlined" />
-                        </FieldGroup>
-                    </MudItem>
-                    <MudItem xs="12" sm="4">
-                        <FieldGroup Label="Secretary Name">
-                            <MudTextField T="string" @bind-Value="_hoaSettings.SecretaryName" Variant="Variant.Outlined" />
-                        </FieldGroup>
-                    </MudItem>
-                    <MudItem xs="12" sm="4">
-                        <FieldGroup Label="Treasurer Name">
-                            <MudTextField T="string" @bind-Value="_hoaSettings.TreasurerName" Variant="Variant.Outlined" />
-                        </FieldGroup>
-                    </MudItem>
-                </MudGrid>
-
-                <MudText Class="hrms-section-heading">Digital Assets</MudText>
-                <MudDivider Style="margin: 8px 0 20px;" />
-                <FieldGroup Label="Logo">
-                    <div class="logo-upload-area">
+                    <div>
+                        <p class="mb-2 text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">Logo</p>
                         @if (!string.IsNullOrWhiteSpace(_logoPreviewUrl))
                         {
-                            <div class="logo-preview-row">
-                                    <img src="@_logoPreviewUrl" class="logo-preview-thumb" alt="HOA logo preview" />
-                                <div class="logo-file-info">
-                                    <span class="logo-filename">@System.IO.Path.GetFileName(_hoaSettings.LogoPath)</span>
-                                    <span class="logo-hint">PNG or SVG, Max 2MB</span>
+                            <div class="flex flex-wrap items-center gap-4 rounded border border-base-300 p-4">
+                                <img src="@_logoPreviewUrl" alt="HOA logo preview" class="h-16 w-16 rounded object-contain" />
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-base-content">@System.IO.Path.GetFileName(_hoaSettings.LogoPath)</p>
+                                    <p class="text-xs text-base-content/40">PNG or SVG, Max 2MB</p>
                                 </div>
-                                <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="PickLogoFileAsync">
-                                    Replace
-                                </MudButton>
+                                <button class="btn btn-outline btn-sm" @onclick="PickLogoFileAsync">Replace</button>
                             </div>
                         }
                         else
                         {
-                            <MudButton Variant="Variant.Outlined" OnClick="PickLogoFileAsync">
-                                Upload Logo
-                            </MudButton>
+                            <button class="btn btn-outline btn-sm" @onclick="PickLogoFileAsync">Upload Logo</button>
                         }
                     </div>
-                </FieldGroup>
 
-                <div class="settings-action-row">
-                    <MudButton Variant="Variant.Text" OnClick="DiscardHoaSettingsChangesAsync">
-                        Discard Changes
-                    </MudButton>
-                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveHoaSettingsAsync">
-                        Save Settings
-                    </MudButton>
+                    <div class="flex justify-end gap-3 border-t border-base-300 pt-4">
+                        <button class="btn btn-ghost btn-sm" @onclick="DiscardHoaSettingsChangesAsync">Discard</button>
+                        <button class="btn btn-primary btn-sm" @onclick="SaveHoaSettingsAsync">Save Settings</button>
+                    </div>
                 </div>
-            </MudPaper>
-        </MudTabPanel>
+            }
+            else if (ActiveTab == "users")
+            {
+                <div class="space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold text-base-content">Users</p>
+                            <p class="text-xs text-base-content/40">Manage access and account status.</p>
+                        </div>
+                        <button class="btn btn-primary btn-sm" @onclick="ToggleAddUserForm">@(_showAddUserForm ? "Close Form" : "Add User")</button>
+                    </div>
 
-        <MudTabPanel Text="User Management">
-            <MudPaper Class="hrms-page-card" Style="padding: 24px; margin-bottom: 24px;" Elevation="0">
-                <div style="display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap;">
-                    <MudText Style="color: #1E293B; font-size: 1rem; font-weight: 700;">Users</MudText>
-                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ToggleAddUserForm">
-                        @(_showAddUserForm ? "Close Form" : "Add User")
-                    </MudButton>
-                </div>
-
-                @if (_showAddUserForm)
-                {
-                    <MudDivider Style="margin: 16px 0;" />
-                    <MudGrid>
-                        <MudItem xs="12" sm="4">
-                            <FieldGroup Label="Username">
-                                <MudTextField T="string" @bind-Value="_userForm.Username" Variant="Variant.Outlined" />
-                            </FieldGroup>
-                        </MudItem>
-                        <MudItem xs="12" sm="4">
-                            <FieldGroup Label="Password">
-                                <MudTextField T="string" @bind-Value="_userForm.Password" Variant="Variant.Outlined" InputType="InputType.Password" />
-                            </FieldGroup>
-                        </MudItem>
-                        <MudItem xs="12" sm="4">
+                    @if (_showAddUserForm)
+                    {
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <FieldGroup Label="Username"><input type="text" class="input input-bordered w-full" @bind="_userForm.Username" /></FieldGroup>
+                            <FieldGroup Label="Password"><input type="password" class="input input-bordered w-full" @bind="_userForm.Password" /></FieldGroup>
                             <FieldGroup Label="Role">
-                                <MudSelect T="int" @bind-Value="_userForm.RoleId" Variant="Variant.Outlined">
-                                    <MudSelectItem T="int" Value="0">Select Role</MudSelectItem>
+                                <select class="select select-bordered w-full" @bind="_userForm.RoleId">
+                                    <option value="0">Select Role</option>
                                     @foreach (var role in _roles)
                                     {
-                                        <MudSelectItem T="int" Value="@role.RoleId">@role.RoleName</MudSelectItem>
+                                        <option value="@role.RoleId">@role.RoleName</option>
                                     }
-                                </MudSelect>
+                                </select>
                             </FieldGroup>
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
                             <FieldGroup Label="Homeowner Link">
-                                <MudSelect T="int?" @bind-Value="_userForm.HomeownerId" Variant="Variant.Outlined">
-                                    <MudSelectItem T="int?" Value="@((int?)null)">No linked homeowner</MudSelectItem>
+                                <select class="select select-bordered w-full" @bind="_userForm.HomeownerId">
+                                    <option value="">No linked homeowner</option>
                                     @foreach (var homeowner in _availableHomeowners)
                                     {
-                                        <MudSelectItem T="int?" Value="@((int?)homeowner.HomeownerId)">@GetHomeownerDisplay(homeowner)</MudSelectItem>
+                                        <option value="@homeowner.HomeownerId">@GetHomeownerDisplay(homeowner)</option>
                                     }
-                                </MudSelect>
+                                </select>
                             </FieldGroup>
-                        </MudItem>
-                    </MudGrid>
+                        </div>
+                        <div class="flex justify-end gap-3">
+                            <button class="btn btn-ghost btn-sm" @onclick="ToggleAddUserForm">Cancel</button>
+                            <button class="btn btn-primary btn-sm" @onclick="AddUserAsync">Create User</button>
+                        </div>
+                    }
 
-                    <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 12px;">
-                        <MudButton Variant="Variant.Text" OnClick="ToggleAddUserForm">Cancel</MudButton>
-                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddUserAsync">Create User</MudButton>
-                    </div>
-                }
-
-                <MudDivider Style="margin: 16px 0;" />
-                <MudGrid>
-                    <MudItem xs="12" sm="4">
-                        <FieldGroup Label="Username">
-                            <MudTextField T="string"
-                                          @bind-Value="_filterUsername"
-                                          Variant="Variant.Outlined"
-                                          Immediate="true" />
-                        </FieldGroup>
-                    </MudItem>
-                    <MudItem xs="12" sm="4">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <FieldGroup Label="Username"><input type="text" class="input input-bordered input-sm w-full" @bind-value="_filterUsername" @bind-value:event="oninput" /></FieldGroup>
                         <FieldGroup Label="Role">
-                            <MudSelect T="string" @bind-Value="_filterRole" Variant="Variant.Outlined">
-                                <MudSelectItem T="string" Value="@string.Empty">All Roles</MudSelectItem>
-                                <MudSelectItem T="string" Value="@("Super Admin")">Super Admin</MudSelectItem>
-                                <MudSelectItem T="string" Value="@("HOA President")">HOA President</MudSelectItem>
-                                <MudSelectItem T="string" Value="@("Board Member")">Board Member</MudSelectItem>
-                                <MudSelectItem T="string" Value="@("Staff")">Staff</MudSelectItem>
-                                <MudSelectItem T="string" Value="@("Homeowner")">Homeowner</MudSelectItem>
-                            </MudSelect>
+                            <select class="select select-bordered select-sm w-full" @bind="_filterRole">
+                                <option value="">All Roles</option>
+                                <option>Super Admin</option><option>HOA President</option><option>Board Member</option><option>Staff</option><option>Homeowner</option>
+                            </select>
                         </FieldGroup>
-                    </MudItem>
-                    <MudItem xs="12" sm="4">
                         <FieldGroup Label="Status">
-                            <MudSelect T="string" @bind-Value="_filterStatus" Variant="Variant.Outlined">
-                                <MudSelectItem T="string" Value="@string.Empty">All Statuses</MudSelectItem>
-                                <MudSelectItem T="string" Value="@("Active")">Active</MudSelectItem>
-                                <MudSelectItem T="string" Value="@("Inactive")">Inactive</MudSelectItem>
-                            </MudSelect>
+                            <select class="select select-bordered select-sm w-full" @bind="_filterStatus">
+                                <option value="">All Statuses</option><option>Active</option><option>Inactive</option>
+                            </select>
                         </FieldGroup>
-                    </MudItem>
-                </MudGrid>
-            </MudPaper>
+                    </div>
 
-            @if (!FilteredUsers.Any())
+                    @if (!FilteredUsers.Any())
+                    {
+                        <EmptyState Title="No users found" Subtitle="No users match the current filters." Icon="O" />
+                    }
+                    else
+                    {
+                        <div class="overflow-x-auto">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                        <th>Username</th><th>Role</th><th>Status</th><th>Last Login</th><th class="text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in FilteredUsers)
+                                    {
+                                        <tr class="h-[52px] hover">
+                                            <td class="text-sm font-medium">@user.Username</td>
+                                            <td class="text-sm text-base-content/60">@DisplayValue(user.Role?.RoleName)</td>
+                                            <td><StatusChip Status="@(user.IsActive ? "Active" : "Inactive")" /></td>
+                                            <td class="text-sm text-base-content/60">@FormatDate(user.LastLoginAt)</td>
+                                            <td class="text-right">
+                                                @if (user.IsActive)
+                                                {
+                                                    <button class="btn btn-ghost btn-xs text-error" @onclick="() => DeactivateUserAsync(user.UserId)">Deactivate</button>
+                                                }
+                                                <button class="btn btn-ghost btn-xs" @onclick="() => BeginPasswordReset(user)">Reset Password</button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <TableRecordCount Count="@FilteredUsers.Count()" EntityLabel="users" />
+                    }
+
+                    @if (_resetPasswordUser is not null)
+                    {
+                        <div class="rounded border border-base-300 p-4">
+                            <p class="text-sm font-semibold text-base-content">Reset Password for @_resetPasswordUser.Username</p>
+                            <div class="mt-4 max-w-md">
+                                <FieldGroup Label="New Password"><input type="password" class="input input-bordered w-full" @bind="_resetPasswordValue" /></FieldGroup>
+                            </div>
+                            <div class="mt-4 flex justify-end gap-3">
+                                <button class="btn btn-ghost btn-sm" @onclick="CancelPasswordReset">Cancel</button>
+                                <button class="btn btn-primary btn-sm" @onclick="SavePasswordResetAsync">Save Password</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else if (ActiveTab == "phases")
             {
-                <MudPaper Class="hrms-page-card" Elevation="0">
-                    <EmptyState Title="No users found"
-                                Subtitle="No users match the current filters"
-                                Icon="@Icons.Material.Filled.PersonSearch" />
-                </MudPaper>
+                <div class="space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold text-base-content">Phases</p>
+                            <p class="text-xs text-base-content/40">Maintain phase names and assignments.</p>
+                        </div>
+                        <button class="btn btn-primary btn-sm" @onclick="BeginAddPhase">@(_editingPhaseId.HasValue ? "Cancel Edit" : "Add Phase")</button>
+                    </div>
+
+                    @if (_showPhaseForm)
+                    {
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <FieldGroup Label="Phase Name"><input type="text" class="input input-bordered w-full" @bind="_phaseForm.Name" /></FieldGroup>
+                            <FieldGroup Label="Description"><input type="text" class="input input-bordered w-full" @bind="_phaseForm.Description" /></FieldGroup>
+                        </div>
+                        <div class="flex justify-end gap-3">
+                            <button class="btn btn-ghost btn-sm" @onclick="CancelPhaseForm">Cancel</button>
+                            <button class="btn btn-primary btn-sm" @onclick="SavePhaseAsync">Save Phase</button>
+                        </div>
+                    }
+
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                    <th>Phase Name</th><th>Description</th><th>Homeowner Count</th><th>Unit Count</th><th class="text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var phase in _phases)
+                                {
+                                    <tr class="h-[52px] hover">
+                                        <td class="text-sm font-medium">@phase.Name</td>
+                                        <td class="text-sm text-base-content/60">@DisplayValue(phase.Description)</td>
+                                        <td class="text-sm text-base-content/60">@phase.HomeownerCount</td>
+                                        <td class="text-sm text-base-content/60">@phase.UnitCount</td>
+                                        <td class="text-right">
+                                            <button class="btn btn-ghost btn-xs" @onclick="() => BeginEditPhase(phase)">Edit</button>
+                                            <button class="btn btn-ghost btn-xs text-error" @onclick="() => DeletePhaseAsync(phase.PhaseId)">Delete</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <TableRecordCount Count="@_phases.Count" EntityLabel="phases" />
+                </div>
             }
             else
             {
-                <MudPaper Class="hrms-page-card" Elevation="0">
-                    <MudTable T="User" Items="FilteredUsers" Hover="false" Striped="false">
-                        <HeaderContent>
-                            <MudTh>Username</MudTh>
-                            <MudTh>Role</MudTh>
-                            <MudTh>Status</MudTh>
-                            <MudTh>Last Login</MudTh>
-                            <MudTh>Actions</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd DataLabel="Username">@context.Username</MudTd>
-                            <MudTd DataLabel="Role">@DisplayValue(context.Role?.RoleName)</MudTd>
-                            <MudTd DataLabel="Status"><StatusChip Label="@(context.IsActive ? "Active" : "Inactive")" /></MudTd>
-                            <MudTd DataLabel="Last Login">@FormatDate(context.LastLoginAt)</MudTd>
-                            <MudTd DataLabel="Actions">
-                                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                    @if (context.IsActive)
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
+                        <FieldGroup Label="Username"><input type="text" class="input input-bordered input-sm w-full" @bind-value="_auditUsernameFilter" @bind-value:event="oninput" /></FieldGroup>
+                        <FieldGroup Label="Action">
+                            <select class="select select-bordered select-sm w-full" @bind="_auditActionFilter">
+                                <option value="">All Actions</option>
+                                @foreach (var action in AuditActionOptions)
+                                {
+                                    <option value="@action">@action</option>
+                                }
+                            </select>
+                        </FieldGroup>
+                        <FieldGroup Label="Table">
+                            <select class="select select-bordered select-sm w-full" @bind="_auditTableFilter">
+                                <option value="">All Tables</option>
+                                @foreach (var table in AuditTableOptions)
+                                {
+                                    <option value="@table">@table</option>
+                                }
+                            </select>
+                        </FieldGroup>
+                        <FieldGroup Label="From"><input type="date" class="input input-bordered input-sm w-full" value="@FormatHtmlDate(_auditFromDate)" @onchange="OnAuditFromDateChanged" /></FieldGroup>
+                        <FieldGroup Label="To"><input type="date" class="input input-bordered input-sm w-full" value="@FormatHtmlDate(_auditToDate)" @onchange="OnAuditToDateChanged" /></FieldGroup>
+                    </div>
+
+                    @if (!FilteredAuditLogs.Any())
+                    {
+                        <EmptyState Title="No audit logs found" Subtitle="No audit logs match the current filters." Icon="O" />
+                    }
+                    else
+                    {
+                        <div class="overflow-x-auto">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                        <th>Timestamp</th><th>Username</th><th>Action</th><th>Table</th><th>Record ID</th><th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var log in FilteredAuditLogs)
                                     {
-                                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeactivateUserAsync(context.UserId))">
-                                            Deactivate
-                                        </MudButton>
+                                        <tr class="h-[52px] hover">
+                                            <td class="text-sm text-base-content/60">@FormatDate(log.Timestamp)</td>
+                                            <td class="text-sm">@DisplayValue(log.User?.Username)</td>
+                                            <td class="text-sm text-base-content/60">@DisplayValue(log.Action)</td>
+                                            <td class="text-sm text-base-content/60">@DisplayValue(log.TableAffected)</td>
+                                            <td class="text-sm text-base-content/60">@DisplayValue(log.RecordId?.ToString())</td>
+                                            <td class="text-sm text-base-content/60">@DisplayValue(log.Details)</td>
+                                        </tr>
                                     }
-                                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginPasswordReset(context))">
-                                        Reset Password
-                                    </MudButton>
-                                </div>
-                            </MudTd>
-                        </RowTemplate>
-                    </MudTable>
-                </MudPaper>
-            }
-            <TableRecordCount Count="FilteredUsers.Count()" EntityLabel="users" />
-
-            @if (_resetPasswordUser is not null)
-            {
-                <MudPaper Class="hrms-page-card" Style="padding: 24px; margin-top: 24px;" Elevation="0">
-                    <MudText Style="color: #1E293B; font-size: 1rem; font-weight: 700;">
-                        Reset Password for @_resetPasswordUser.Username
-                    </MudText>
-                    <MudGrid Style="margin-top: 8px;">
-                        <MudItem xs="12" sm="6">
-                            <FieldGroup Label="New Password">
-                                <MudTextField T="string" @bind-Value="_resetPasswordValue" Variant="Variant.Outlined" InputType="InputType.Password" />
-                            </FieldGroup>
-                        </MudItem>
-                    </MudGrid>
-
-                    <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 12px;">
-                        <MudButton Variant="Variant.Text" OnClick="CancelPasswordReset">Cancel</MudButton>
-                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SavePasswordResetAsync">
-                            Save Password
-                        </MudButton>
-                    </div>
-                </MudPaper>
-            }
-        </MudTabPanel>
-
-        <MudTabPanel Text="Phase Management">
-            <MudPaper Class="hrms-page-card" Style="padding: 24px; margin-bottom: 24px;" Elevation="0">
-                <div style="display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap;">
-                    <MudText Style="color: #1E293B; font-size: 1rem; font-weight: 700;">Phases</MudText>
-                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="BeginAddPhase">
-                        @(_editingPhaseId.HasValue ? "Cancel Edit" : "Add Phase")
-                    </MudButton>
+                                </tbody>
+                            </table>
+                        </div>
+                        <TableRecordCount Count="@FilteredAuditLogs.Count()" EntityLabel="audit logs" />
+                    }
                 </div>
-
-                @if (_showPhaseForm)
-                {
-                    <MudDivider Style="margin: 16px 0;" />
-                    <MudGrid>
-                        <MudItem xs="12" sm="4">
-                            <FieldGroup Label="Phase Name">
-                                <MudTextField T="string" @bind-Value="_phaseForm.Name" Variant="Variant.Outlined" />
-                            </FieldGroup>
-                        </MudItem>
-                        <MudItem xs="12" sm="8">
-                            <FieldGroup Label="Description">
-                                <MudTextField T="string" @bind-Value="_phaseForm.Description" Variant="Variant.Outlined" />
-                            </FieldGroup>
-                        </MudItem>
-                    </MudGrid>
-
-                    <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 12px;">
-                        <MudButton Variant="Variant.Text" OnClick="CancelPhaseForm">Cancel</MudButton>
-                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SavePhaseAsync">
-                            Save Phase
-                        </MudButton>
-                    </div>
-                }
-            </MudPaper>
-
-            <MudPaper Class="hrms-page-card" Elevation="0">
-                <MudTable T="PhaseSummaryRow" Items="_phases" Hover="false" Striped="false">
-                    <HeaderContent>
-                        <MudTh>Phase Name</MudTh>
-                        <MudTh>Description</MudTh>
-                        <MudTh>Homeowner Count</MudTh>
-                        <MudTh>Unit Count</MudTh>
-                        <MudTh>Actions</MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="Phase Name">@context.Name</MudTd>
-                        <MudTd DataLabel="Description">@DisplayValue(context.Description)</MudTd>
-                        <MudTd DataLabel="Homeowner Count">@context.HomeownerCount</MudTd>
-                        <MudTd DataLabel="Unit Count">@context.UnitCount</MudTd>
-                        <MudTd DataLabel="Actions">
-                            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => BeginEditPhase(context))">
-                                    Edit
-                                </MudButton>
-                                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeletePhaseAsync(context.PhaseId))">
-                                    Delete
-                                </MudButton>
-                            </div>
-                        </MudTd>
-                    </RowTemplate>
-                </MudTable>
-            </MudPaper>
-            <TableRecordCount Count="_phases.Count" EntityLabel="phases" />
-        </MudTabPanel>
-
-        <MudTabPanel Text="Audit Log">
-            <MudPaper Class="hrms-page-card" Style="padding: 24px; margin-bottom: 24px;" Elevation="0">
-                <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
-                    <FieldGroup Label="Username" Style="min-width: 220px;">
-                        <MudTextField T="string"
-                                      @bind-Value="_auditUsernameFilter"
-                                      Variant="Variant.Outlined"
-                                      Immediate="true" />
-                    </FieldGroup>
-
-                    <FieldGroup Label="Action" Style="min-width: 180px;">
-                        <MudSelect T="string"
-                                   @bind-Value="_auditActionFilter"
-                                   Variant="Variant.Outlined">
-                            <MudSelectItem T="string" Value="@string.Empty">All Actions</MudSelectItem>
-                            @foreach (var action in AuditActionOptions)
-                            {
-                                <MudSelectItem T="string" Value="@action">@action</MudSelectItem>
-                            }
-                        </MudSelect>
-                    </FieldGroup>
-
-                    <FieldGroup Label="Table" Style="min-width: 220px;">
-                        <MudSelect T="string"
-                                   @bind-Value="_auditTableFilter"
-                                   Variant="Variant.Outlined">
-                            <MudSelectItem T="string" Value="@string.Empty">All Tables</MudSelectItem>
-                            @foreach (var table in AuditTableOptions)
-                            {
-                                <MudSelectItem T="string" Value="@table">@table</MudSelectItem>
-                            }
-                        </MudSelect>
-                    </FieldGroup>
-
-                    <FieldGroup Label="From">
-                        <MudDatePicker DateFormat="MMMM dd, yyyy"
-                                       @bind-Date="_auditFromDate"
-                                       Variant="Variant.Outlined" />
-                    </FieldGroup>
-
-                    <FieldGroup Label="To">
-                        <MudDatePicker DateFormat="MMMM dd, yyyy"
-                                       @bind-Date="_auditToDate"
-                                       Variant="Variant.Outlined" />
-                    </FieldGroup>
-                </div>
-            </MudPaper>
-
-            <MudPaper Class="hrms-page-card" Elevation="0">
-                <MudTable T="AuditLog" Items="FilteredAuditLogs" Hover="false" Striped="false">
-                    <HeaderContent>
-                        <MudTh>Timestamp</MudTh>
-                        <MudTh>Username</MudTh>
-                        <MudTh>Action</MudTh>
-                        <MudTh>Table Affected</MudTh>
-                        <MudTh>Record ID</MudTh>
-                        <MudTh>Details</MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="Timestamp">@FormatDate(context.Timestamp)</MudTd>
-                        <MudTd DataLabel="Username">@DisplayValue(context.User?.Username)</MudTd>
-                        <MudTd DataLabel="Action">@DisplayValue(context.Action)</MudTd>
-                        <MudTd DataLabel="Table Affected">@DisplayValue(context.TableAffected)</MudTd>
-                        <MudTd DataLabel="Record ID">@DisplayValue(context.RecordId?.ToString())</MudTd>
-                        <MudTd DataLabel="Details">@DisplayValue(context.Details)</MudTd>
-                    </RowTemplate>
-                </MudTable>
-            </MudPaper>
-            <TableRecordCount Count="FilteredAuditLogs.Count()" EntityLabel="audit logs" />
-        </MudTabPanel>
-    </MudTabs>
+            }
+        </div>
+    </div>
 }
 
 @code {
     private static readonly string[] AuditActionOptions = ["Login", "Create", "Update", "Delete"];
-    private static readonly string[] AuditTableOptions =
-    [
-        "Users",
-        "Homeowners",
-        "Units",
-        "Events",
-        "Attendances",
-        "InteractionLogs",
-        "MSMEs",
-        "DuesRecords",
-        "ViolationRecords",
-        "ClearanceRequests",
-        "AuditLogs",
-        "HOASettings",
-        "Phases"
-    ];
-
+    private static readonly string[] AuditTableOptions = ["Users", "Homeowners", "Units", "Events", "Attendances", "InteractionLogs", "MSMEs", "DuesRecords", "ViolationRecords", "ClearanceRequests", "AuditLogs", "HOASettings", "Phases"];
     private HOASettings _hoaSettings = new() { SettingId = 1 };
     private List<User> _users = [];
     private List<Role> _roles = [];
@@ -440,96 +307,49 @@ else
     private string _auditTableFilter = string.Empty;
     private DateTime? _auditFromDate;
     private DateTime? _auditToDate;
+    private string ActiveTab { get; set; } = "hoa";
 
-    private IEnumerable<User> FilteredUsers => _users
-        .Where(user =>
-            (string.IsNullOrEmpty(_filterUsername) ||
-             user.Username.Contains(_filterUsername, StringComparison.OrdinalIgnoreCase)) &&
-            (string.IsNullOrEmpty(_filterRole) ||
-             user.Role.RoleName == _filterRole) &&
-            (string.IsNullOrEmpty(_filterStatus) ||
-             (user.IsActive ? "Active" : "Inactive") == _filterStatus));
+    private IEnumerable<User> FilteredUsers => _users.Where(user =>
+        (string.IsNullOrEmpty(_filterUsername) || user.Username.Contains(_filterUsername, StringComparison.OrdinalIgnoreCase)) &&
+        (string.IsNullOrEmpty(_filterRole) || user.Role.RoleName == _filterRole) &&
+        (string.IsNullOrEmpty(_filterStatus) || (user.IsActive ? "Active" : "Inactive") == _filterStatus));
 
     private IEnumerable<AuditLog> FilteredAuditLogs => _auditLogs
-        .Where(log => string.IsNullOrWhiteSpace(_auditUsernameFilter) ||
-                      (log.User?.Username?.Contains(_auditUsernameFilter, StringComparison.OrdinalIgnoreCase) ?? false))
+        .Where(log => string.IsNullOrWhiteSpace(_auditUsernameFilter) || (log.User?.Username?.Contains(_auditUsernameFilter, StringComparison.OrdinalIgnoreCase) ?? false))
         .Where(log => string.IsNullOrWhiteSpace(_auditActionFilter) || log.Action == _auditActionFilter)
         .Where(log => string.IsNullOrWhiteSpace(_auditTableFilter) || log.TableAffected == _auditTableFilter)
-        .Where(log =>
-        {
-            var timestamp = ParseDate(log.Timestamp);
-            return !_auditFromDate.HasValue || (timestamp.HasValue && timestamp.Value.Date >= _auditFromDate.Value.Date);
-        })
-        .Where(log =>
-        {
-            var timestamp = ParseDate(log.Timestamp);
-            return !_auditToDate.HasValue || (timestamp.HasValue && timestamp.Value.Date <= _auditToDate.Value.Date);
-        })
+        .Where(log => !_auditFromDate.HasValue || (ParseDate(log.Timestamp)?.Date >= _auditFromDate.Value.Date))
+        .Where(log => !_auditToDate.HasValue || (ParseDate(log.Timestamp)?.Date <= _auditToDate.Value.Date))
         .OrderByDescending(log => ParseDate(log.Timestamp));
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadAsync();
-    }
+    protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {
         _isLoading = true;
-
         _hoaSettings = await LoadHoaSettingsAsync();
         await LoadLogoPreviewAsync(_hoaSettings.LogoPath);
-
-        _users = await DbContext.Users
-            .AsNoTracking()
-            .Include(user => user.Role)
-            .Include(user => user.Homeowner)
-            .OrderBy(user => user.Username)
-            .ToListAsync();
-
-        _roles = await DbContext.Roles
-            .AsNoTracking()
-            .OrderBy(role => role.RoleName)
-            .ToListAsync();
-
+        _users = await DbContext.Users.AsNoTracking().Include(user => user.Role).Include(user => user.Homeowner).OrderBy(user => user.Username).ToListAsync();
+        _roles = await DbContext.Roles.AsNoTracking().OrderBy(role => role.RoleName).ToListAsync();
         _availableHomeowners = await GetAvailableHomeownersAsync();
-
-        _phases = await DbContext.Phases
-            .AsNoTracking()
-            .Include(phase => phase.Homeowners)
-            .Include(phase => phase.Units)
-            .OrderBy(phase => phase.Name)
-            .Select(phase => new PhaseSummaryRow
-            {
-                PhaseId = phase.PhaseId,
-                Name = phase.Name,
-                Description = phase.Description,
-                HomeownerCount = phase.Homeowners.Count(homeowner => !homeowner.IsDeleted),
-                UnitCount = phase.Units.Count
-            })
-            .ToListAsync();
-
-        _auditLogs = await DbContext.AuditLogs
-            .AsNoTracking()
-            .Include(log => log.User)
-            .OrderByDescending(log => log.Timestamp)
-            .ToListAsync();
-
+        _phases = await DbContext.Phases.AsNoTracking().Include(phase => phase.Homeowners).Include(phase => phase.Units).OrderBy(phase => phase.Name).Select(phase => new PhaseSummaryRow
+        {
+            PhaseId = phase.PhaseId,
+            Name = phase.Name,
+            Description = phase.Description,
+            HomeownerCount = phase.Homeowners.Count(homeowner => !homeowner.IsDeleted),
+            UnitCount = phase.Units.Count
+        }).ToListAsync();
+        _auditLogs = await DbContext.AuditLogs.AsNoTracking().Include(log => log.User).OrderByDescending(log => log.Timestamp).ToListAsync();
         _isLoading = false;
     }
 
     private async Task SaveHoaSettingsAsync()
     {
-        if (AuthService.CurrentUser is null)
+        if (AuthService.CurrentUser is null) return;
+        if (string.IsNullOrWhiteSpace(_hoaSettings.HOAName) || string.IsNullOrWhiteSpace(_hoaSettings.Subdivision) || string.IsNullOrWhiteSpace(_hoaSettings.City) || string.IsNullOrWhiteSpace(_hoaSettings.Province))
         {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_hoaSettings.HOAName) ||
-            string.IsNullOrWhiteSpace(_hoaSettings.Subdivision) ||
-            string.IsNullOrWhiteSpace(_hoaSettings.City) ||
-            string.IsNullOrWhiteSpace(_hoaSettings.Province))
-        {
-            Snackbar.Add("HOA name and address fields are required.", Severity.Warning);
+            await ShowToastAsync("HOA name and address fields are required.", "warning");
             return;
         }
 
@@ -556,14 +376,14 @@ else
         _hoaSettings = await LoadHoaSettingsAsync();
         await LoadLogoPreviewAsync(_hoaSettings.LogoPath);
         await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Update", "HOASettings", settings.SettingId, "Updated HOA settings.");
-        Snackbar.Add("HOA settings saved.", Severity.Success);
+        await ShowToastAsync("HOA settings saved.", "success");
     }
 
     private async Task DiscardHoaSettingsChangesAsync()
     {
         _hoaSettings = await LoadHoaSettingsAsync();
         await LoadLogoPreviewAsync(_hoaSettings.LogoPath);
-        Snackbar.Add("Unsaved HOA configuration changes were discarded.", Severity.Info);
+        await ShowToastAsync("Unsaved HOA configuration changes were discarded.", "info");
     }
 
     private async Task PickLogoFileAsync()
@@ -577,16 +397,13 @@ else
             })
         });
 
-        if (result is null)
-        {
-            return;
-        }
+        if (result is null) return;
 
         var extension = System.IO.Path.GetExtension(result.FileName);
         if (!string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(extension, ".svg", StringComparison.OrdinalIgnoreCase))
         {
-            Snackbar.Add("Only PNG and SVG logo files are supported.", Severity.Warning);
+            await ShowToastAsync("Only PNG and SVG logo files are supported.", "warning");
             return;
         }
 
@@ -597,38 +414,28 @@ else
     private void ToggleAddUserForm()
     {
         _showAddUserForm = !_showAddUserForm;
-        if (!_showAddUserForm)
-        {
-            _userForm = new UserFormModel();
-        }
+        if (!_showAddUserForm) _userForm = new UserFormModel();
     }
 
     private async Task AddUserAsync()
     {
-        if (AuthService.CurrentUser is null)
+        if (AuthService.CurrentUser is null) return;
+        if (string.IsNullOrWhiteSpace(_userForm.Username) || string.IsNullOrWhiteSpace(_userForm.Password) || _userForm.RoleId == 0)
         {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_userForm.Username) ||
-            string.IsNullOrWhiteSpace(_userForm.Password) ||
-            _userForm.RoleId == 0)
-        {
-            Snackbar.Add("Username, password, and role are required.", Severity.Warning);
+            await ShowToastAsync("Username, password, and role are required.", "warning");
             return;
         }
 
         var username = _userForm.Username.Trim();
         if (await DbContext.Users.AnyAsync(user => user.Username == username))
         {
-            Snackbar.Add("That username is already in use.", Severity.Error);
+            await ShowToastAsync("That username is already in use.", "error");
             return;
         }
 
-        if (_userForm.HomeownerId.HasValue &&
-            await DbContext.Users.AnyAsync(user => user.HomeownerId == _userForm.HomeownerId.Value))
+        if (_userForm.HomeownerId.HasValue && await DbContext.Users.AnyAsync(user => user.HomeownerId == _userForm.HomeownerId.Value))
         {
-            Snackbar.Add("That homeowner is already linked to another user.", Severity.Error);
+            await ShowToastAsync("That homeowner is already linked to another user.", "error");
             return;
         }
 
@@ -645,8 +452,7 @@ else
         DbContext.Users.Add(user);
         await DbContext.SaveChangesAsync();
         await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Create", "Users", user.UserId, $"Created user '{user.Username}'.");
-
-        Snackbar.Add("User created successfully.", Severity.Success);
+        await ShowToastAsync("User created successfully.", "success");
         _userForm = new UserFormModel();
         _showAddUserForm = false;
         await LoadAsync();
@@ -666,58 +472,48 @@ else
 
     private async Task SavePasswordResetAsync()
     {
-        if (AuthService.CurrentUser is null || _resetPasswordUser is null)
-        {
-            return;
-        }
-
+        if (AuthService.CurrentUser is null || _resetPasswordUser is null) return;
         if (string.IsNullOrWhiteSpace(_resetPasswordValue))
         {
-            Snackbar.Add("Enter a new password first.", Severity.Warning);
+            await ShowToastAsync("Enter a new password first.", "warning");
             return;
         }
 
         var user = await DbContext.Users.FirstOrDefaultAsync(item => item.UserId == _resetPasswordUser.UserId);
         if (user is null)
         {
-            Snackbar.Add("The selected user could not be found.", Severity.Error);
+            await ShowToastAsync("The selected user could not be found.", "error");
             return;
         }
 
         user.PasswordHash = HashHelper.Hash(_resetPasswordValue);
         await DbContext.SaveChangesAsync();
         await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Update", "Users", user.UserId, $"Reset password for '{user.Username}'.");
-
-        Snackbar.Add("Password updated successfully.", Severity.Success);
+        await ShowToastAsync("Password updated successfully.", "success");
         CancelPasswordReset();
         await LoadAsync();
     }
 
     private async Task DeactivateUserAsync(int userId)
     {
-        if (AuthService.CurrentUser is null)
-        {
-            return;
-        }
-
+        if (AuthService.CurrentUser is null) return;
         if (AuthService.CurrentUser.UserId == userId)
         {
-            Snackbar.Add("You cannot deactivate your own account.", Severity.Warning);
+            await ShowToastAsync("You cannot deactivate your own account.", "warning");
             return;
         }
 
         var user = await DbContext.Users.FirstOrDefaultAsync(item => item.UserId == userId);
         if (user is null)
         {
-            Snackbar.Add("The selected user could not be found.", Severity.Error);
+            await ShowToastAsync("The selected user could not be found.", "error");
             return;
         }
 
         user.IsActive = false;
         await DbContext.SaveChangesAsync();
         await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Update", "Users", user.UserId, $"Deactivated user '{user.Username}'.");
-
-        Snackbar.Add("User deactivated.", Severity.Success);
+        await ShowToastAsync("User deactivated.", "success");
         await LoadAsync();
     }
 
@@ -738,11 +534,7 @@ else
     {
         _showPhaseForm = true;
         _editingPhaseId = phase.PhaseId;
-        _phaseForm = new PhaseFormModel
-        {
-            Name = phase.Name,
-            Description = phase.Description
-        };
+        _phaseForm = new PhaseFormModel { Name = phase.Name, Description = phase.Description };
     }
 
     private void CancelPhaseForm()
@@ -754,14 +546,10 @@ else
 
     private async Task SavePhaseAsync()
     {
-        if (AuthService.CurrentUser is null)
-        {
-            return;
-        }
-
+        if (AuthService.CurrentUser is null) return;
         if (string.IsNullOrWhiteSpace(_phaseForm.Name))
         {
-            Snackbar.Add("Phase name is required.", Severity.Warning);
+            await ShowToastAsync("Phase name is required.", "warning");
             return;
         }
 
@@ -770,7 +558,7 @@ else
             var phase = await DbContext.Phases.FirstOrDefaultAsync(item => item.PhaseId == _editingPhaseId.Value);
             if (phase is null)
             {
-                Snackbar.Add("The selected phase could not be found.", Severity.Error);
+                await ShowToastAsync("The selected phase could not be found.", "error");
                 return;
             }
 
@@ -778,23 +566,15 @@ else
             phase.Description = NullIfEmpty(_phaseForm.Description);
             await DbContext.SaveChangesAsync();
             await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Update", "Phases", phase.PhaseId, $"Updated phase '{phase.Name}'.");
-
-            Snackbar.Add("Phase updated.", Severity.Success);
+            await ShowToastAsync("Phase updated.", "success");
         }
         else
         {
-            var phase = new Phase
-            {
-                Name = _phaseForm.Name.Trim(),
-                Description = NullIfEmpty(_phaseForm.Description),
-                CreatedAt = DateTime.UtcNow.ToString("o")
-            };
-
+            var phase = new Phase { Name = _phaseForm.Name.Trim(), Description = NullIfEmpty(_phaseForm.Description), CreatedAt = DateTime.UtcNow.ToString("o") };
             DbContext.Phases.Add(phase);
             await DbContext.SaveChangesAsync();
             await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Create", "Phases", phase.PhaseId, $"Created phase '{phase.Name}'.");
-
-            Snackbar.Add("Phase created.", Severity.Success);
+            await ShowToastAsync("Phase created.", "success");
         }
 
         CancelPhaseForm();
@@ -803,45 +583,38 @@ else
 
     private async Task DeletePhaseAsync(int phaseId)
     {
-        if (AuthService.CurrentUser is null)
-        {
-            return;
-        }
+        if (AuthService.CurrentUser is null) return;
 
         var assignedHomeowners = await DbContext.Homeowners.CountAsync(homeowner => !homeowner.IsDeleted && homeowner.PhaseId == phaseId);
         var assignedUnits = await DbContext.Units.CountAsync(unit => unit.PhaseId == phaseId);
-
         if (assignedHomeowners > 0 || assignedUnits > 0)
         {
-            Snackbar.Add("This phase cannot be deleted while homeowners or units are still assigned to it.", Severity.Error);
+            await ShowToastAsync("This phase cannot be deleted while homeowners or units are still assigned to it.", "error");
             return;
         }
 
         var phase = await DbContext.Phases.FirstOrDefaultAsync(item => item.PhaseId == phaseId);
         if (phase is null)
         {
-            Snackbar.Add("The selected phase could not be found.", Severity.Error);
+            await ShowToastAsync("The selected phase could not be found.", "error");
             return;
         }
 
         DbContext.Phases.Remove(phase);
         await DbContext.SaveChangesAsync();
         await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Delete", "Phases", phase.PhaseId, $"Deleted phase '{phase.Name}'.");
-
-        Snackbar.Add("Phase deleted.", Severity.Success);
+        await ShowToastAsync("Phase deleted.", "success");
         await LoadAsync();
     }
 
     private async Task<List<Homeowner>> GetAvailableHomeownersAsync()
     {
-        var linkedHomeownerIds = await DbContext.Users
-            .AsNoTracking()
+        var linkedHomeownerIds = await DbContext.Users.AsNoTracking()
             .Where(user => user.HomeownerId.HasValue)
             .Select(user => user.HomeownerId!.Value)
             .ToListAsync();
 
-        return await DbContext.Homeowners
-            .AsNoTracking()
+        return await DbContext.Homeowners.AsNoTracking()
             .Where(homeowner => !homeowner.IsDeleted && !linkedHomeownerIds.Contains(homeowner.HomeownerId))
             .OrderBy(homeowner => homeowner.LastName)
             .ThenBy(homeowner => homeowner.FirstName)
@@ -850,19 +623,9 @@ else
 
     private async Task<HOASettings> LoadHoaSettingsAsync()
     {
-        var settings = await DbContext.HOASettings
-            .AsNoTracking()
-            .FirstOrDefaultAsync();
-
+        var settings = await DbContext.HOASettings.AsNoTracking().FirstOrDefaultAsync();
         return settings is null
-            ? new HOASettings
-            {
-                SettingId = 1,
-                HOAName = "Homeowners Association",
-                Subdivision = "Sample Subdivision",
-                City = "Davao City",
-                Province = "Davao del Sur"
-            }
+            ? new HOASettings { SettingId = 1, HOAName = "Homeowners Association", Subdivision = "Sample Subdivision", City = "Davao City", Province = "Davao del Sur" }
             : new HOASettings
             {
                 SettingId = settings.SettingId,
@@ -883,70 +646,23 @@ else
     private async Task LoadLogoPreviewAsync(string? path)
     {
         _logoPreviewUrl = null;
-
-        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
-        {
-            return;
-        }
-
+        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path)) return;
         var bytes = await System.IO.File.ReadAllBytesAsync(path);
-        var extension = System.IO.Path.GetExtension(path).ToLowerInvariant();
-        var mimeType = extension switch
-        {
-            ".svg" => "image/svg+xml",
-            _ => "image/png"
-        };
-
+        var mimeType = System.IO.Path.GetExtension(path).ToLowerInvariant() == ".svg" ? "image/svg+xml" : "image/png";
         _logoPreviewUrl = $"data:{mimeType};base64,{Convert.ToBase64String(bytes)}";
     }
 
-    private static string GetHomeownerDisplay(Homeowner homeowner)
-    {
-        var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
-            .Where(value => !string.IsNullOrWhiteSpace(value));
+    private Task ShowToastAsync(string message, string type) => JS.InvokeVoidAsync("hrms.showToast", message, type).AsTask();
+    private void OnAuditFromDateChanged(ChangeEventArgs args) => _auditFromDate = DateTime.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
+    private void OnAuditToDateChanged(ChangeEventArgs args) => _auditToDate = DateTime.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
+    private static string FormatHtmlDate(DateTime? value) => value?.ToString("yyyy-MM-dd") ?? string.Empty;
+    private static string GetHomeownerDisplay(Homeowner homeowner) => string.Join(" ", new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }.Where(value => !string.IsNullOrWhiteSpace(value)));
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+    private static string FormatDate(string? value) => string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed) ? "-" : parsed.ToString("MMMM dd, yyyy");
+    private static DateTime? ParseDate(string? value) => DateTime.TryParse(value, out var parsed) ? parsed : null;
 
-        return string.Join(" ", parts);
-    }
-
-    private static string? NullIfEmpty(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private static string DisplayValue(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? "-" : value;
-
-    private static string FormatDate(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value) || !DateTime.TryParse(value, out var parsed))
-        {
-            return "-";
-        }
-
-        return parsed.ToString("MMMM dd, yyyy");
-    }
-
-    private static DateTime? ParseDate(string? value) =>
-        DateTime.TryParse(value, out var parsed) ? parsed : null;
-
-    private sealed class UserFormModel
-    {
-        public string Username { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-        public int RoleId { get; set; }
-        public int? HomeownerId { get; set; }
-    }
-
-    private sealed class PhaseFormModel
-    {
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-    }
-
-    private sealed class PhaseSummaryRow
-    {
-        public int PhaseId { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public int HomeownerCount { get; set; }
-        public int UnitCount { get; set; }
-    }
+    private sealed class UserFormModel { public string Username { get; set; } = string.Empty; public string Password { get; set; } = string.Empty; public int RoleId { get; set; } public int? HomeownerId { get; set; } }
+    private sealed class PhaseFormModel { public string Name { get; set; } = string.Empty; public string? Description { get; set; } }
+    private sealed class PhaseSummaryRow { public int PhaseId { get; set; } public string Name { get; set; } = string.Empty; public string? Description { get; set; } public int HomeownerCount { get; set; } public int UnitCount { get; set; } }
 }

@@ -36,6 +36,9 @@ public class ViolationService
             .ToListAsync();
     }
 
+    public Task<List<ViolationRecord>> GetByHomeownerIdAsync(int homeownerId) =>
+        GetByHomeownerAsync(homeownerId);
+
     public async Task<List<ViolationRecord>> SearchAsync(string? homeownerName, string? status, string? type)
     {
         var query = BaseQuery();

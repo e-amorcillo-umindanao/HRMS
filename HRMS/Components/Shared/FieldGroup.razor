@@ -1,5 +1,9 @@
 <div class="@BuildClassName()" style="@Style">
-    <label class="field-label">@Label</label>
+    <label class="label pb-1">
+        <span class="label-text text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+            @Label
+        </span>
+    </label>
     @ChildContent
 </div>
 
@@ -17,5 +21,5 @@
     public RenderFragment? ChildContent { get; set; }
 
     private string BuildClassName() =>
-        string.IsNullOrWhiteSpace(Class) ? "field-group" : $"field-group {Class}";
+        string.IsNullOrWhiteSpace(Class) ? "form-control w-full" : $"form-control w-full {Class}";
 }

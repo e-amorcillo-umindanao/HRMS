@@ -2,105 +2,134 @@
 @inject MSMEService MSMEService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
-<PageHeader Title="MSME Registry" Subtitle="Track registered businesses, owners, and permit status." />
+<PageHeader Title="MSME Registry"
+            Subtitle="Track registered businesses, owners, and permit status.">
+    <Actions>
+        <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/msme/add")'>
+            Register Business
+        </button>
+    </Actions>
+</PageHeader>
 
-<MudPaper Class="hrms-page-card" Style="padding: 16px; margin-bottom: 24px;" Elevation="0">
-    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
-        <FieldGroup Label="Business Name" Style="min-width: 220px;">
-            <MudTextField T="string"
-                          Value="_nameFilter"
-                          ValueChanged="OnNameFilterChanged"
-                          Variant="Variant.Outlined"
-                          Immediate="true" />
-        </FieldGroup>
+<div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
+    <div class="card-body p-4">
+        <div class="flex flex-wrap items-end gap-3">
+            <div class="form-control min-w-[200px] flex-1">
+                <label class="label py-0 pb-1">
+                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Business Name</span>
+                </label>
+                <input type="text"
+                       class="input input-bordered input-sm w-full"
+                       placeholder="Search business name..."
+                       value="@_nameFilter"
+                       @oninput="OnNameInput" />
+            </div>
 
-        <FieldGroup Label="Status" Style="min-width: 180px;">
-            <MudSelect T="string"
-                       Value="_statusFilter"
-                       ValueChanged="OnStatusFilterChanged"
-                       Variant="Variant.Outlined">
-                <MudSelectItem T="string" Value="@string.Empty">All Statuses</MudSelectItem>
-                @foreach (var status in StatusOptions)
-                {
-                    <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
-                }
-            </MudSelect>
-        </FieldGroup>
+            <div class="form-control min-w-[148px]">
+                <label class="label py-0 pb-1">
+                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Status</span>
+                </label>
+                <select class="select select-bordered select-sm" value="@_statusFilter" @onchange="OnStatusChanged">
+                    <option value="">All Statuses</option>
+                    @foreach (var status in StatusOptions)
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+            </div>
 
-        <FieldGroup Label="Business Type" Style="min-width: 220px;">
-            <MudSelect T="string"
-                       Value="_businessTypeFilter"
-                       ValueChanged="OnBusinessTypeFilterChanged"
-                       Variant="Variant.Outlined">
-                <MudSelectItem T="string" Value="@string.Empty">All Business Types</MudSelectItem>
-                @foreach (var businessType in BusinessTypeOptions)
-                {
-                    <MudSelectItem T="string" Value="@businessType">@businessType</MudSelectItem>
-                }
-            </MudSelect>
-        </FieldGroup>
-
-        <div style="margin-left: auto;">
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="/msme/add">
-                Register Business
-            </MudButton>
+            <div class="form-control min-w-[180px]">
+                <label class="label py-0 pb-1">
+                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Business Type</span>
+                </label>
+                <select class="select select-bordered select-sm" value="@_businessTypeFilter" @onchange="OnBusinessTypeChanged">
+                    <option value="">All Business Types</option>
+                    @foreach (var businessType in BusinessTypeOptions)
+                    {
+                        <option value="@businessType">@businessType</option>
+                    }
+                </select>
+            </div>
         </div>
     </div>
-</MudPaper>
+</div>
 
-@if (_isLoading)
-{
-    <LoadingSpinner />
-}
-else if (_msmes.Count == 0)
-{
-    <MudPaper Class="hrms-page-card" Elevation="0">
-        <EmptyState Title="No MSMEs found"
-                    Subtitle="Register a business to begin tracking owners and interactions."
-                    Icon="@Icons.Material.Filled.Storefront" />
-    </MudPaper>
-}
-else
-{
-    <MudPaper Class="hrms-page-card" Elevation="0">
-        <MudTable T="MSME" Items="_msmes" Hover="false" Striped="false">
-            <HeaderContent>
-                <MudTh>Business Name</MudTh>
-                <MudTh>Business Type</MudTh>
-                <MudTh>Owner</MudTh>
-                <MudTh>Status</MudTh>
-                <MudTh>Registration Date</MudTh>
-                <MudTh>Expiry Date</MudTh>
-                <MudTh>Actions</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Business Name">@DisplayValue(context.BusinessName)</MudTd>
-                <MudTd DataLabel="Business Type">@DisplayValue(context.BusinessType)</MudTd>
-                <MudTd DataLabel="Owner">@DisplayValue(GetFullName(context.Homeowner))</MudTd>
-                <MudTd DataLabel="Status"><StatusChip Label="@context.Status" /></MudTd>
-                <MudTd DataLabel="Registration Date">@FormatDate(context.RegistrationDate)</MudTd>
-                <MudTd DataLabel="Expiry Date">@((MarkupString)RenderExpiryDate(context))</MudTd>
-                <MudTd DataLabel="Actions">
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/msme/{context.MSMEId}"))">
-                            View
-                        </MudButton>
-                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/msme/edit/{context.MSMEId}"))">
-                            Edit
-                        </MudButton>
-                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => PromptDeleteAsync(context))">
-                            Delete
-                        </MudButton>
-                    </div>
-                </MudTd>
-            </RowTemplate>
-        </MudTable>
-    </MudPaper>
-    <TableRecordCount Count="_msmes.Count" EntityLabel="msmes" />
-}
+<div class="card border border-base-300 bg-base-100 shadow-none">
+    <div class="card-body p-0">
+        @if (_isLoading)
+        {
+            <LoadingSpinner />
+        }
+        else if (_msmes.Count == 0)
+        {
+            <EmptyState Title="No MSMEs found"
+                        Subtitle="Register a business to begin tracking owners and interactions."
+                        Icon="O" />
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                            <th>Business Name</th>
+                            <th>Business Type</th>
+                            <th>Owner</th>
+                            <th>Status</th>
+                            <th>Registration Date</th>
+                            <th>Expiry Date</th>
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var msme in _msmes)
+                        {
+                            <tr class="h-[52px] hover">
+                                <td class="text-sm text-base-content">@DisplayValue(msme.BusinessName)</td>
+                                <td>
+                                    <span class="badge badge-sm @GetBusinessTypeBadge(msme.BusinessType)">@DisplayValue(msme.BusinessType)</span>
+                                </td>
+                                <td class="text-sm text-base-content/60">@DisplayValue(GetFullName(msme.Homeowner))</td>
+                                <td><StatusChip Status="@msme.Status" /></td>
+                                <td class="text-sm text-base-content/60">@FormatDate(msme.RegistrationDate)</td>
+                                <td class="@(IsExpiredWarning(msme) ? "text-error font-semibold" : "text-base-content/60") text-sm">@FormatDate(msme.ExpiryDate)</td>
+                                <td class="text-right">
+                                    <button class="btn btn-ghost btn-xs"
+                                            @onclick='() => NavigationManager.NavigateTo($"/msme/{msme.MSMEId}")'>
+                                        View
+                                    </button>
+                                    <button class="btn btn-ghost btn-xs"
+                                            @onclick='() => NavigationManager.NavigateTo($"/msme/edit/{msme.MSMEId}")'>
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-ghost btn-xs text-error"
+                                            @onclick='() => AskDelete(msme)'>
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-4 pb-4">
+                <TableRecordCount From="@(_msmes.Count == 0 ? 0 : 1)"
+                                  To="@_msmes.Count"
+                                  Total="@_msmes.Count"
+                                  Entity="msmes" />
+            </div>
+        }
+    </div>
+</div>
+
+<ConfirmDialog IsVisible="@_showConfirm"
+               Title="Delete MSME"
+               Message="@_confirmMessage"
+               ConfirmLabel="Delete"
+               OnConfirm="DeleteConfirmedAsync"
+               OnCancel="CancelDelete" />
 
 @code {
     private static readonly string[] StatusOptions = ["Active", "Suspended", "Expired", "Closed"];
@@ -119,6 +148,9 @@ else
     private string _statusFilter = string.Empty;
     private string _businessTypeFilter = string.Empty;
     private bool _isLoading = true;
+    private bool _showConfirm;
+    private int? _pendingDeleteId;
+    private string _confirmMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -138,51 +170,57 @@ else
         _isLoading = false;
     }
 
-    private async Task OnNameFilterChanged(string value)
+    private async Task OnNameInput(ChangeEventArgs args)
     {
-        _nameFilter = value;
+        _nameFilter = args.Value?.ToString() ?? string.Empty;
         await LoadMsmesAsync();
     }
 
-    private async Task OnStatusFilterChanged(string value)
+    private async Task OnStatusChanged(ChangeEventArgs args)
     {
-        _statusFilter = value;
+        _statusFilter = args.Value?.ToString() ?? string.Empty;
         await LoadMsmesAsync();
     }
 
-    private async Task OnBusinessTypeFilterChanged(string value)
+    private async Task OnBusinessTypeChanged(ChangeEventArgs args)
     {
-        _businessTypeFilter = value;
+        _businessTypeFilter = args.Value?.ToString() ?? string.Empty;
         await LoadMsmesAsync();
     }
 
-    private async Task PromptDeleteAsync(MSME msme)
+    private void AskDelete(MSME msme)
     {
-        var parameters = new DialogParameters
-        {
-            [nameof(ConfirmDialog.Title)] = "Delete MSME",
-            [nameof(ConfirmDialog.Message)] = $"Are you sure you want to delete {msme.BusinessName}?",
-            [nameof(ConfirmDialog.OnConfirm)] = EventCallback.Factory.Create(this, async () => await DeleteAsync(msme.MSMEId))
-        };
-
-        await DialogService.ShowAsync<ConfirmDialog>(string.Empty, parameters);
+        _pendingDeleteId = msme.MSMEId;
+        _confirmMessage = $"Are you sure you want to delete {msme.BusinessName}?";
+        _showConfirm = true;
     }
 
-    private async Task DeleteAsync(int msmeId)
+    private Task CancelDelete()
     {
-        if (AuthService.CurrentUser is null)
+        _showConfirm = false;
+        _pendingDeleteId = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteConfirmedAsync()
+    {
+        _showConfirm = false;
+
+        if (!_pendingDeleteId.HasValue || AuthService.CurrentUser is null)
         {
             return;
         }
 
-        var deleted = await MSMEService.DeleteAsync(msmeId, AuthService.CurrentUser.UserId);
+        var deleted = await MSMEService.DeleteAsync(_pendingDeleteId.Value, AuthService.CurrentUser.UserId);
+        _pendingDeleteId = null;
+
         if (!deleted)
         {
-            Snackbar.Add("Unable to delete MSME.", Severity.Error);
+            await JS.InvokeVoidAsync("hrms.showToast", "Unable to delete MSME.", "error");
             return;
         }
 
-        Snackbar.Add("MSME deleted successfully.", Severity.Success);
+        await JS.InvokeVoidAsync("hrms.showToast", "MSME deleted successfully.", "success");
         await LoadMsmesAsync();
     }
 
@@ -215,18 +253,20 @@ else
         return parsed.ToString("MMMM dd, yyyy");
     }
 
-    private static string RenderExpiryDate(MSME msme)
+    private static bool IsExpiredWarning(MSME msme) =>
+        !string.IsNullOrWhiteSpace(msme.ExpiryDate)
+        && DateTime.TryParse(msme.ExpiryDate, out var expiryDate)
+        && expiryDate.Date < DateTime.Today
+        && msme.Status != "Expired"
+        && msme.Status != "Closed";
+
+    private static string GetBusinessTypeBadge(string? businessType) => businessType switch
     {
-        if (string.IsNullOrWhiteSpace(msme.ExpiryDate) || !DateTime.TryParse(msme.ExpiryDate, out var expiryDate))
-        {
-            return "-";
-        }
-
-        var formatted = expiryDate.ToString("MMMM dd, yyyy");
-        var isExpiredWhileActive = expiryDate.Date < DateTime.UtcNow.Date && msme.Status == "Active";
-
-        return isExpiredWhileActive
-            ? $"<span style=\"color:#EF4444;font-weight:600;\">{formatted}</span>"
-            : formatted;
-    }
+        "Sari-sari Store" => "badge-info",
+        "Home Salon/Barbershop" => "badge-success",
+        "Food Business" => "badge-warning",
+        "Online Selling" => "badge-info",
+        "Repair Shop" => "badge-warning",
+        _ => "badge-ghost"
+    };
 }

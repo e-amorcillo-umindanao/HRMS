@@ -1,4 +1,4 @@
 @page "/"
 @inject AuthService AuthService
 
-<RedirectTo Href="@(AuthService.IsAuthenticated ? "/dashboard" : "/login")" />
+<RedirectTo Href="@(AuthService.IsAuthenticated ? AuthService.DefaultRoute : "/login")" />

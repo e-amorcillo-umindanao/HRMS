@@ -1,10 +1,12 @@
 @page "/dues/add"
+@page "/dues/new"
 @page "/dues/edit/{DuesId:int}"
+@page "/dues/{DuesId:int}/edit"
 @inject DuesService DuesService
 @inject HomeownerService HomeownerService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageHeader Title="@(IsEdit ? "Edit Dues Record" : "Record Dues")"
             Subtitle="Capture monthly dues, due dates, and payment status." />
@@ -15,78 +17,89 @@
 }
 else
 {
-    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-        @if (!string.IsNullOrWhiteSpace(_errorMessage))
-        {
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
-                @_errorMessage
-            </MudAlert>
-        }
-
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Dues Information</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudAutocomplete T="Homeowner"
-                                 Label="Homeowner"
-                                 Value="_selectedHomeowner"
-                                 ValueChanged="OnHomeownerChanged"
-                                 SearchFunc="SearchHomeownersAsync"
-                                 ToStringFunc="GetHomeownerDisplay"
-                                 Variant="Variant.Outlined"
-                                 Clearable="true"
-                                 ResetValueOnEmptyText="true"
-                                 MaxItems="8"
-                                 Dense="true" />
-            </MudItem>
-            <MudItem xs="12" sm="3">
-                <MudSelect T="int" @bind-Value="_model.Month" Label="Month" Variant="Variant.Outlined">
-                    @foreach (var month in Enumerable.Range(1, 12))
-                    {
-                        <MudSelectItem T="int" Value="@month">@GetMonthName(month)</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="3">
-                <MudSelect T="int" @bind-Value="_model.Year" Label="Year" Variant="Variant.Outlined">
-                    @foreach (var year in _yearOptions)
-                    {
-                        <MudSelectItem T="int" Value="@year">@year</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="4">
-                <MudNumericField T="decimal" @bind-Value="_model.Amount" Label="Amount" Variant="Variant.Outlined" Min="0" />
-            </MudItem>
-            <MudItem xs="12" sm="4">
-                <MudDatePicker Label="Due Date" DateFormat="MMMM dd, yyyy" @bind-Date="_dueDate" Variant="Variant.Outlined" />
-            </MudItem>
-        </MudGrid>
-
-        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Payment</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="4">
-                <MudSelect T="string" Value="_model.Status" ValueChanged="OnStatusChanged" Label="Status" Variant="Variant.Outlined">
-                    @foreach (var status in StatusOptions)
-                    {
-                        <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            @if (_model.Status == "Paid")
+    <div class="card max-w-3xl border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-6">
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
             {
-                <MudItem xs="12" sm="4">
-                    <MudDatePicker Label="Paid Date" DateFormat="MMMM dd, yyyy" @bind-Date="_paidDate" Variant="Variant.Outlined" />
-                </MudItem>
+                <div role="alert" class="alert alert-error mb-4">
+                    <span>@_errorMessage</span>
+                </div>
             }
-        </MudGrid>
 
-        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
-            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-base-content/40">Dues Information</p>
+            <div class="divider my-0 mb-4"></div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <div class="md:col-span-2">
+                    <FieldGroup Label="Homeowner">
+                        <select class="select select-bordered w-full" @bind="_selectedHomeownerId">
+                            <option value="">Select homeowner...</option>
+                            @foreach (var homeowner in _activeHomeowners.OrderBy(GetHomeownerDisplay))
+                            {
+                                <option value="@homeowner.HomeownerId">@GetHomeownerDisplay(homeowner)</option>
+                            }
+                        </select>
+                    </FieldGroup>
+                </div>
+                <FieldGroup Label="Month">
+                    <select class="select select-bordered w-full" @bind="_model.Month">
+                        @foreach (var month in Enumerable.Range(1, 12))
+                        {
+                            <option value="@month">@GetMonthName(month)</option>
+                        }
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Year">
+                    <select class="select select-bordered w-full" @bind="_model.Year">
+                        @foreach (var year in _yearOptions)
+                        {
+                            <option value="@year">@year</option>
+                        }
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Amount">
+                    <input type="number" min="0" step="0.01" class="input input-bordered w-full" @bind="_model.Amount" />
+                </FieldGroup>
+                <FieldGroup Label="Due Date">
+                    <input type="date"
+                           class="input input-bordered w-full"
+                           value="@FormatHtmlDate(_dueDate)"
+                           @onchange="OnDueDateChanged" />
+                </FieldGroup>
+            </div>
+
+            <p class="mb-2 mt-8 text-xs font-semibold uppercase tracking-wide text-base-content/40">Payment</p>
+            <div class="divider my-0 mb-4"></div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <FieldGroup Label="Status">
+                    <select class="select select-bordered w-full" @bind="_model.Status" @bind:after="OnStatusChanged">
+                        @foreach (var status in StatusOptions)
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
+                </FieldGroup>
+                @if (_model.Status == "Paid")
+                {
+                    <FieldGroup Label="Paid Date">
+                        <input type="date"
+                               class="input input-bordered w-full"
+                               value="@FormatHtmlDate(_paidDate)"
+                               @onchange="OnPaidDateChanged" />
+                    </FieldGroup>
+                }
+            </div>
         </div>
-    </MudPaper>
+        <div class="flex justify-end gap-3 border-t border-base-300 px-6 py-4">
+            <button class="btn btn-ghost btn-sm" @onclick="Cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveAsync" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="loading loading-spinner loading-xs"></span>
+                }
+                Save
+            </button>
+        </div>
+    </div>
 }
 
 @code {
@@ -98,10 +111,11 @@ else
     private readonly DuesFormModel _model = new();
     private List<Homeowner> _activeHomeowners = [];
     private List<int> _yearOptions = [];
-    private Homeowner? _selectedHomeowner;
+    private int? _selectedHomeownerId;
     private DateTime? _dueDate;
     private DateTime? _paidDate;
     private bool _isLoading = true;
+    private bool _isSaving;
     private string? _errorMessage;
 
     private bool IsEdit => DuesId.HasValue;
@@ -131,7 +145,7 @@ else
             _model.Status = dues.Status;
             _dueDate = ParseDate(dues.DueDate);
             _paidDate = ParseDate(dues.PaidDate);
-            _selectedHomeowner = _activeHomeowners.FirstOrDefault(homeowner => homeowner.HomeownerId == dues.HomeownerId);
+            _selectedHomeownerId = dues.HomeownerId;
         }
         else
         {
@@ -144,15 +158,17 @@ else
     private async Task SaveAsync()
     {
         _errorMessage = Validate();
-        if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null || _selectedHomeowner is null)
+        if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null || !_selectedHomeownerId.HasValue)
         {
             return;
         }
 
+        _isSaving = true;
+
         var dues = new DuesRecord
         {
             DuesId = _model.DuesId ?? 0,
-            HomeownerId = _selectedHomeowner.HomeownerId,
+            HomeownerId = _selectedHomeownerId.Value,
             Month = _model.Month,
             Year = _model.Year,
             Amount = _model.Amount,
@@ -168,24 +184,28 @@ else
             if (IsEdit)
             {
                 var updated = await DuesService.UpdateAsync(dues, AuthService.CurrentUser.UserId);
+                _isSaving = false;
+
                 if (updated is null)
                 {
                     _errorMessage = "Unable to update dues record.";
                     return;
                 }
 
-                Snackbar.Add("Dues record updated successfully.", Severity.Success);
+                await JS.InvokeVoidAsync("hrms.showToast", "Dues record updated successfully.", "success");
             }
             else
             {
                 await DuesService.AddAsync(dues, AuthService.CurrentUser.UserId);
-                Snackbar.Add("Dues record added successfully.", Severity.Success);
+                _isSaving = false;
+                await JS.InvokeVoidAsync("hrms.showToast", "Dues record added successfully.", "success");
             }
 
             NavigationManager.NavigateTo("/dues");
         }
         catch (InvalidOperationException exception)
         {
+            _isSaving = false;
             _errorMessage = exception.Message;
         }
     }
@@ -197,7 +217,7 @@ else
 
     private string? Validate()
     {
-        if (_selectedHomeowner is null)
+        if (!_selectedHomeownerId.HasValue)
         {
             return "Homeowner is required.";
         }
@@ -237,41 +257,19 @@ else
         _model.Year = DateTime.UtcNow.Year;
         _model.Amount = 0;
         _model.Status = "Unpaid";
-        _selectedHomeowner = null;
+        _selectedHomeownerId = null;
         _dueDate = DateTime.UtcNow.Date;
         _paidDate = null;
     }
 
-    private Task OnHomeownerChanged(Homeowner? homeowner)
+    private Task OnStatusChanged()
     {
-        _selectedHomeowner = homeowner;
-        return Task.CompletedTask;
-    }
-
-    private Task OnStatusChanged(string value)
-    {
-        _model.Status = value;
         if (_model.Status != "Paid")
         {
             _paidDate = null;
         }
 
         return Task.CompletedTask;
-    }
-
-    private Task<IEnumerable<Homeowner>> SearchHomeownersAsync(string value, CancellationToken cancellationToken)
-    {
-        IEnumerable<Homeowner> matches = _activeHomeowners
-            .OrderBy(homeowner => homeowner.LastName)
-            .ThenBy(homeowner => homeowner.FirstName);
-
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            matches = matches.Where(homeowner =>
-                GetHomeownerDisplay(homeowner).Contains(value, StringComparison.OrdinalIgnoreCase));
-        }
-
-        return Task.FromResult(matches.Take(8));
     }
 
     private static List<int> BuildYearOptions()
@@ -283,13 +281,14 @@ else
             .ToList();
     }
 
-    private static string GetHomeownerDisplay(Homeowner? homeowner)
-    {
-        if (homeowner is null)
-        {
-            return string.Empty;
-        }
+    private void OnDueDateChanged(ChangeEventArgs args) =>
+        _dueDate = DateTime.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
 
+    private void OnPaidDateChanged(ChangeEventArgs args) =>
+        _paidDate = DateTime.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
+
+    private static string GetHomeownerDisplay(Homeowner homeowner)
+    {
         var fullName = GetFullName(homeowner);
         var unitNumber = string.IsNullOrWhiteSpace(homeowner.Unit?.UnitNumber) ? null : homeowner.Unit.UnitNumber;
 
@@ -321,6 +320,9 @@ else
 
     private static string ToIsoDateString(DateTime value) =>
         DateTime.SpecifyKind(value.Date, DateTimeKind.Utc).ToString("o");
+
+    private static string FormatHtmlDate(DateTime? value) =>
+        value?.ToString("yyyy-MM-dd") ?? string.Empty;
 
     private sealed class DuesFormModel
     {

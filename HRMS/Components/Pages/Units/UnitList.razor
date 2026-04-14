@@ -3,90 +3,117 @@
 @inject UnitService UnitService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
-<PageHeader Title="Units" Subtitle="Track subdivision units, head homeowners, and occupant assignments." />
+<PageHeader Title="Units"
+            Subtitle="Track subdivision units, head homeowners, and occupant assignments.">
+    <Actions>
+        <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/units/add")'>
+            Add Unit
+        </button>
+    </Actions>
+</PageHeader>
 
-<MudPaper Class="hrms-page-card" Style="padding: 16px; margin-bottom: 24px;" Elevation="0">
-    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
-        <FieldGroup Label="Address" Style="min-width: 240px;">
-            <MudTextField T="string"
-                          Value="_addressFilter"
-                          ValueChanged="OnAddressFilterChanged"
-                          Variant="Variant.Outlined"
-                          Immediate="true" />
-        </FieldGroup>
+<div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
+    <div class="card-body p-4">
+        <div class="flex flex-wrap items-end gap-3">
+            <div class="form-control min-w-[200px] flex-1">
+                <label class="label py-0 pb-1">
+                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Address</span>
+                </label>
+                <input type="text"
+                       class="input input-bordered input-sm w-full"
+                       placeholder="Search address..."
+                       value="@_addressFilter"
+                       @oninput="OnAddressInput" />
+            </div>
 
-        <FieldGroup Label="Phase" Style="min-width: 180px;">
-            <MudSelect T="int?"
-                       Value="_phaseFilter"
-                       ValueChanged="OnPhaseFilterChanged"
-                       Variant="Variant.Outlined">
-                <MudSelectItem T="int?" Value="@((int?)null)">All Phases</MudSelectItem>
-                @foreach (var phase in _phases)
-                {
-                    <MudSelectItem T="int?" Value="@phase.PhaseId">@phase.Name</MudSelectItem>
-                }
-            </MudSelect>
-        </FieldGroup>
-
-        <div style="margin-left: auto;">
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="/units/add">
-                Add Unit
-            </MudButton>
+            <div class="form-control min-w-[160px]">
+                <label class="label py-0 pb-1">
+                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Phase</span>
+                </label>
+                <select class="select select-bordered select-sm" value="@GetPhaseValue()" @onchange="OnPhaseChanged">
+                    <option value="">All Phases</option>
+                    @foreach (var phase in _phases)
+                    {
+                        <option value="@phase.PhaseId">@phase.Name</option>
+                    }
+                </select>
+            </div>
         </div>
     </div>
-</MudPaper>
+</div>
 
-@if (_isLoading)
-{
-    <LoadingSpinner />
-}
-else if (_units.Count == 0)
-{
-    <MudPaper Class="hrms-page-card" Elevation="0">
-        <EmptyState Title="No units found"
-                    Subtitle="Try adjusting your filters or add a unit record."
-                    Icon="@Icons.Material.Filled.HomeWork" />
-    </MudPaper>
-}
-else
-{
-    <MudPaper Class="hrms-page-card" Elevation="0">
-        <MudTable T="Unit" Items="_units" Hover="false" Striped="false">
-            <HeaderContent>
-                <MudTh>Unit Number</MudTh>
-                <MudTh>Address</MudTh>
-                <MudTh>Phase</MudTh>
-                <MudTh>Head Homeowner</MudTh>
-                <MudTh>Occupants</MudTh>
-                <MudTh>Actions</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Unit Number">@DisplayValue(context.UnitNumber)</MudTd>
-                <MudTd DataLabel="Address">@DisplayValue(context.Address)</MudTd>
-                <MudTd DataLabel="Phase">@DisplayValue(context.Phase?.Name)</MudTd>
-                <MudTd DataLabel="Head Homeowner">@DisplayValue(GetFullName(context.HeadHomeowner))</MudTd>
-                <MudTd DataLabel="Occupants">@GetOccupantCount(context)</MudTd>
-                <MudTd DataLabel="Actions">
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/units/{context.UnitId}"))">
-                            View
-                        </MudButton>
-                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/units/edit/{context.UnitId}"))">
-                            Edit
-                        </MudButton>
-                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => PromptDeleteAsync(context))">
-                            Delete
-                        </MudButton>
-                    </div>
-                </MudTd>
-            </RowTemplate>
-        </MudTable>
-    </MudPaper>
-    <TableRecordCount Count="_units.Count" EntityLabel="units" />
-}
+<div class="card border border-base-300 bg-base-100 shadow-none">
+    <div class="card-body p-0">
+        @if (_isLoading)
+        {
+            <LoadingSpinner />
+        }
+        else if (_units.Count == 0)
+        {
+            <EmptyState Title="No units found"
+                        Subtitle="Try adjusting your filters or add a unit record."
+                        Icon="○" />
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                            <th>Unit Number</th>
+                            <th>Address</th>
+                            <th>Phase</th>
+                            <th>Head Homeowner</th>
+                            <th>Occupants</th>
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var unit in _units)
+                        {
+                            <tr class="h-[52px] hover">
+                                <td class="text-sm text-base-content">@DisplayValue(unit.UnitNumber)</td>
+                                <td class="text-sm text-base-content/60">@DisplayValue(unit.Address)</td>
+                                <td class="text-sm text-base-content/60">@DisplayValue(unit.Phase?.Name)</td>
+                                <td class="text-sm text-base-content/60">@DisplayValue(GetFullName(unit.HeadHomeowner))</td>
+                                <td class="text-sm text-base-content/60">@GetOccupantCount(unit)</td>
+                                <td class="text-right">
+                                    <button class="btn btn-ghost btn-xs"
+                                            @onclick='() => NavigationManager.NavigateTo($"/units/{unit.UnitId}")'>
+                                        View
+                                    </button>
+                                    <button class="btn btn-ghost btn-xs"
+                                            @onclick='() => NavigationManager.NavigateTo($"/units/edit/{unit.UnitId}")'>
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-ghost btn-xs text-error"
+                                            @onclick='() => AskDelete(unit)'>
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-4 pb-4">
+                <TableRecordCount From="@(_units.Count == 0 ? 0 : 1)"
+                                  To="@_units.Count"
+                                  Total="@_units.Count"
+                                  Entity="units" />
+            </div>
+        }
+    </div>
+</div>
+
+<ConfirmDialog IsVisible="@_showConfirm"
+               Title="Delete Unit"
+               Message="@_confirmMessage"
+               ConfirmLabel="Delete"
+               OnConfirm="DeleteConfirmedAsync"
+               OnCancel="CancelDelete" />
 
 @code {
     private List<Unit> _units = [];
@@ -94,6 +121,9 @@ else
     private string _addressFilter = string.Empty;
     private int? _phaseFilter;
     private bool _isLoading = true;
+    private bool _showConfirm;
+    private int? _pendingDeleteId;
+    private string _confirmMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -115,47 +145,55 @@ else
         _isLoading = false;
     }
 
-    private async Task OnAddressFilterChanged(string value)
+    private async Task OnAddressInput(ChangeEventArgs args)
     {
-        _addressFilter = value;
+        _addressFilter = args.Value?.ToString() ?? string.Empty;
         await LoadUnitsAsync();
     }
 
-    private async Task OnPhaseFilterChanged(int? value)
+    private async Task OnPhaseChanged(ChangeEventArgs args)
     {
-        _phaseFilter = value;
+        _phaseFilter = int.TryParse(args.Value?.ToString(), out var phaseId) ? phaseId : null;
         await LoadUnitsAsync();
     }
 
-    private async Task PromptDeleteAsync(Unit unit)
+    private void AskDelete(Unit unit)
     {
-        var parameters = new DialogParameters
-        {
-            [nameof(ConfirmDialog.Title)] = "Delete Unit",
-            [nameof(ConfirmDialog.Message)] = $"Are you sure you want to delete unit {unit.UnitNumber}?",
-            [nameof(ConfirmDialog.OnConfirm)] = EventCallback.Factory.Create(this, async () => await DeleteAsync(unit.UnitId))
-        };
-
-        await DialogService.ShowAsync<ConfirmDialog>(string.Empty, parameters);
+        _pendingDeleteId = unit.UnitId;
+        _confirmMessage = $"Are you sure you want to delete unit {unit.UnitNumber}?";
+        _showConfirm = true;
     }
 
-    private async Task DeleteAsync(int unitId)
+    private Task CancelDelete()
     {
-        if (AuthService.CurrentUser is null)
+        _showConfirm = false;
+        _pendingDeleteId = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteConfirmedAsync()
+    {
+        _showConfirm = false;
+
+        if (!_pendingDeleteId.HasValue || AuthService.CurrentUser is null)
         {
             return;
         }
 
-        var result = await UnitService.DeleteAsync(unitId, AuthService.CurrentUser.UserId);
+        var result = await UnitService.DeleteAsync(_pendingDeleteId.Value, AuthService.CurrentUser.UserId);
+        _pendingDeleteId = null;
+
         if (!result.Success)
         {
-            Snackbar.Add(result.ErrorMessage ?? "Unable to delete unit.", Severity.Error);
+            await JS.InvokeVoidAsync("hrms.showToast", result.ErrorMessage ?? "Unable to delete unit.", "error");
             return;
         }
 
-        Snackbar.Add("Unit deleted successfully.", Severity.Success);
+        await JS.InvokeVoidAsync("hrms.showToast", "Unit deleted successfully.", "success");
         await LoadUnitsAsync();
     }
+
+    private string GetPhaseValue() => _phaseFilter?.ToString() ?? string.Empty;
 
     private static string DisplayValue(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "-" : value;

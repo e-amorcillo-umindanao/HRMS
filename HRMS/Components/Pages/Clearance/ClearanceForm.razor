@@ -3,9 +3,10 @@
 @inject HomeownerService HomeownerService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
-<PageHeader Title="New Clearance Request" Subtitle="Create a new request on behalf of a homeowner." />
+<PageHeader Title="New Clearance Request"
+            Subtitle="Create a new request on behalf of a homeowner." />
 
 @if (_isLoading)
 {
@@ -13,53 +14,54 @@
 }
 else
 {
-    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-        @if (!string.IsNullOrWhiteSpace(_errorMessage))
-        {
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
-                @_errorMessage
-            </MudAlert>
-        }
+    <div class="card max-w-3xl border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-6">
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div role="alert" class="alert alert-error mb-4 text-sm">
+                    <span>@_errorMessage</span>
+                </div>
+            }
 
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Request Details</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudAutocomplete T="Homeowner"
-                                 Label="Homeowner"
-                                 Value="_selectedHomeowner"
-                                 ValueChanged="OnHomeownerChanged"
-                                 SearchFunc="SearchHomeownersAsync"
-                                 ToStringFunc="GetHomeownerDisplay"
-                                 Variant="Variant.Outlined"
-                                 Clearable="true"
-                                 ResetValueOnEmptyText="true"
-                                 MaxItems="8"
-                                 Dense="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="string" Label="Clearance / Document Type" @bind-Value="_model.ClearanceType" Variant="Variant.Outlined">
-                    @foreach (var type in ClearanceTypes)
-                    {
-                        <MudSelectItem T="string" Value="@type">@type</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="string" Label="Purpose" @bind-Value="_model.Purpose" Variant="Variant.Outlined">
-                    @foreach (var purpose in Purposes)
-                    {
-                        <MudSelectItem T="string" Value="@purpose">@purpose</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-        </MudGrid>
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-base-content/40">Request Details</p>
+            <div class="divider my-0 mb-4"></div>
 
-        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
-            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FieldGroup Label="Homeowner">
+                    <select class="select select-bordered w-full" @bind="_selectedHomeownerId">
+                        <option value="">Select homeowner</option>
+                        @foreach (var homeowner in _homeowners.OrderBy(GetHomeownerDisplay))
+                        {
+                            <option value="@homeowner.HomeownerId">@GetHomeownerDisplay(homeowner)</option>
+                        }
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Clearance / Document Type">
+                    <select class="select select-bordered w-full" @bind="_model.ClearanceType">
+                        <option value="">Select type</option>
+                        @foreach (var type in ClearanceTypes)
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Purpose">
+                    <select class="select select-bordered w-full" @bind="_model.Purpose">
+                        <option value="">Select purpose</option>
+                        @foreach (var purpose in Purposes)
+                        {
+                            <option value="@purpose">@purpose</option>
+                        }
+                    </select>
+                </FieldGroup>
+            </div>
         </div>
-    </MudPaper>
+
+        <div class="flex justify-end gap-3 border-t border-base-300 px-6 py-4">
+            <button class="btn btn-ghost btn-sm" @onclick="Cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveAsync">Save</button>
+        </div>
+    </div>
 }
 
 @code {
@@ -68,7 +70,7 @@ else
 
     private readonly ClearanceFormModel _model = new();
     private List<Homeowner> _homeowners = [];
-    private Homeowner? _selectedHomeowner;
+    private int? _selectedHomeownerId;
     private bool _isLoading = true;
     private string? _errorMessage;
 
@@ -87,19 +89,19 @@ else
     private async Task SaveAsync()
     {
         _errorMessage = Validate();
-        if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null || _selectedHomeowner is null)
+        if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null || !_selectedHomeownerId.HasValue)
         {
             return;
         }
 
         await ClearanceService.AddAsync(new ClearanceRequest
         {
-            HomeownerId = _selectedHomeowner.HomeownerId,
+            HomeownerId = _selectedHomeownerId.Value,
             ClearanceType = _model.ClearanceType,
             Purpose = _model.Purpose
         }, AuthService.CurrentUser.UserId);
 
-        Snackbar.Add("Clearance request created successfully.", Severity.Success);
+        await JS.InvokeVoidAsync("hrms.showToast", "Clearance request created successfully.", "success");
         NavigationManager.NavigateTo("/clearance");
     }
 
@@ -110,7 +112,7 @@ else
 
     private string? Validate()
     {
-        if (_selectedHomeowner is null)
+        if (!_selectedHomeownerId.HasValue)
         {
             return "Homeowner is required.";
         }
@@ -128,34 +130,8 @@ else
         return null;
     }
 
-    private Task OnHomeownerChanged(Homeowner? homeowner)
+    private static string GetHomeownerDisplay(Homeowner homeowner)
     {
-        _selectedHomeowner = homeowner;
-        return Task.CompletedTask;
-    }
-
-    private Task<IEnumerable<Homeowner>> SearchHomeownersAsync(string value, CancellationToken cancellationToken)
-    {
-        IEnumerable<Homeowner> matches = _homeowners
-            .OrderBy(homeowner => homeowner.LastName)
-            .ThenBy(homeowner => homeowner.FirstName);
-
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            matches = matches.Where(homeowner =>
-                GetHomeownerDisplay(homeowner).Contains(value, StringComparison.OrdinalIgnoreCase));
-        }
-
-        return Task.FromResult(matches.Take(8));
-    }
-
-    private static string GetHomeownerDisplay(Homeowner? homeowner)
-    {
-        if (homeowner is null)
-        {
-            return string.Empty;
-        }
-
         var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
             .Where(value => !string.IsNullOrWhiteSpace(value));
 

@@ -1,5 +1,4 @@
 @page "/homeowners/{Id:int}"
-@page "/profile"
 @inject HomeownerService HomeownerService
 @inject AttendanceService AttendanceService
 @inject DuesService DuesService
@@ -9,7 +8,7 @@
 @inject DocumentService DocumentService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 @if (_isLoading)
 {
@@ -18,196 +17,266 @@
 else if (_homeowner is null)
 {
     <PageHeader Title="Homeowner" Subtitle="The requested profile could not be loaded." />
-    <MudPaper Class="hrms-page-card" Elevation="0">
+    <div class="card border border-base-300 bg-base-100 shadow-none">
         <EmptyState Title="No profile available"
                     Subtitle="This account does not have a linked homeowner record yet."
-                    Icon="@Icons.Material.Filled.PersonOff" />
-    </MudPaper>
+                    Icon="○" />
+    </div>
 }
 else
 {
-    <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap;">
-        <PageHeader Title="@GetFullName(_homeowner)" Subtitle="Homeowner profile" />
-        <div style="display: flex; gap: 12px;">
-            <MudButton Variant="Variant.Outlined" OnClick="GenerateStatementAsync">
-                Generate Statement
-            </MudButton>
-            <MudButton Variant="Variant.Text" OnClick="GoBack">Back</MudButton>
+    <PageHeader Title="@GetFullName(_homeowner)" Subtitle="Homeowner profile and history.">
+        <Actions>
+            <button class="btn btn-outline btn-sm" @onclick="GenerateStatementAsync">Generate Statement</button>
+            <button class="btn btn-ghost btn-sm" @onclick="GoBack">Back</button>
             @if (!AuthService.IsHomeowner())
             {
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => NavigationManager.NavigateTo($"/homeowners/edit/{_homeowner.HomeownerId}"))">
+                <button class="btn btn-primary btn-sm"
+                        @onclick='() => NavigationManager.NavigateTo($"/homeowners/{_homeowner.HomeownerId}/edit")'>
                     Edit
-                </MudButton>
+                </button>
             }
+        </Actions>
+    </PageHeader>
+
+    <div class="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div class="card border border-base-300 bg-base-100 shadow-none xl:col-span-1">
+            <div class="card-body p-0">
+                <div class="border-b border-base-300 p-5">
+                    <p class="text-sm font-semibold text-base-content">Profile</p>
+                </div>
+                <div class="p-5">
+                    <div class="mb-5 flex items-center gap-4">
+                        <div class="avatar placeholder">
+                            <div class="w-12 rounded-full bg-primary text-primary-content">
+                                <span class="text-lg font-semibold">@GetInitials(_homeowner)</span>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-base-content">@GetFullName(_homeowner)</p>
+                            <div class="mt-1"><StatusChip Status="@_homeowner.Status" /></div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        @DetailField("Birth Date", FormatDate(_homeowner.BirthDate))
+                        @DetailField("Gender", DisplayValue(_homeowner.Gender))
+                        @DetailField("Civil Status", DisplayValue(_homeowner.CivilStatus))
+                        @DetailField("Contact Number", DisplayValue(_homeowner.ContactNumber))
+                        @DetailField("Email", DisplayValue(_homeowner.Email))
+                        @DetailField("Address", DisplayValue(_homeowner.Address))
+                        @DetailField("Phase", DisplayValue(_homeowner.Phase?.Name))
+                        @DetailField("Unit", DisplayValue(_homeowner.Unit?.UnitNumber))
+                        @DetailField("Resident Since", FormatDate(_homeowner.ResidencySince))
+                        <div>
+                            <p class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/40">Categories</p>
+                            <div class="mt-1">
+                                @if (GetCategories(_homeowner).Count == 0)
+                                {
+                                    <p class="text-sm text-base-content">-</p>
+                                }
+                                else
+                                {
+                                    @foreach (var category in GetCategories(_homeowner))
+                                    {
+                                        <span class="badge badge-info badge-sm mr-1">@category</span>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border border-base-300 bg-base-100 shadow-none xl:col-span-2">
+            <div class="card-body p-0">
+                <div class="border-b border-base-300 p-5">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold text-base-content">Record History</p>
+                            <p class="mt-0.5 text-xs text-base-content/40">Attendance, dues, violations, clearances, and interactions.</p>
+                        </div>
+                        @if (!AuthService.IsHomeowner() && AuthService.IsAtLeast("Board Member"))
+                        {
+                            <button class="btn btn-primary btn-sm" @onclick="NavigateToLogInteraction">Log Interaction</button>
+                        }
+                    </div>
+                </div>
+
+                <div class="px-5 pt-5">
+                    <div role="tablist" class="tabs tabs-bordered">
+                        <button role="tab" class="tab @GetTabClass("attendance")" @onclick='() => _activeTab = "attendance"'>Attendance</button>
+                        <button role="tab" class="tab @GetTabClass("dues")" @onclick='() => _activeTab = "dues"'>Dues</button>
+                        <button role="tab" class="tab @GetTabClass("violations")" @onclick='() => _activeTab = "violations"'>Violations</button>
+                        <button role="tab" class="tab @GetTabClass("clearances")" @onclick='() => _activeTab = "clearances"'>Clearances</button>
+                        <button role="tab" class="tab @GetTabClass("interactions")" @onclick='() => _activeTab = "interactions"'>Interactions</button>
+                    </div>
+                </div>
+
+                <div class="p-5">
+                    @if (_activeTab == "attendance")
+                    {
+                        @if (_attendanceHistory.Count == 0)
+                        {
+                            <EmptyState Title="No attendance records"
+                                        Subtitle="Attendance history will appear here once events are recorded."
+                                        Icon="○" />
+                        }
+                        else
+                        {
+                            <div class="overflow-x-auto">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                            <th>Event</th>
+                                            <th>Event Type</th>
+                                            <th>Event Date</th>
+                                            <th>Venue</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var attendance in _attendanceHistory)
+                                        {
+                                            <tr class="h-[52px] hover">
+                                                <td class="text-sm text-base-content">@DisplayValue(attendance.Event?.Title)</td>
+                                                <td class="text-sm text-base-content/60">@DisplayValue(attendance.Event?.EventType)</td>
+                                                <td class="text-sm text-base-content/60">@FormatDate(attendance.Event?.EventDate)</td>
+                                                <td class="text-sm text-base-content/60">@DisplayValue(attendance.Event?.Venue)</td>
+                                                <td>
+                                                    <span class="badge badge-sm @GetAttendanceBadgeClass(attendance.Status)">
+                                                        @DisplayValue(attendance.Status)
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <TableRecordCount From="1" To="@_attendanceHistory.Count" Total="@_attendanceHistory.Count" Entity="attendance records" />
+                        }
+                    }
+                    else if (_activeTab == "dues")
+                    {
+                        @if (_duesHistory.Count == 0)
+                        {
+                            <EmptyState Title="No dues records"
+                                        Subtitle="Dues history will appear here once records are added."
+                                        Icon="○" />
+                        }
+                        else
+                        {
+                            <div class="overflow-x-auto">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                            <th>Month/Year</th>
+                                            <th>Amount</th>
+                                            <th>Due Date</th>
+                                            <th>Paid Date</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var dues in _duesHistory)
+                                        {
+                                            <tr class="h-[52px] hover">
+                                                <td class="text-sm text-base-content">@FormatMonthYear(dues.Month, dues.Year)</td>
+                                                <td class="text-sm font-medium text-base-content">@FormatCurrency(dues.Amount)</td>
+                                                <td class="text-sm text-base-content/60">@FormatDate(dues.DueDate)</td>
+                                                <td class="text-sm text-base-content/60">@FormatDate(dues.PaidDate)</td>
+                                                <td><StatusChip Status="@dues.Status" /></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <TableRecordCount From="1" To="@_duesHistory.Count" Total="@_duesHistory.Count" Entity="dues records" />
+                        }
+                    }
+                    else if (_activeTab == "violations")
+                    {
+                        @if (_violations.Count == 0)
+                        {
+                            <EmptyState Title="No violations"
+                                        Subtitle="Violation records will appear here once incidents are filed."
+                                        Icon="○" />
+                        }
+                        else
+                        {
+                            <div class="overflow-x-auto">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                            <th>Violation Number</th>
+                                            <th>Violation Type</th>
+                                            <th>Violation Date</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var violation in _violations)
+                                        {
+                                            <tr class="h-[52px] hover">
+                                                <td><span class="violation-pill">@DisplayValue(violation.ViolationNumber)</span></td>
+                                                <td class="text-sm text-base-content">@DisplayValue(violation.ViolationType)</td>
+                                                <td class="text-sm text-base-content/60">@FormatDate(violation.ViolationDate)</td>
+                                                <td><StatusChip Status="@violation.Status" /></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <TableRecordCount From="1" To="@_violations.Count" Total="@_violations.Count" Entity="violations" />
+                        }
+                    }
+                    else if (_activeTab == "clearances")
+                    {
+                        @if (_clearanceRequests.Count == 0)
+                        {
+                            <EmptyState Title="No clearance requests"
+                                        Subtitle="Clearance requests will appear here once they are submitted."
+                                        Icon="○" />
+                        }
+                        else
+                        {
+                            <div class="overflow-x-auto">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                            <th>Clearance Type</th>
+                                            <th>Purpose</th>
+                                            <th>Status</th>
+                                            <th>Requested At</th>
+                                            <th>Processed At</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var request in _clearanceRequests)
+                                        {
+                                            <tr class="h-[52px] hover">
+                                                <td class="text-sm text-base-content">@DisplayValue(request.ClearanceType)</td>
+                                                <td class="text-sm text-base-content/60">@DisplayValue(request.Purpose)</td>
+                                                <td><StatusChip Status="@request.Status" /></td>
+                                                <td class="text-sm text-base-content/60">@FormatDate(request.RequestedAt)</td>
+                                                <td class="text-sm text-base-content/60">@FormatDate(request.ProcessedAt)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <TableRecordCount From="1" To="@_clearanceRequests.Count" Total="@_clearanceRequests.Count" Entity="clearance requests" />
+                        }
+                    }
+                    else
+                    {
+                        <InteractionTimeline Logs="_interactionLogs" />
+                    }
+                </div>
+            </div>
         </div>
     </div>
-
-    <MudPaper Class="hrms-page-card" Style="padding: 24px; margin-bottom: 24px;" Elevation="0">
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Personal Information</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="4"><MudText><strong>First Name:</strong> @DisplayValue(_homeowner.FirstName)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Middle Name:</strong> @DisplayValue(_homeowner.MiddleName)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Last Name:</strong> @DisplayValue(_homeowner.LastName)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Birth Date:</strong> @FormatDate(_homeowner.BirthDate)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Gender:</strong> @DisplayValue(_homeowner.Gender)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Civil Status:</strong> @DisplayValue(_homeowner.CivilStatus)</MudText></MudItem>
-        </MudGrid>
-
-        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Contact Details</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="4"><MudText><strong>Contact Number:</strong> @DisplayValue(_homeowner.ContactNumber)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Email:</strong> @DisplayValue(_homeowner.Email)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Address:</strong> @DisplayValue(_homeowner.Address)</MudText></MudItem>
-        </MudGrid>
-
-        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Assignment &amp; Classification</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="4">
-                <MudText><strong>Status:</strong> @DisplayValue(_homeowner.Status)</MudText>
-            </MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Phase:</strong> @DisplayValue(_homeowner.Phase?.Name)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Unit:</strong> @DisplayValue(_homeowner.Unit?.UnitNumber)</MudText></MudItem>
-            <MudItem xs="12" sm="6">
-                <MudText><strong>Categories:</strong></MudText>
-                @if (GetCategories(_homeowner).Count == 0)
-                {
-                    <MudText>-</MudText>
-                }
-                else
-                {
-                    @foreach (var category in GetCategories(_homeowner))
-                    {
-                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Style="margin-right: 4px; margin-top: 6px;">
-                            @category
-                        </MudChip>
-                    }
-                }
-            </MudItem>
-            <MudItem xs="12" sm="6"><MudText><strong>Residency Since:</strong> @FormatDate(_homeowner.ResidencySince)</MudText></MudItem>
-        </MudGrid>
-    </MudPaper>
-
-    <MudPaper Class="hrms-page-card" Style="padding: 8px 16px 16px;" Elevation="0">
-        <MudTabs Rounded="true">
-            <MudTabPanel Text="Attendance History">
-                @if (_attendanceHistory.Count == 0)
-                {
-                    <MudText>No records yet.</MudText>
-                }
-                else
-                {
-                    <MudTable T="Attendance" Items="_attendanceHistory" Hover="false" Striped="false">
-                        <HeaderContent>
-                            <MudTh>Event</MudTh>
-                            <MudTh>Event Type</MudTh>
-                            <MudTh>Event Date</MudTh>
-                            <MudTh>Venue</MudTh>
-                            <MudTh>Status</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd DataLabel="Event">@DisplayValue(context.Event?.Title)</MudTd>
-                            <MudTd DataLabel="Event Type">@DisplayValue(context.Event?.EventType)</MudTd>
-                            <MudTd DataLabel="Event Date">@FormatDate(context.Event?.EventDate)</MudTd>
-                            <MudTd DataLabel="Venue">@DisplayValue(context.Event?.Venue)</MudTd>
-                            <MudTd DataLabel="Status">@((MarkupString)RenderAttendanceStatusChip(context.Status))</MudTd>
-                        </RowTemplate>
-                    </MudTable>
-                    <TableRecordCount Count="_attendanceHistory.Count" EntityLabel="attendance records" />
-                }
-            </MudTabPanel>
-            <MudTabPanel Text="Dues History">
-                @if (_duesHistory.Count == 0)
-                {
-                    <MudText>No records yet.</MudText>
-                }
-                else
-                {
-                    <MudTable T="DuesRecord" Items="_duesHistory" Hover="false" Striped="false">
-                        <HeaderContent>
-                            <MudTh>Month/Year</MudTh>
-                            <MudTh>Amount</MudTh>
-                            <MudTh>Due Date</MudTh>
-                            <MudTh>Paid Date</MudTh>
-                            <MudTh>Status</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd DataLabel="Month/Year">@FormatMonthYear(context.Month, context.Year)</MudTd>
-                            <MudTd DataLabel="Amount">@FormatCurrency(context.Amount)</MudTd>
-                            <MudTd DataLabel="Due Date">@FormatDate(context.DueDate)</MudTd>
-                            <MudTd DataLabel="Paid Date">@FormatDate(context.PaidDate)</MudTd>
-                            <MudTd DataLabel="Status">@((MarkupString)RenderDuesStatusChip(context.Status))</MudTd>
-                        </RowTemplate>
-                    </MudTable>
-                    <TableRecordCount Count="_duesHistory.Count" EntityLabel="dues records" />
-                }
-            </MudTabPanel>
-            <MudTabPanel Text="Violations">
-                @if (_violations.Count == 0)
-                {
-                    <MudText>No records yet.</MudText>
-                }
-                else
-                {
-                    <MudTable T="ViolationRecord" Items="_violations" Hover="false" Striped="false">
-                        <HeaderContent>
-                            <MudTh>Violation Number</MudTh>
-                            <MudTh>Violation Type</MudTh>
-                            <MudTh>Violation Date</MudTh>
-                            <MudTh>Status</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd DataLabel="Violation Number">@DisplayValue(context.ViolationNumber)</MudTd>
-                            <MudTd DataLabel="Violation Type">@DisplayValue(context.ViolationType)</MudTd>
-                            <MudTd DataLabel="Violation Date">@FormatDate(context.ViolationDate)</MudTd>
-                            <MudTd DataLabel="Status">@((MarkupString)RenderViolationStatusChip(context.Status))</MudTd>
-                        </RowTemplate>
-                    </MudTable>
-                    <TableRecordCount Count="_violations.Count" EntityLabel="violations" />
-                }
-            </MudTabPanel>
-            <MudTabPanel Text="Clearance Requests">
-                @if (_clearanceRequests.Count == 0)
-                {
-                    <MudText>No records yet.</MudText>
-                }
-                else
-                {
-                    <MudTable T="ClearanceRequest" Items="_clearanceRequests" Hover="false" Striped="false">
-                        <HeaderContent>
-                            <MudTh>Clearance Type</MudTh>
-                            <MudTh>Purpose</MudTh>
-                            <MudTh>Status</MudTh>
-                            <MudTh>Requested At</MudTh>
-                            <MudTh>Processed At</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd DataLabel="Clearance Type">@DisplayValue(context.ClearanceType)</MudTd>
-                            <MudTd DataLabel="Purpose">@DisplayValue(context.Purpose)</MudTd>
-                            <MudTd DataLabel="Status">@((MarkupString)RenderClearanceStatusChip(context.Status))</MudTd>
-                            <MudTd DataLabel="Requested At">@FormatDate(context.RequestedAt)</MudTd>
-                            <MudTd DataLabel="Processed At">@FormatDate(context.ProcessedAt)</MudTd>
-                        </RowTemplate>
-                    </MudTable>
-                    <TableRecordCount Count="_clearanceRequests.Count" EntityLabel="clearance requests" />
-                }
-            </MudTabPanel>
-            <MudTabPanel Text="Interaction History">
-                @if (!AuthService.IsHomeowner() && _homeowner is not null && AuthService.IsAtLeast("Board Member"))
-                {
-                    <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
-                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="NavigateToLogInteraction">
-                            Log Interaction
-                        </MudButton>
-                    </div>
-                }
-
-                <InteractionTimeline Logs="_interactionLogs" />
-            </MudTabPanel>
-        </MudTabs>
-    </MudPaper>
 }
 
 @code {
@@ -221,6 +290,7 @@ else
     private List<ClearanceRequest> _clearanceRequests = [];
     private List<InteractionLog> _interactionLogs = [];
     private bool _isLoading = true;
+    private string _activeTab = "attendance";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -269,7 +339,7 @@ else
         var document = await DocumentService.GenerateDuesStatementAsync(_homeowner.HomeownerId);
         if (document is null)
         {
-            Snackbar.Add("Unable to generate dues statement.", Severity.Error);
+            await JS.InvokeVoidAsync("hrms.showToast", "Unable to generate dues statement.", "error");
             return;
         }
 
@@ -284,7 +354,7 @@ else
 
     private void GoBack()
     {
-        NavigationManager.NavigateTo(AuthService.IsHomeowner() ? "/dashboard" : "/homeowners");
+        NavigationManager.NavigateTo(AuthService.IsHomeowner() ? "/profile" : "/homeowners");
     }
 
     private void NavigateToLogInteraction()
@@ -297,6 +367,23 @@ else
         NavigationManager.NavigateTo($"/engagement/log?homeownerId={_homeowner.HomeownerId}&returnUrl=/homeowners/{_homeowner.HomeownerId}");
     }
 
+    private string GetTabClass(string tab) => _activeTab == tab ? "tab-active" : string.Empty;
+
+    private static string GetAttendanceBadgeClass(string? status) => status switch
+    {
+        "Present" => "badge-success",
+        "Absent" => "badge-error",
+        "Excused" => "badge-warning",
+        _ => "badge-ghost"
+    };
+
+    private static string GetInitials(Homeowner homeowner)
+    {
+        var first = string.IsNullOrWhiteSpace(homeowner.FirstName) ? string.Empty : homeowner.FirstName[..1];
+        var last = string.IsNullOrWhiteSpace(homeowner.LastName) ? string.Empty : homeowner.LastName[..1];
+        return (first + last).ToUpperInvariant();
+    }
+
     private static string GetFullName(Homeowner homeowner)
     {
         var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
@@ -304,6 +391,13 @@ else
 
         return string.Join(" ", parts);
     }
+
+    private static List<string> GetCategories(Homeowner homeowner) =>
+        string.IsNullOrWhiteSpace(homeowner.Categories)
+            ? []
+            : homeowner.Categories
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
 
     private static string DisplayValue(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "-" : value;
@@ -316,27 +410,6 @@ else
         }
 
         return parsed.ToString("MMMM dd, yyyy");
-    }
-
-    private static List<string> GetCategories(Homeowner homeowner) =>
-        string.IsNullOrWhiteSpace(homeowner.Categories)
-            ? []
-            : homeowner.Categories
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToList();
-
-    private static string RenderAttendanceStatusChip(string? status)
-    {
-        var (background, foreground) = status switch
-        {
-            "Present" => ("#DCFCE7", "#166534"),
-            "Absent" => ("#FEE2E2", "#991B1B"),
-            "Excused" => ("#FEF3C7", "#92400E"),
-            _ => ("#E2E8F0", "#475569")
-        };
-
-        var text = string.IsNullOrWhiteSpace(status) ? "-" : status;
-        return $"<span style=\"display:inline-block;padding:4px 10px;border-radius:4px;background:{background};color:{foreground};font-size:0.75rem;font-weight:600;\">{text}</span>";
     }
 
     private static string FormatMonthYear(int month, int year) =>
@@ -354,46 +427,17 @@ else
 
     private static string FormatCurrency(decimal amount) => $"PHP {amount:N2}";
 
-    private static string RenderDuesStatusChip(string? status)
+    private static RenderFragment DetailField(string label, string value) => builder =>
     {
-        var (background, foreground) = status switch
-        {
-            "Paid" => ("#DCFCE7", "#166534"),
-            "Unpaid" => ("#FEF3C7", "#92400E"),
-            "Overdue" => ("#FEE2E2", "#991B1B"),
-            _ => ("#E2E8F0", "#475569")
-        };
-
-        var text = string.IsNullOrWhiteSpace(status) ? "-" : status;
-        return $"<span style=\"display:inline-block;padding:4px 10px;border-radius:4px;background:{background};color:{foreground};font-size:0.75rem;font-weight:600;\">{text}</span>";
-    }
-
-    private static string RenderViolationStatusChip(string? status)
-    {
-        var (background, foreground) = status switch
-        {
-            "Open" => ("#FEE2E2", "#991B1B"),
-            "Under Review" => ("#FEF3C7", "#92400E"),
-            "Resolved" => ("#DCFCE7", "#166534"),
-            "Closed" => ("#E2E8F0", "#475569"),
-            _ => ("#E2E8F0", "#475569")
-        };
-
-        var text = string.IsNullOrWhiteSpace(status) ? "-" : status;
-        return $"<span style=\"display:inline-block;padding:4px 10px;border-radius:4px;background:{background};color:{foreground};font-size:0.75rem;font-weight:600;\">{text}</span>";
-    }
-
-    private static string RenderClearanceStatusChip(string? status)
-    {
-        var (background, foreground) = status switch
-        {
-            "Pending" => ("#FEF3C7", "#92400E"),
-            "Approved" => ("#DCFCE7", "#166534"),
-            "Rejected" => ("#FEE2E2", "#991B1B"),
-            _ => ("#E2E8F0", "#475569")
-        };
-
-        var text = string.IsNullOrWhiteSpace(status) ? "-" : status;
-        return $"<span style=\"display:inline-block;padding:4px 10px;border-radius:4px;background:{background};color:{foreground};font-size:0.75rem;font-weight:600;\">{text}</span>";
-    }
+        builder.OpenElement(0, "div");
+        builder.OpenElement(1, "p");
+        builder.AddAttribute(2, "class", "text-[10.5px] font-semibold uppercase tracking-wide text-base-content/40");
+        builder.AddContent(3, label);
+        builder.CloseElement();
+        builder.OpenElement(4, "p");
+        builder.AddAttribute(5, "class", "mt-0.5 text-sm text-base-content");
+        builder.AddContent(6, value);
+        builder.CloseElement();
+        builder.CloseElement();
+    };
 }

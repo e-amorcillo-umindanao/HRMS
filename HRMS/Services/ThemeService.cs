@@ -1,0 +1,28 @@
+namespace HRMS.Services;
+
+public class ThemeService
+{
+    private string _currentTheme = "lemonade";
+
+    public string CurrentTheme => _currentTheme;
+
+    public bool IsDark => _currentTheme == "business";
+
+    public event Action? OnThemeChanged;
+
+    public void SetTheme(string theme)
+    {
+        if (_currentTheme == theme)
+        {
+            return;
+        }
+
+        _currentTheme = theme;
+        OnThemeChanged?.Invoke();
+    }
+
+    public void Toggle()
+    {
+        SetTheme(IsDark ? "lemonade" : "business");
+    }
+}

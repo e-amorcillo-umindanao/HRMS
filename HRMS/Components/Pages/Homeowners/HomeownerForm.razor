@@ -1,10 +1,12 @@
 @page "/homeowners/add"
+@page "/homeowners/new"
 @page "/homeowners/edit/{HomeownerId:int}"
+@page "/homeowners/{HomeownerId:int}/edit"
 @inject AppDbContext DbContext
 @inject HomeownerService HomeownerService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageHeader Title="@(IsEdit ? "Edit Homeowner" : "Add Homeowner")"
             Subtitle="Capture personal, contact, and assignment information." />
@@ -15,114 +17,134 @@
 }
 else
 {
-    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-        @if (!string.IsNullOrWhiteSpace(_errorMessage))
-        {
-            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
-                @_errorMessage
-            </MudAlert>
-        }
+    <div class="card max-w-3xl border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-6">
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div role="alert" class="alert alert-error mb-4">
+                    <span>@_errorMessage</span>
+                </div>
+            }
 
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Personal Information</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudTextField T="string" Label="First Name" @bind-Value="_model.FirstName" Variant="Variant.Outlined" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField T="string" Label="Middle Name" @bind-Value="_model.MiddleName" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField T="string" Label="Last Name" @bind-Value="_model.LastName" Variant="Variant.Outlined" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudDatePicker Label="Birth Date" DateFormat="MMMM dd, yyyy" @bind-Date="_birthDate" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="string" Label="Gender" @bind-Value="_model.Gender" Variant="Variant.Outlined">
-                    <MudSelectItem T="string" Value="@("Male")">Male</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Female")">Female</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Other")">Other</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="string" Label="Civil Status" @bind-Value="_model.CivilStatus" Variant="Variant.Outlined">
-                    <MudSelectItem T="string" Value="@string.Empty">-</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Single")">Single</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Married")">Married</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Widowed")">Widowed</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Separated")">Separated</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Annulled")">Annulled</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-        </MudGrid>
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-base-content/40">Personal Information</p>
+            <div class="divider my-0 mb-4"></div>
+            <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FieldGroup Label="First Name">
+                    <input type="text" class="input input-bordered w-full" @bind="_model.FirstName" />
+                </FieldGroup>
+                <FieldGroup Label="Middle Name">
+                    <input type="text" class="input input-bordered w-full" @bind="_model.MiddleName" />
+                </FieldGroup>
+                <FieldGroup Label="Last Name">
+                    <input type="text" class="input input-bordered w-full" @bind="_model.LastName" />
+                </FieldGroup>
+                <FieldGroup Label="Birth Date">
+                    <input type="date"
+                           class="input input-bordered w-full"
+                           value="@FormatHtmlDate(_birthDate)"
+                           @onchange="OnBirthDateChanged" />
+                </FieldGroup>
+                <FieldGroup Label="Gender">
+                    <select class="select select-bordered w-full" @bind="_model.Gender">
+                        <option value="">Select gender</option>
+                        <option>Male</option>
+                        <option>Female</option>
+                        <option>Other</option>
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Civil Status">
+                    <select class="select select-bordered w-full" @bind="_model.CivilStatus">
+                        <option value="">-</option>
+                        <option>Single</option>
+                        <option>Married</option>
+                        <option>Widowed</option>
+                        <option>Separated</option>
+                        <option>Annulled</option>
+                    </select>
+                </FieldGroup>
+            </div>
 
-        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Contact Details</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudTextField T="string" Label="Contact Number" @bind-Value="_model.ContactNumber" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField T="string" Label="Email" @bind-Value="_model.Email" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField T="string" Label="Address" @bind-Value="_model.Address" Variant="Variant.Outlined" />
-            </MudItem>
-        </MudGrid>
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-base-content/40">Contact Details</p>
+            <div class="divider my-0 mb-4"></div>
+            <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FieldGroup Label="Contact Number">
+                    <input type="text" class="input input-bordered w-full" @bind="_model.ContactNumber" />
+                </FieldGroup>
+                <FieldGroup Label="Email">
+                    <input type="email" class="input input-bordered w-full" @bind="_model.Email" />
+                </FieldGroup>
+                <div class="md:col-span-2">
+                    <FieldGroup Label="Address">
+                        <input type="text" class="input input-bordered w-full" @bind="_model.Address" />
+                    </FieldGroup>
+                </div>
+            </div>
 
-        <div style="margin-top: 28px; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Assignment &amp; Classification</div>
-        <MudDivider Style="margin: 8px 0 20px;" />
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="string" Label="Status" @bind-Value="_model.Status" Variant="Variant.Outlined">
-                    @foreach (var status in StatusOptions)
-                    {
-                        <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="int?" Label="Phase" @bind-Value="_model.PhaseId" Variant="Variant.Outlined">
-                    <MudSelectItem T="int?" Value="@((int?)null)">-</MudSelectItem>
-                    @foreach (var phase in _phases)
-                    {
-                        <MudSelectItem T="int?" Value="@phase.PhaseId">@phase.Name</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="int?" Label="Unit" @bind-Value="_model.UnitId" Variant="Variant.Outlined">
-                    <MudSelectItem T="int?" Value="@((int?)null)">-</MudSelectItem>
-                    @foreach (var unit in _units)
-                    {
-                        <MudSelectItem T="int?" Value="@unit.UnitId">@($"{unit.UnitNumber} - {unit.Address}")</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="string"
-                           Label="Categories"
-                           MultiSelection="true"
-                           Variant="Variant.Outlined"
-                           SelectedValues="_selectedCategories"
-                           SelectedValuesChanged="OnSelectedCategoriesChanged">
-                    @foreach (var category in CategoryOptions)
-                    {
-                        <MudSelectItem T="string" Value="@category">@category</MudSelectItem>
-                    }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudDatePicker Label="Residency Since" DateFormat="MMMM dd, yyyy" @bind-Date="_residencySince" Variant="Variant.Outlined" />
-            </MudItem>
-        </MudGrid>
-
-        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px;">
-            <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-base-content/40">Assignment & Classification</p>
+            <div class="divider my-0 mb-4"></div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FieldGroup Label="Status">
+                    <select class="select select-bordered w-full" @bind="_model.Status">
+                        @foreach (var status in StatusOptions)
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Phase">
+                    <select class="select select-bordered w-full" @bind="_model.PhaseId">
+                        <option value="">-</option>
+                        @foreach (var phase in _phases)
+                        {
+                            <option value="@phase.PhaseId">@phase.Name</option>
+                        }
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Unit">
+                    <select class="select select-bordered w-full" @bind="_model.UnitId">
+                        <option value="">-</option>
+                        @foreach (var unit in _units)
+                        {
+                            <option value="@unit.UnitId">@($"{unit.UnitNumber} - {unit.Address}")</option>
+                        }
+                    </select>
+                </FieldGroup>
+                <FieldGroup Label="Residency Since">
+                    <input type="date"
+                           class="input input-bordered w-full"
+                           value="@FormatHtmlDate(_residencySince)"
+                           @onchange="OnResidencySinceChanged" />
+                </FieldGroup>
+                <div class="md:col-span-2">
+                    <FieldGroup Label="Categories">
+                        <div class="flex flex-wrap gap-3 pt-1">
+                            @foreach (var category in CategoryOptions)
+                            {
+                                <label class="flex cursor-pointer items-center gap-2">
+                                    <input type="checkbox"
+                                           class="checkbox checkbox-primary checkbox-sm"
+                                           checked="@_selectedCategories.Contains(category)"
+                                           @onchange="args => ToggleCategory(category, args.Value is bool isChecked && isChecked)" />
+                                    <span class="text-sm text-base-content">@category</span>
+                                </label>
+                            }
+                        </div>
+                    </FieldGroup>
+                </div>
+            </div>
         </div>
-    </MudPaper>
+
+        <div class="flex justify-end gap-3 border-t border-base-300 px-6 py-4">
+            <button class="btn btn-ghost btn-sm" @onclick="Cancel">Cancel</button>
+            <button class="btn btn-primary btn-sm" @onclick="SaveAsync" disabled="@_isSaving">
+                @if (_isSaving)
+                {
+                    <span class="loading loading-spinner loading-xs"></span>
+                }
+                @(IsEdit ? "Save Changes" : "Save")
+            </button>
+        </div>
+    </div>
 }
 
 @code {
@@ -139,6 +161,7 @@ else
     private DateTime? _birthDate;
     private DateTime? _residencySince;
     private bool _isLoading = true;
+    private bool _isSaving;
     private string? _errorMessage;
 
     private bool IsEdit => HomeownerId.HasValue;
@@ -153,8 +176,7 @@ else
 
         if (IsEdit)
         {
-            var homeownerId = HomeownerId.GetValueOrDefault();
-            var homeowner = await HomeownerService.GetByIdAsync(homeownerId);
+            var homeowner = await HomeownerService.GetByIdAsync(HomeownerId.GetValueOrDefault());
             if (homeowner is null)
             {
                 _errorMessage = "Homeowner record not found.";
@@ -176,7 +198,9 @@ else
             _model.UnitId = homeowner.UnitId;
             _selectedCategories = homeowner.Categories is null
                 ? []
-                : homeowner.Categories.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(StringComparer.Ordinal);
+                : homeowner.Categories
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .ToHashSet(StringComparer.Ordinal);
             _birthDate = ParseDate(homeowner.BirthDate);
             _residencySince = ParseDate(homeowner.ResidencySince);
         }
@@ -195,6 +219,8 @@ else
         {
             return;
         }
+
+        _isSaving = true;
 
         var homeowner = new Homeowner
         {
@@ -218,27 +244,47 @@ else
         if (IsEdit)
         {
             var updated = await HomeownerService.UpdateAsync(homeowner, AuthService.CurrentUser.UserId);
+            _isSaving = false;
+
             if (updated is null)
             {
                 _errorMessage = "Unable to update homeowner.";
                 return;
             }
 
-            Snackbar.Add("Homeowner updated successfully.", Severity.Success);
+            await JS.InvokeVoidAsync("hrms.showToast", "Homeowner updated successfully.", "success");
             NavigationManager.NavigateTo($"/homeowners/{updated.HomeownerId}");
+            return;
         }
-        else
-        {
-            await HomeownerService.AddAsync(homeowner, AuthService.CurrentUser.UserId);
-            Snackbar.Add("Homeowner added successfully.", Severity.Success);
-            NavigationManager.NavigateTo("/homeowners");
-        }
+
+        await HomeownerService.AddAsync(homeowner, AuthService.CurrentUser.UserId);
+        _isSaving = false;
+        await JS.InvokeVoidAsync("hrms.showToast", "Homeowner added successfully.", "success");
+        NavigationManager.NavigateTo("/homeowners");
     }
 
     private void Cancel()
     {
         NavigationManager.NavigateTo(IsEdit ? $"/homeowners/{HomeownerId}" : "/homeowners");
     }
+
+    private void ToggleCategory(string category, bool isChecked)
+    {
+        if (isChecked)
+        {
+            _selectedCategories.Add(category);
+        }
+        else
+        {
+            _selectedCategories.Remove(category);
+        }
+    }
+
+    private void OnBirthDateChanged(ChangeEventArgs args) =>
+        _birthDate = ParseInputDate(args.Value?.ToString());
+
+    private void OnResidencySinceChanged(ChangeEventArgs args) =>
+        _residencySince = ParseInputDate(args.Value?.ToString());
 
     private string? Validate()
     {
@@ -289,14 +335,14 @@ else
         _residencySince = null;
     }
 
-    private Task OnSelectedCategoriesChanged(IEnumerable<string> values)
-    {
-        _selectedCategories = values.ToHashSet(StringComparer.Ordinal);
-        return Task.CompletedTask;
-    }
-
     private static DateTime? ParseDate(string? value) =>
         DateTime.TryParse(value, out var parsed) ? parsed : null;
+
+    private static DateTime? ParseInputDate(string? value) =>
+        DateTime.TryParse(value, out var parsed) ? parsed : null;
+
+    private static string FormatHtmlDate(DateTime? value) =>
+        value?.ToString("yyyy-MM-dd") ?? string.Empty;
 
     private static string ToIsoDateString(DateTime value) =>
         DateTime.SpecifyKind(value.Date, DateTimeKind.Utc).ToString("o");

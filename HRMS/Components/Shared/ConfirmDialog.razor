@@ -1,40 +1,38 @@
-<MudDialog>
-    <DialogContent>
-        <MudText Typo="Typo.h6" Style="font-weight: 700; color: #1E293B;">@Title</MudText>
-        <MudText Style="margin-top: 12px; color: #64748B;">@Message</MudText>
-    </DialogContent>
-    <DialogActions>
-        <MudButton Variant="Variant.Text" OnClick="CancelAsync">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmAsync">Confirm</MudButton>
-    </DialogActions>
-</MudDialog>
+@if (IsVisible)
+{
+    <div class="modal modal-open z-[999]">
+        <div class="modal-box max-w-sm">
+            <h3 class="text-base font-semibold text-base-content">@Title</h3>
+            <p class="py-4 text-sm leading-relaxed text-base-content/60">@Message</p>
+            <div class="modal-action">
+                <button class="btn btn-ghost btn-sm" @onclick="HandleCancel">Cancel</button>
+                <button class="btn btn-error btn-sm" @onclick="HandleConfirm">@ConfirmLabel</button>
+            </div>
+        </div>
+        <div class="modal-backdrop bg-base-content/20" @onclick="HandleCancel"></div>
+    </div>
+}
 
 @code {
-    [CascadingParameter]
-    private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter]
+    public bool IsVisible { get; set; }
 
     [Parameter]
-    public string Title { get; set; } = string.Empty;
+    public string Title { get; set; } = "Confirm Action";
 
     [Parameter]
-    public string Message { get; set; } = string.Empty;
+    public string Message { get; set; } = "Are you sure you want to proceed?";
+
+    [Parameter]
+    public string ConfirmLabel { get; set; } = "Confirm";
 
     [Parameter]
     public EventCallback OnConfirm { get; set; }
 
-    private async Task ConfirmAsync()
-    {
-        if (OnConfirm.HasDelegate)
-        {
-            await OnConfirm.InvokeAsync();
-        }
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
 
-        MudDialog.Close(DialogResult.Ok(true));
-    }
+    private async Task HandleConfirm() => await OnConfirm.InvokeAsync();
 
-    private Task CancelAsync()
-    {
-        MudDialog.Cancel();
-        return Task.CompletedTask;
-    }
+    private async Task HandleCancel() => await OnCancel.InvokeAsync();
 }

@@ -1,63 +1,103 @@
 @page "/login"
+@layout AuthLayout
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
+@inject IDbContextFactory<AppDbContext> DbContextFactory
 
-<MudPaper Class="hrms-page-card" Style="width: 100%; max-width: 400px; padding: 40px;" Elevation="0">
-    <MudText Style="font-size: 2rem; font-weight: 700; color: #1E293B;">HRMS</MudText>
-    <MudText Style="margin-bottom: 24px; color: #64748B;">Homeowners Record Management System</MudText>
+<div class="hidden flex-1 lg:flex relative">
+    <img src="images/login-bg.jpg" class="absolute inset-0 h-full w-full object-cover" alt="" />
+    <div class="absolute inset-0 bg-slate-950/55"></div>
+    <div class="absolute bottom-8 left-8 text-white">
+        <p class="mb-1 text-xs uppercase tracking-widest text-white/60">@_hoaName</p>
+        <p class="text-[22px] font-medium">Homeowners Record Management System</p>
+    </div>
+</div>
 
-    @if (!string.IsNullOrWhiteSpace(_errorMessage))
-    {
-        <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Dense="true" Class="mb-4">
-            @_errorMessage
-        </MudAlert>
-    }
+<div class="flex w-full flex-shrink-0 items-center justify-center bg-base-100 p-8 lg:w-[480px]">
+    <div class="flex w-full max-w-[360px] flex-col gap-5">
+        <div>
+            <h1 class="text-[22px] font-medium tracking-tight text-base-content">Welcome back</h1>
+            <p class="mt-1 text-[13px] text-base-content/50">
+                Sign in to your account to continue.
+            </p>
+        </div>
 
-    <FieldGroup Label="Username" Class="mb-3">
-        <MudTextField @bind-Value="_username"
-                      Variant="Variant.Outlined"
-                      FullWidth="true"
-                      Margin="Margin.Dense"
-                      OnKeyUp="HandleKeyUp" />
-    </FieldGroup>
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <div role="alert" class="alert alert-error px-4 py-2 text-sm">
+                <span>@_errorMessage</span>
+            </div>
+        }
 
-    <FieldGroup Label="Password">
-        <MudTextField @bind-Value="_password"
-                      Variant="Variant.Outlined"
-                      FullWidth="true"
-                      Margin="Margin.Dense"
-                      InputType="@(_showPassword ? InputType.Text : InputType.Password)"
-                      Adornment="Adornment.End"
-                      AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
-                      OnAdornmentClick="TogglePasswordVisibility"
-                      OnKeyUp="HandleKeyUp" />
-    </FieldGroup>
+        <FieldGroup Label="Username">
+            <input class="input input-bordered w-full" @bind="_username" />
+        </FieldGroup>
 
-    <MudButton FullWidth="true"
-               Color="Color.Primary"
-               Variant="Variant.Filled"
-               Disabled="_isSubmitting"
-               Style="margin-top: 20px;"
-               OnClick="SubmitAsync">
-        LOGIN
-    </MudButton>
+        <FieldGroup Label="Password">
+            <div class="relative">
+                <input type="@(_showPassword ? "text" : "password")" class="input input-bordered w-full pr-10" @bind="_password" @onkeydown="HandleEnter" />
+                <button type="button" class="btn btn-ghost btn-xs absolute right-2 top-1/2 -translate-y-1/2" @onclick="TogglePasswordVisibility">
+                    @(_showPassword ? "Hide" : "Show")
+                </button>
+            </div>
+        </FieldGroup>
 
-    <MudText Style="margin-top: 24px; text-align: center; color: #94A3B8; font-size: 0.875rem;">
-        &copy; Homeowners Association
-    </MudText>
-</MudPaper>
+        <button class="btn btn-neutral w-full" @onclick="SubmitAsync" disabled="@_isSubmitting">
+            @if (_isSubmitting)
+            {
+                <span class="loading loading-spinner loading-sm"></span>
+            }
+            else
+            {
+                <span>Login</span>
+            }
+        </button>
+
+        <p class="text-center text-[11.5px] text-base-content/30">&copy; @_hoaName</p>
+    </div>
+</div>
 
 @code {
     private string _username = string.Empty;
     private string _password = string.Empty;
     private string? _errorMessage;
-    private bool _showPassword;
     private bool _isSubmitting;
+    private string _hoaName = "Homeowners Association";
+    private bool _showPassword;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var context = await DbContextFactory.CreateDbContextAsync();
+        var settings = await context.HOASettings.AsNoTracking().FirstOrDefaultAsync();
+        if (!string.IsNullOrWhiteSpace(settings?.HOAName))
+        {
+            _hoaName = settings.HOAName;
+        }
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        _showPassword = !_showPassword;
+    }
+
+    private async Task HandleEnter(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await SubmitAsync();
+        }
+    }
 
     private async Task SubmitAsync()
     {
         if (_isSubmitting)
         {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_username) || string.IsNullOrWhiteSpace(_password))
+        {
+            _errorMessage = "Please enter your username and password.";
             return;
         }
 
@@ -69,7 +109,7 @@
             var isValid = await AuthService.LoginAsync(_username, _password);
             if (isValid)
             {
-                NavigationManager.NavigateTo("/dashboard");
+                NavigationManager.NavigateTo(AuthService.DefaultRoute);
                 return;
             }
 
@@ -78,19 +118,6 @@
         finally
         {
             _isSubmitting = false;
-        }
-    }
-
-    private void TogglePasswordVisibility()
-    {
-        _showPassword = !_showPassword;
-    }
-
-    private async Task HandleKeyUp(KeyboardEventArgs args)
-    {
-        if (args.Key == "Enter")
-        {
-            await SubmitAsync();
         }
     }
 }

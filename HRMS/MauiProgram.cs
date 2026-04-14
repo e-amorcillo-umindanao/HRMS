@@ -3,7 +3,6 @@ using HRMS.Helpers;
 using HRMS.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MudBlazor.Services;
 using QuestPDF.Infrastructure;
 
 namespace HRMS;
@@ -25,7 +24,6 @@ public static class MauiProgram
         var connectionString = @"Server=(localdb)\mssqllocaldb;Database=HRMS;Trusted_Connection=True;MultipleActiveResultSets=true;";
 
         builder.Services.AddMauiBlazorWebView();
-        builder.Services.AddMudServices();
         builder.Services.AddDbContext<AppDbContext>(options =>
             options.UseSqlServer(connectionString));
         builder.Services.AddDbContextFactory<AppDbContext>(options =>
@@ -46,6 +44,7 @@ public static class MauiProgram
         builder.Services.AddScoped<ReportService>();
         builder.Services.AddScoped<AuditService>();
         builder.Services.AddScoped<SessionHelper>();
+        builder.Services.AddSingleton<ThemeService>();
         builder.Services.AddSingleton(new BackupService(connectionString));
 
 #if DEBUG

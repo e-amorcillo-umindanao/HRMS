@@ -2,7 +2,8 @@
 @inject EngagementService EngagementService
 @inject NavigationManager NavigationManager
 
-<PageHeader Title="Engagement" />
+<PageHeader Title="Engagement"
+            Subtitle="Homeowner engagement scores, interaction history, and event attendance." />
 
 @if (_isLoading)
 {
@@ -10,70 +11,69 @@
 }
 else
 {
-    <MudGrid Style="margin-bottom: 24px;">
-        <MudItem xs="12" md="4">
-            <KpiCard Title="Total High" Value="@HighCount.ToString()" />
-        </MudItem>
-        <MudItem xs="12" md="4">
-            <KpiCard Title="Total Medium" Value="@MediumCount.ToString()" />
-        </MudItem>
-        <MudItem xs="12" md="4">
-            <KpiCard Title="Total Low" Value="@LowCount.ToString()" />
-        </MudItem>
-    </MudGrid>
+    <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <KpiCard Label="Total High" Value="@HighCount.ToString()" Sub="Score 75-100" Accent="success" />
+        <KpiCard Label="Total Medium" Value="@MediumCount.ToString()" Sub="Score 40-74" Accent="warning" />
+        <KpiCard Label="Total Low" Value="@LowCount.ToString()" Sub="Score 0-39" Accent="error" />
+    </div>
 
-    @if (_summaries.Count == 0)
-    {
-        <MudPaper Class="hrms-page-card" Elevation="0">
-            <EmptyState Title="No engagement records yet"
-                        Subtitle="Add homeowners and interactions to start tracking engagement."
-                        Icon="@Icons.Material.Filled.Handshake" />
-        </MudPaper>
-    }
-    else
-    {
-        <MudPaper Class="hrms-page-card" Elevation="0">
-            <MudTable T="EngagementSummary" Items="_summaries" Hover="false" Striped="false">
-                <HeaderContent>
-                    <MudTh>Homeowner Name</MudTh>
-                    <MudTh>Engagement Score</MudTh>
-                    <MudTh>Badge</MudTh>
-                    <MudTh>Last Interaction Date</MudTh>
-                    <MudTh>Events Attended</MudTh>
-                    <MudTh>Actions</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Homeowner Name">@context.HomeownerName</MudTd>
-                    <MudTd DataLabel="Engagement Score">
-                        <div class="engagement-score-cell">
-                            <MudProgressLinear Value="@context.Score"
-                                               Color="@GetScoreColor(context.Score)"
-                                               Rounded="false"
-                                               Size="Size.Small"
-                                               Style="border-radius: 4px;" />
-                            <span class="score-label">@($"{context.Score:0.##}%")</span>
-                        </div>
-                    </MudTd>
-                    <MudTd DataLabel="Badge">
-                        <EngagementBadge Label="@context.Label" />
-                    </MudTd>
-                    <MudTd DataLabel="Last Interaction Date">@FormatDate(context.LastInteractionDate)</MudTd>
-                    <MudTd DataLabel="Events Attended">@($"{context.EventsAttended} / {context.TotalEvents}")</MudTd>
-                    <MudTd DataLabel="Actions">
-                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/homeowners/{context.HomeownerId}"))">
-                                View Homeowner
-                            </MudButton>
-                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/engagement/log?homeownerId={context.HomeownerId}&returnUrl=%2Fengagement"))">
-                                Log Interaction
-                            </MudButton>
-                        </div>
-                    </MudTd>
-                </RowTemplate>
-            </MudTable>
-        </MudPaper>
-        <TableRecordCount Count="_summaries.Count" EntityLabel="engagement records" />
-    }
+    <div class="card border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-0">
+            @if (_summaries.Count == 0)
+            {
+                <EmptyState Title="No engagement records yet"
+                            Subtitle="Add homeowners and interactions to start tracking engagement."
+                            Icon="○" />
+            }
+            else
+            {
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                                <th>Homeowner Name</th>
+                                <th>Engagement Score</th>
+                                <th>Badge</th>
+                                <th>Last Interaction Date</th>
+                                <th>Events Attended</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var summary in _summaries)
+                            {
+                                <tr class="h-[52px] hover">
+                                    <td class="text-sm text-base-content">@summary.HomeownerName</td>
+                                    <td><EngagementBadge Score="@summary.Score" /></td>
+                                    <td>
+                                        <span class="badge badge-sm @GetLevelBadgeClass(summary.Label)">@summary.Label</span>
+                                    </td>
+                                    <td class="text-sm text-base-content/60">@FormatDate(summary.LastInteractionDate)</td>
+                                    <td class="text-sm text-base-content/60">@($"{summary.EventsAttended} / {summary.TotalEvents}")</td>
+                                    <td class="text-right">
+                                        <button class="btn btn-ghost btn-xs"
+                                                @onclick='() => NavigationManager.NavigateTo($"/homeowners/{summary.HomeownerId}")'>
+                                            View Homeowner
+                                        </button>
+                                        <button class="btn btn-ghost btn-xs text-primary"
+                                                @onclick='() => NavigationManager.NavigateTo($"/engagement/log?homeownerId={summary.HomeownerId}&returnUrl=%2Fengagement")'>
+                                            Log Interaction
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-4 pb-4">
+                    <TableRecordCount From="@(_summaries.Count == 0 ? 0 : 1)"
+                                      To="@_summaries.Count"
+                                      Total="@_summaries.Count"
+                                      Entity="engagement records" />
+                </div>
+            }
+        </div>
+    </div>
 }
 
 @code {
@@ -99,10 +99,11 @@ else
     private static string FormatDate(DateTime? value) =>
         value.HasValue ? value.Value.ToString("MMMM dd, yyyy") : "-";
 
-    private static Color GetScoreColor(double score) => score switch
+    private static string GetLevelBadgeClass(string label) => label switch
     {
-        >= 75 => Color.Success,
-        >= 40 => Color.Warning,
-        _ => Color.Error
+        "High Engagement" => "badge-success",
+        "Medium Engagement" => "badge-warning",
+        "Low Engagement" => "badge-error",
+        _ => "badge-ghost"
     };
 }

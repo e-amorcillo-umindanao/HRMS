@@ -36,6 +36,9 @@ public class ClearanceService
             .ToListAsync();
     }
 
+    public Task<List<ClearanceRequest>> GetByHomeownerIdAsync(int homeownerId) =>
+        GetByHomeownerAsync(homeownerId);
+
     public async Task<List<ClearanceRequest>> SearchAsync(string? homeownerName, string? status, string? clearanceType, int? homeownerId = null)
     {
         var query = BaseQuery();

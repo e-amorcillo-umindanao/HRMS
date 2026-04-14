@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="lemonade">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>HRMS</title>
     <base href="/" />
-    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="css/output.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
     <link href="HRMS.styles.css" rel="stylesheet" />
     <link rel="icon" href="data:," />
@@ -13,6 +13,7 @@
 <body>
     <div class="status-bar-safe-area"></div>
     <div id="app">Loading...</div>
+    <div id="toast-container"></div>
 
     <div id="blazor-error-ui" data-nosnippet>
         An unhandled error has occurred.
@@ -62,7 +63,12 @@
             }
         };
     </script>
-    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="js/chart.umd.min.js"></script>
+    <script src="js/hrms.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/dropdown.js"></script>
+    <script src="js/modal.js"></script>
+    <script src="js/toast.js"></script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
 </body>
 </html>

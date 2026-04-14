@@ -1,0 +1,25 @@
+.card,
+.hrms-page-card {
+  background: var(--color-bg-surface);
+  border: var(--border-card);
+  border-radius: var(--radius);
+}
+
+.card-header {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.card-body {
+  padding: var(--space-5);
+}
+
+.card-footer {
+  padding: var(--space-4) var(--space-5);
+  border-top: 0.5px solid var(--color-border);
+}
+
+.hrms-page-placeholder {
+  padding: var(--space-6);
+  color: var(--color-text-muted);
+}

@@ -3,14 +3,21 @@
 @inject IJSRuntime JSRuntime
 @inject AuthService AuthService
 @inject SessionHelper SessionHelper
+@inject ThemeService ThemeService
 
-<div class="hrms-main-layout">
-    <TopBar />
+<div class="drawer drawer-open min-h-screen">
+    <input id="sidebar-toggle" type="checkbox" class="drawer-toggle" checked />
 
-    <div class="hrms-main-layout__body">
+    <div class="drawer-side z-50">
+        <label for="sidebar-toggle" class="drawer-overlay"></label>
         <Sidebar />
+    </div>
 
-        <main class="hrms-content">
+    <div class="drawer-content flex flex-col">
+        <TopBar IsDark="@ThemeService.IsDark"
+                OnThemeToggle="ToggleThemeAsync" />
+
+        <main class="flex-1 overflow-y-auto bg-base-200 p-6">
             @Body
         </main>
     </div>
@@ -23,6 +30,8 @@
     protected override void OnInitialized()
     {
         AuthService.StateChanged += HandleAuthStateChanged;
+        ThemeService.OnThemeChanged += HandleThemeChanged;
+        SessionHelper.SessionWarningRaised += HandleSessionWarningRaised;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -30,6 +39,9 @@
         if (firstRender)
         {
             _layoutReference = DotNetObjectReference.Create(this);
+            var savedTheme = await JSRuntime.InvokeAsync<string>("hrms.initTheme");
+            ThemeService.SetTheme(savedTheme);
+            StateHasChanged();
         }
 
         if (AuthService.IsAuthenticated && !_isActivityRegistered && _layoutReference is not null)
@@ -56,6 +68,8 @@
     public async ValueTask DisposeAsync()
     {
         AuthService.StateChanged -= HandleAuthStateChanged;
+        ThemeService.OnThemeChanged -= HandleThemeChanged;
+        SessionHelper.SessionWarningRaised -= HandleSessionWarningRaised;
         SessionHelper.Stop();
 
         if (_isActivityRegistered)
@@ -75,5 +89,22 @@
     private void HandleAuthStateChanged()
     {
         _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleThemeChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleSessionWarningRaised()
+    {
+        _ = InvokeAsync(async () =>
+            await JSRuntime.InvokeVoidAsync("hrms.showToast", "Session will lock in 2 minutes due to inactivity.", "warning"));
+    }
+
+    private async Task ToggleThemeAsync()
+    {
+        ThemeService.Toggle();
+        await JSRuntime.InvokeVoidAsync("hrms.setTheme", ThemeService.CurrentTheme);
     }
 }

@@ -3,7 +3,7 @@
 @inject DocumentService DocumentService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 @if (_isLoading)
 {
@@ -12,42 +12,39 @@
 else if (_violation is null)
 {
     <PageHeader Title="Violation" Subtitle="The requested violation record could not be loaded." />
-    <MudPaper Class="hrms-page-card" Elevation="0">
+    <div class="card border border-base-300 bg-base-100 shadow-none">
         <EmptyState Title="No violation available"
                     Subtitle="The requested violation record could not be found."
-                    Icon="@Icons.Material.Filled.Gavel" />
-    </MudPaper>
+                    Icon="O" />
+    </div>
 }
 else
 {
-    <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap;">
-        <PageHeader Title="@_violation.ViolationNumber" Subtitle="Violation record" />
-        <div style="display: flex; gap: 12px;">
-            <MudButton Variant="Variant.Text" OnClick="GoBack">Back</MudButton>
+    <PageHeader Title="@_violation.ViolationNumber" Subtitle="Violation record.">
+        <Actions>
+            <button class="btn btn-ghost btn-sm" @onclick="GoBack">Back</button>
             @if (CanGenerateViolationPdf)
             {
-                <MudButton Variant="Variant.Outlined" OnClick="GeneratePdfAsync">
-                    Generate PDF Report
-                </MudButton>
+                <button class="btn btn-outline btn-sm" @onclick="GeneratePdfAsync">Generate PDF Report</button>
             }
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => NavigationManager.NavigateTo($"/violations/edit/{_violation.ViolationId}"))">
-                Edit
-            </MudButton>
+            <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo($"/violations/edit/{_violation.ViolationId}")'>Edit</button>
+        </Actions>
+    </PageHeader>
+
+    <div class="card border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-5">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                @DetailField("Violation Number", DisplayValue(_violation.ViolationNumber))
+                @DetailField("Homeowner", DisplayValue(_violation.HomeownerName))
+                @DetailField("Status", DisplayValue(_violation.Status))
+                @DetailField("Type", DisplayValue(_violation.ViolationType))
+                @DetailField("Violation Date", FormatDate(_violation.ViolationDate))
+                @DetailField("Filed By", DisplayValue(_violation.FiledByUser?.Username))
+                @DetailField("Details", DisplayValue(_violation.Details))
+                @DetailField("Resolution", DisplayValue(_violation.Resolution))
+            </div>
         </div>
     </div>
-
-    <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-        <MudGrid>
-            <MudItem xs="12" sm="4"><MudText><strong>Violation Number:</strong> @DisplayValue(_violation.ViolationNumber)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Homeowner:</strong> @DisplayValue(_violation.HomeownerName)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Status:</strong> <StatusChip Label="@_violation.Status" /></MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Type:</strong> @DisplayValue(_violation.ViolationType)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Violation Date:</strong> @FormatDate(_violation.ViolationDate)</MudText></MudItem>
-            <MudItem xs="12" sm="4"><MudText><strong>Filed By:</strong> @DisplayValue(_violation.FiledByUser?.Username)</MudText></MudItem>
-            <MudItem xs="12"><MudText><strong>Details:</strong> @DisplayValue(_violation.Details)</MudText></MudItem>
-            <MudItem xs="12"><MudText><strong>Resolution:</strong> @DisplayValue(_violation.Resolution)</MudText></MudItem>
-        </MudGrid>
-    </MudPaper>
 }
 
 @code {
@@ -82,7 +79,7 @@ else
             var document = await DocumentService.GenerateViolationReportAsync(Id, AuthService.CurrentRole);
             if (document is null)
             {
-                Snackbar.Add("Unable to generate violation report.", Severity.Error);
+                await JS.InvokeVoidAsync("hrms.showToast", "Unable to generate violation report.", "error");
                 return;
             }
 
@@ -96,7 +93,7 @@ else
         }
         catch (UnauthorizedAccessException exception)
         {
-            Snackbar.Add(exception.Message, Severity.Error);
+            await JS.InvokeVoidAsync("hrms.showToast", exception.Message, "error");
         }
     }
 
@@ -112,4 +109,18 @@ else
 
         return parsed.ToString("MMMM dd, yyyy");
     }
+
+    private static RenderFragment DetailField(string label, string value) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.OpenElement(1, "p");
+        builder.AddAttribute(2, "class", "text-[10.5px] font-semibold uppercase tracking-wide text-base-content/40");
+        builder.AddContent(3, label);
+        builder.CloseElement();
+        builder.OpenElement(4, "p");
+        builder.AddAttribute(5, "class", "mt-0.5 text-sm text-base-content");
+        builder.AddContent(6, value);
+        builder.CloseElement();
+        builder.CloseElement();
+    };
 }

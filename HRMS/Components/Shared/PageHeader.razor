@@ -1,8 +1,17 @@
-<div style="margin-bottom: 24px;">
-    <h1 style="margin: 0; color: #1E293B; font-size: 2rem; font-weight: 700;">@Title</h1>
-    @if (!string.IsNullOrWhiteSpace(Subtitle))
+<div class="page-header">
+    <div>
+        <h1 class="text-lg font-medium tracking-tight text-base-content">@Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Subtitle))
+        {
+            <p class="mt-0.5 text-xs text-base-content/50">@Subtitle</p>
+        }
+    </div>
+
+    @if (Actions is not null)
     {
-        <p style="margin: 8px 0 0; color: #64748B;">@Subtitle</p>
+        <div class="flex items-center gap-3">
+            @Actions
+        </div>
     }
 </div>
 
@@ -12,4 +21,7 @@
 
     [Parameter]
     public string? Subtitle { get; set; }
+
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
 }

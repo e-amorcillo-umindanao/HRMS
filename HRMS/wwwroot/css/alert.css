@@ -1,0 +1,18 @@
+.alert {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border: 0.5px solid transparent;
+  font-size: var(--font-size-sm);
+}
+
+.alert-error {
+  background: var(--color-error-bg);
+  border-color: #FECACA;
+  color: var(--color-error-text);
+}
+
+.alert-success {
+  background: var(--color-success-bg);
+  border-color: #BBF7D0;
+  color: var(--color-success-text);
+}

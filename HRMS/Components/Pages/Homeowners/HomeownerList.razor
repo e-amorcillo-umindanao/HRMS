@@ -3,157 +3,183 @@
 @inject AppDbContext DbContext
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
-@inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
-<PageHeader Title="Homeowners" Subtitle="Manage homeowner records, profile data, and CSV imports." />
+<PageHeader Title="Homeowners"
+            Subtitle="Manage homeowner records, profile data, and CSV imports.">
+    <Actions>
+        <label class="btn btn-outline btn-sm">
+            Import CSV
+            <InputFile OnChange="ImportCsvAsync" accept=".csv" hidden />
+        </label>
+        <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/homeowners/new")'>
+            Add Homeowner
+        </button>
+    </Actions>
+</PageHeader>
 
-<MudPaper Class="hrms-page-card" Style="padding: 16px; margin-bottom: 24px;" Elevation="0">
-    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
-        <FieldGroup Label="Name" Style="min-width: 220px;">
-            <MudTextField T="string"
-                          Value="_nameFilter"
-                          ValueChanged="OnNameFilterChanged"
-                          Variant="Variant.Outlined"
-                          Immediate="true" />
-        </FieldGroup>
+<div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
+    <div class="card-body p-4">
+        <div class="flex flex-wrap items-end gap-3">
+            <div class="form-control min-w-[200px] flex-1">
+                <label class="label py-0 pb-1">
+                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Name</span>
+                </label>
+                <input type="text"
+                       class="input input-bordered input-sm w-full"
+                       placeholder="Search name..."
+                       value="@_nameFilter"
+                       @oninput="OnNameInput" />
+            </div>
 
-        <FieldGroup Label="Status" Style="min-width: 180px;">
-            <MudSelect T="string"
-                       Value="_statusFilter"
-                       ValueChanged="OnStatusFilterChanged"
-                       Variant="Variant.Outlined">
-                <MudSelectItem T="string" Value="@string.Empty">All Statuses</MudSelectItem>
-                @foreach (var status in StatusOptions)
-                {
-                    <MudSelectItem T="string" Value="@status">@status</MudSelectItem>
-                }
-            </MudSelect>
-        </FieldGroup>
+            <div class="form-control min-w-[148px]">
+                <label class="label py-0 pb-1">
+                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Status</span>
+                </label>
+                <select class="select select-bordered select-sm" value="@_statusFilter" @onchange="OnStatusChanged">
+                    <option value="">All Statuses</option>
+                    @foreach (var status in StatusOptions)
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+            </div>
 
-        <FieldGroup Label="Phase" Style="min-width: 180px;">
-            <MudSelect T="int?"
-                       Value="_phaseFilter"
-                       ValueChanged="OnPhaseFilterChanged"
-                       Variant="Variant.Outlined">
-                <MudSelectItem T="int?" Value="@((int?)null)">All Phases</MudSelectItem>
-                @foreach (var phase in _phases)
-                {
-                    <MudSelectItem T="int?" Value="@phase.PhaseId">@phase.Name</MudSelectItem>
-                }
-            </MudSelect>
-        </FieldGroup>
+            <div class="form-control min-w-[148px]">
+                <label class="label py-0 pb-1">
+                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Phase</span>
+                </label>
+                <select class="select select-bordered select-sm" value="@GetPhaseValue()" @onchange="OnPhaseChanged">
+                    <option value="">All Phases</option>
+                    @foreach (var phase in _phases)
+                    {
+                        <option value="@phase.PhaseId">@phase.Name</option>
+                    }
+                </select>
+            </div>
 
-        <FieldGroup Label="Category" Style="min-width: 180px;">
-            <MudSelect T="string"
-                       Value="_categoryFilter"
-                       ValueChanged="OnCategoryFilterChanged"
-                       Variant="Variant.Outlined">
-                <MudSelectItem T="string" Value="@string.Empty">All Categories</MudSelectItem>
-                @foreach (var category in CategoryOptions)
-                {
-                    <MudSelectItem T="string" Value="@category">@category</MudSelectItem>
-                }
-            </MudSelect>
-        </FieldGroup>
-
-        <div style="margin-left: auto; display: flex; flex-wrap: wrap; gap: 12px;">
-            <MudButton HtmlTag="label" Variant="Variant.Outlined">
-                Import CSV
-                <InputFile OnChange="ImportCsvAsync" accept=".csv" hidden />
-            </MudButton>
-
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="/homeowners/add">
-                Add Homeowner
-            </MudButton>
+            <div class="form-control min-w-[148px]">
+                <label class="label py-0 pb-1">
+                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Category</span>
+                </label>
+                <select class="select select-bordered select-sm" value="@_categoryFilter" @onchange="OnCategoryChanged">
+                    <option value="">All Categories</option>
+                    @foreach (var category in CategoryOptions)
+                    {
+                        <option value="@category">@category</option>
+                    }
+                </select>
+            </div>
         </div>
     </div>
-</MudPaper>
+</div>
 
 @if (!string.IsNullOrWhiteSpace(_importMessage))
 {
-    <MudAlert Severity="@_importSeverity" Variant="Variant.Outlined" Style="margin-bottom: 16px;">
-        @_importMessage
-    </MudAlert>
+    <div role="alert" class="alert mb-4 @($"alert-{_importTone}")">
+        <span>@_importMessage</span>
+    </div>
 }
 
 @if (_importErrors.Count > 0)
 {
-    <MudPaper Class="hrms-page-card" Style="padding: 16px; margin-bottom: 24px;" Elevation="0">
-        <MudText Style="font-weight: 700; color: #1E293B; margin-bottom: 8px;">Import Errors</MudText>
-        @foreach (var error in _importErrors)
-        {
-            <MudText Style="color: #64748B;">
-                @(error.RowNumber > 0 ? $"Row {error.RowNumber}: {error.Message}" : error.Message)
-            </MudText>
-        }
-    </MudPaper>
+    <div class="card mb-6 border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body gap-2 p-4">
+            <p class="text-sm font-semibold text-base-content">Import Errors</p>
+            @foreach (var error in _importErrors)
+            {
+                <p class="text-sm text-base-content/60">
+                    @(error.RowNumber > 0 ? $"Row {error.RowNumber}: {error.Message}" : error.Message)
+                </p>
+            }
+        </div>
+    </div>
 }
 
-@if (_isLoading)
-{
-    <LoadingSpinner />
-}
-else if (_homeowners.Count == 0)
-{
-    <MudPaper Class="hrms-page-card" Elevation="0">
-        <EmptyState Title="No homeowners found"
-                    Subtitle="Try adjusting your filters or add a new homeowner record."
-                    Icon="@Icons.Material.Filled.Inbox" />
-    </MudPaper>
-}
-else
-{
-    <MudPaper Class="hrms-page-card" Elevation="0">
-        <MudTable T="Homeowner" Items="_homeowners" Hover="false" Striped="false">
-            <HeaderContent>
-                <MudTh>Full Name</MudTh>
-                <MudTh>Status</MudTh>
-                <MudTh>Phase</MudTh>
-                <MudTh>Unit</MudTh>
-                <MudTh>Categories</MudTh>
-                <MudTh>Residency Since</MudTh>
-                <MudTh>Actions</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Full Name">@GetFullName(context)</MudTd>
-                <MudTd DataLabel="Status"><StatusChip Label="@context.Status" /></MudTd>
-                <MudTd DataLabel="Phase">@DisplayValue(context.Phase?.Name)</MudTd>
-                <MudTd DataLabel="Unit">@DisplayValue(context.Unit?.UnitNumber)</MudTd>
-                <MudTd DataLabel="Categories">
-                    @if (GetCategories(context).Count == 0)
-                    {
-                        <span>-</span>
-                    }
-                    else
-                    {
-                        @foreach (var category in GetCategories(context))
+<div class="card border border-base-300 bg-base-100 shadow-none">
+    <div class="card-body p-0">
+        @if (_isLoading)
+        {
+            <LoadingSpinner />
+        }
+        else if (_homeowners.Count == 0)
+        {
+            <EmptyState Title="No homeowners found"
+                        Subtitle="Try adjusting your filters or add a new homeowner record."
+                        Icon="○" />
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                            <th>Full Name</th>
+                            <th>Status</th>
+                            <th>Phase</th>
+                            <th>Unit</th>
+                            <th>Categories</th>
+                            <th>Residency Since</th>
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var homeowner in _homeowners)
                         {
-                            <MudChip T="string" Size="Size.Small" Style="margin-right: 4px; margin-bottom: 4px; background: #E2E8F0; color: #1E293B; font-weight: 600;">
-                                @category
-                            </MudChip>
+                            <tr class="h-[52px] hover">
+                                <td class="text-sm font-medium text-base-content">@GetFullName(homeowner)</td>
+                                <td><StatusChip Status="@homeowner.Status" /></td>
+                                <td class="text-sm text-base-content/60">@DisplayValue(homeowner.Phase?.Name)</td>
+                                <td class="text-sm text-base-content/60">@DisplayValue(homeowner.Unit?.UnitNumber)</td>
+                                <td>
+                                    @if (GetCategories(homeowner).Count == 0)
+                                    {
+                                        <span class="text-sm text-base-content/30">-</span>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var category in GetCategories(homeowner))
+                                        {
+                                            <span class="badge badge-info badge-sm mr-1">@category</span>
+                                        }
+                                    }
+                                </td>
+                                <td class="text-sm text-base-content/60">@FormatDate(homeowner.ResidencySince)</td>
+                                <td class="text-right">
+                                    <button class="btn btn-ghost btn-xs"
+                                            @onclick='() => NavigationManager.NavigateTo($"/homeowners/{homeowner.HomeownerId}")'>
+                                        View
+                                    </button>
+                                    <button class="btn btn-ghost btn-xs"
+                                            @onclick='() => NavigationManager.NavigateTo($"/homeowners/{homeowner.HomeownerId}/edit")'>
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-ghost btn-xs text-error"
+                                            @onclick='() => AskDelete(homeowner)'>
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
                         }
-                    }
-                </MudTd>
-                <MudTd DataLabel="Residency Since">@FormatDate(context.ResidencySince)</MudTd>
-                <MudTd DataLabel="Actions">
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/homeowners/{context.HomeownerId}"))">
-                            View
-                        </MudButton>
-                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/homeowners/edit/{context.HomeownerId}"))">
-                            Edit
-                        </MudButton>
-                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" OnClick="@(() => PromptDeleteAsync(context))">
-                            Delete
-                        </MudButton>
-                    </div>
-                </MudTd>
-            </RowTemplate>
-        </MudTable>
-    </MudPaper>
-    <TableRecordCount Count="_homeowners.Count" EntityLabel="homeowners" />
-}
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-4 pb-4">
+                <TableRecordCount From="@(_homeowners.Count == 0 ? 0 : 1)"
+                                  To="@_homeowners.Count"
+                                  Total="@_homeowners.Count"
+                                  Entity="homeowners" />
+            </div>
+        }
+    </div>
+</div>
+
+<ConfirmDialog IsVisible="@_showConfirm"
+               Title="Delete Homeowner"
+               Message="@_confirmMessage"
+               ConfirmLabel="Delete"
+               OnConfirm="DeleteConfirmedAsync"
+               OnCancel="CancelDelete" />
 
 @code {
     private static readonly string[] StatusOptions = ["Active", "Inactive", "Transferred", "Deceased"];
@@ -168,7 +194,10 @@ else
     private int? _phaseFilter;
     private bool _isLoading = true;
     private string? _importMessage;
-    private Severity _importSeverity = Severity.Success;
+    private string _importTone = "success";
+    private bool _showConfirm;
+    private int? _pendingDeleteId;
+    private string _confirmMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -195,27 +224,27 @@ else
         _isLoading = false;
     }
 
-    private async Task OnNameFilterChanged(string value)
+    private async Task OnNameInput(ChangeEventArgs args)
     {
-        _nameFilter = value;
+        _nameFilter = args.Value?.ToString() ?? string.Empty;
         await LoadHomeownersAsync();
     }
 
-    private async Task OnStatusFilterChanged(string value)
+    private async Task OnStatusChanged(ChangeEventArgs args)
     {
-        _statusFilter = value;
+        _statusFilter = args.Value?.ToString() ?? string.Empty;
         await LoadHomeownersAsync();
     }
 
-    private async Task OnCategoryFilterChanged(string value)
+    private async Task OnCategoryChanged(ChangeEventArgs args)
     {
-        _categoryFilter = value;
+        _categoryFilter = args.Value?.ToString() ?? string.Empty;
         await LoadHomeownersAsync();
     }
 
-    private async Task OnPhaseFilterChanged(int? value)
+    private async Task OnPhaseChanged(ChangeEventArgs args)
     {
-        _phaseFilter = value;
+        _phaseFilter = int.TryParse(args.Value?.ToString(), out var phaseId) ? phaseId : null;
         await LoadHomeownersAsync();
     }
 
@@ -234,48 +263,54 @@ else
         var result = await HomeownerService.ImportFromCsvAsync(stream, AuthService.CurrentUser.UserId);
 
         _importErrors.AddRange(result.Errors);
-
-        _importSeverity = result.Errors.Count == 0
-            ? Severity.Success
+        _importTone = result.Errors.Count == 0
+            ? "success"
             : result.ImportedCount > 0
-                ? Severity.Warning
-                : Severity.Error;
+                ? "warning"
+                : "error";
 
         _importMessage = result.Errors.Count == 0
             ? $"Imported {result.ImportedCount} homeowner record(s) successfully."
             : $"Imported {result.ImportedCount} homeowner record(s). Some rows could not be processed.";
 
-        Snackbar.Add(_importMessage, _importSeverity);
-
+        await JS.InvokeVoidAsync("hrms.showToast", _importMessage, _importTone);
         await LoadHomeownersAsync();
     }
 
-    private async Task PromptDeleteAsync(Homeowner homeowner)
+    private void AskDelete(Homeowner homeowner)
     {
-        var parameters = new DialogParameters
-        {
-            [nameof(ConfirmDialog.Title)] = "Delete Homeowner",
-            [nameof(ConfirmDialog.Message)] = $"Are you sure you want to delete {GetFullName(homeowner)}?",
-            [nameof(ConfirmDialog.OnConfirm)] = EventCallback.Factory.Create(this, async () => await DeleteAsync(homeowner.HomeownerId))
-        };
-
-        await DialogService.ShowAsync<ConfirmDialog>(string.Empty, parameters);
+        _pendingDeleteId = homeowner.HomeownerId;
+        _confirmMessage = $"Are you sure you want to delete {GetFullName(homeowner)}?";
+        _showConfirm = true;
     }
 
-    private async Task DeleteAsync(int homeownerId)
+    private Task CancelDelete()
     {
-        if (AuthService.CurrentUser is null)
+        _showConfirm = false;
+        _pendingDeleteId = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteConfirmedAsync()
+    {
+        _showConfirm = false;
+
+        if (!_pendingDeleteId.HasValue || AuthService.CurrentUser is null)
         {
             return;
         }
 
-        var deleted = await HomeownerService.SoftDeleteAsync(homeownerId, AuthService.CurrentUser.UserId);
+        var deleted = await HomeownerService.SoftDeleteAsync(_pendingDeleteId.Value, AuthService.CurrentUser.UserId);
+        _pendingDeleteId = null;
+
         if (deleted)
         {
-            Snackbar.Add("Homeowner deleted successfully.", Severity.Success);
+            await JS.InvokeVoidAsync("hrms.showToast", "Homeowner deleted successfully.", "success");
             await LoadHomeownersAsync();
         }
     }
+
+    private string GetPhaseValue() => _phaseFilter?.ToString() ?? string.Empty;
 
     private static string GetFullName(Homeowner homeowner)
     {
@@ -284,6 +319,13 @@ else
 
         return string.Join(" ", parts);
     }
+
+    private static List<string> GetCategories(Homeowner homeowner) =>
+        string.IsNullOrWhiteSpace(homeowner.Categories)
+            ? []
+            : homeowner.Categories
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
 
     private static string DisplayValue(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "-" : value;
@@ -297,13 +339,6 @@ else
 
         return parsed.ToString("MMMM dd, yyyy");
     }
-
-    private static List<string> GetCategories(Homeowner homeowner) =>
-        string.IsNullOrWhiteSpace(homeowner.Categories)
-            ? []
-            : homeowner.Categories
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToList();
 
     private static string? NullIfEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value;

@@ -31,9 +31,13 @@ public class AuthService
 
     public User? CurrentUser { get; private set; }
 
+    public int? CurrentHomeownerId => CurrentUser?.HomeownerId;
+
     public bool IsAuthenticated => CurrentUser is not null;
 
     public string? CurrentRole => CurrentUser?.Role?.RoleName;
+
+    public string DefaultRoute => IsHomeowner() ? "/profile" : "/dashboard";
 
     public async Task<bool> LoginAsync(string username, string password)
     {
@@ -95,7 +99,7 @@ public class AuthService
     {
         var normalized = NormalizeRoute(route);
 
-        if (normalized is "/" or "/dashboard")
+        if (normalized == "/")
         {
             return true;
         }
@@ -103,6 +107,16 @@ public class AuthService
         if (normalized == "/profile")
         {
             return IsHomeowner();
+        }
+
+        if (IsHomeowner())
+        {
+            return false;
+        }
+
+        if (normalized == "/dashboard")
+        {
+            return true;
         }
 
         if (normalized.StartsWith("/clearance", StringComparison.Ordinal))

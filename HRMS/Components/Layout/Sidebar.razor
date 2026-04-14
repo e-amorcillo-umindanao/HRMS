@@ -1,100 +1,186 @@
+@implements IDisposable
 @inject AuthService AuthService
+@inject NavigationManager Nav
 
-<aside class="hrms-sidebar">
-    <div class="hrms-sidebar__header">HRMS</div>
+<aside class="flex min-h-full w-[220px] flex-col bg-neutral text-neutral-content">
+    <div class="px-4 py-5 text-base font-medium tracking-tight">HRMS</div>
 
-    <div class="hrms-sidebar__content">
-        <MudNavMenu Class="hrms-sidebar__nav">
-            <MudNavLink Href="/dashboard" Match="NavLinkMatch.All">
-                Dashboard
-            </MudNavLink>
+    <nav class="flex-1 px-3">
+        @if (AuthService.IsHomeowner())
+        {
+            @RenderSection("Main", HomeownerItems)
+        }
+        else
+        {
+            @RenderSection("Main", MainItems)
+            @RenderSection("Operations", OperationsItems)
 
-            @if (AuthService.IsHomeowner())
+            if (AdminItems.Count > 0)
             {
-                <MudNavLink Href="/profile" Match="NavLinkMatch.Prefix">
-                    Profile
-                </MudNavLink>
+                @RenderSection("Admin", AdminItems)
             }
-            else
-            {
-                @if (AuthService.IsAtLeast("Staff"))
-                {
-                    <MudNavLink Href="/homeowners" Match="NavLinkMatch.Prefix">
-                        Homeowners
-                    </MudNavLink>
-                    <MudNavLink Href="/units" Match="NavLinkMatch.Prefix">
-                        Units
-                    </MudNavLink>
-                }
+        }
+    </nav>
 
-                @if (AuthService.IsAtLeast("Board Member"))
-                {
-                    <MudNavLink Href="/engagement" Match="NavLinkMatch.Prefix">
-                        Engagement
-                    </MudNavLink>
-                }
-
-                @if (AuthService.IsAtLeast("Staff"))
-                {
-                    <MudNavLink Href="/events" Match="NavLinkMatch.Prefix">
-                        Events
-                    </MudNavLink>
-                }
-
-                @if (AuthService.IsAtLeast("Board Member"))
-                {
-                    <MudNavLink Href="/msme" Match="NavLinkMatch.Prefix">
-                        MSME
-                    </MudNavLink>
-                }
-
-                @if (AuthService.IsAtLeast("Staff"))
-                {
-                    <MudNavLink Href="/dues" Match="NavLinkMatch.Prefix">
-                        Dues
-                    </MudNavLink>
-                }
-
-                @if (AuthService.IsAtLeast("Board Member"))
-                {
-                    <MudNavLink Href="/violations" Match="NavLinkMatch.Prefix">
-                        Violations
-                    </MudNavLink>
-                }
-
-                <MudNavLink Href="/clearance" Match="NavLinkMatch.Prefix">
-                    Clearance
-                </MudNavLink>
-
-                @if (AuthService.IsAtLeast("HOA President"))
-                {
-                    <MudNavLink Href="/documents" Match="NavLinkMatch.Prefix">
-                        Documents
-                    </MudNavLink>
-                }
-
-                @if (AuthService.IsAtLeast("Staff"))
-                {
-                    <MudNavLink Href="/reports" Match="NavLinkMatch.Prefix">
-                        Reports
-                    </MudNavLink>
-                }
-
-                @if (AuthService.HasRole("Super Admin"))
-                {
-                    <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix">
-                        Settings
-                    </MudNavLink>
-                }
-            }
-        </MudNavMenu>
+    <div class="border-t border-base-content/10 p-3">
+        <button type="button" class="btn btn-ghost btn-sm w-full justify-start text-base-content/60" @onclick="LogoutAsync">
+            Logout
+        </button>
     </div>
-
-    <MudButton Class="hrms-sidebar__logout" Variant="Variant.Text" OnClick="LogoutAsync">
-        Logout
-    </MudButton>
 </aside>
 
 @code {
+    protected override void OnInitialized()
+    {
+        AuthService.StateChanged += HandleStateChanged;
+        Nav.LocationChanged += HandleLocationChanged;
+    }
+
+    public void Dispose()
+    {
+        AuthService.StateChanged -= HandleStateChanged;
+        Nav.LocationChanged -= HandleLocationChanged;
+    }
+
+    private List<NavItem> HomeownerItems =>
+    [
+        new("My Profile", "/profile")
+    ];
+
+    private List<NavItem> MainItems
+    {
+        get
+        {
+            var items = new List<NavItem>
+            {
+                new("Dashboard", "/dashboard")
+            };
+
+            if (AuthService.IsAtLeast("Staff"))
+            {
+                items.Add(new("Homeowners", "/homeowners"));
+                items.Add(new("Units", "/units"));
+            }
+
+            return items;
+        }
+    }
+
+    private List<NavItem> OperationsItems
+    {
+        get
+        {
+            var items = new List<NavItem>();
+
+            if (AuthService.IsAtLeast("Board Member"))
+            {
+                items.Add(new("Engagement", "/engagement"));
+            }
+
+            if (AuthService.IsAtLeast("Staff"))
+            {
+                items.Add(new("Events", "/events"));
+            }
+
+            if (AuthService.IsAtLeast("Board Member"))
+            {
+                items.Add(new("MSME", "/msme"));
+            }
+
+            if (AuthService.IsAtLeast("Staff"))
+            {
+                items.Add(new("Dues", "/dues"));
+            }
+
+            if (AuthService.IsAtLeast("Board Member"))
+            {
+                items.Add(new("Violations", "/violations"));
+            }
+
+            items.Add(new("Clearance", "/clearance"));
+
+            if (AuthService.IsAtLeast("HOA President"))
+            {
+                items.Add(new("Documents", "/documents"));
+            }
+
+            if (AuthService.IsAtLeast("Staff"))
+            {
+                items.Add(new("Reports", "/reports"));
+            }
+
+            return items;
+        }
+    }
+
+    private List<NavItem> AdminItems =>
+        AuthService.HasRole("Super Admin")
+            ? [new NavItem("Settings", "/settings")]
+            : [];
+
+    private RenderFragment RenderSection(string label, IReadOnlyList<NavItem> items) => builder =>
+    {
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        var sequence = 0;
+        builder.OpenElement(sequence++, "p");
+        builder.AddAttribute(sequence++, "class", "menu-title mt-4 mb-1 px-0 text-[9.5px] uppercase tracking-widest opacity-50");
+        builder.AddContent(sequence++, label);
+        builder.CloseElement();
+
+        builder.OpenElement(sequence++, "ul");
+        builder.AddAttribute(sequence++, "class", "menu menu-compact gap-0.5");
+
+        foreach (var item in items)
+        {
+            builder.OpenElement(sequence++, "li");
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "class", GetNavItemClass(item.Href));
+            builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => NavigateTo(item.Href)));
+
+            builder.OpenElement(sequence++, "span");
+            builder.AddAttribute(sequence++, "class", "h-2 w-2 rounded-full bg-current opacity-40");
+            builder.CloseElement();
+
+            builder.OpenElement(sequence++, "span");
+            builder.AddContent(sequence++, item.Label);
+            builder.CloseElement();
+
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+
+    private string GetNavItemClass(string href) =>
+        IsActive(href) ? "nav-link active" : "nav-link";
+
+    private bool IsActive(string href)
+    {
+        var currentRoute = AuthService.NormalizeRoute(Nav.ToBaseRelativePath(Nav.Uri));
+        var targetRoute = AuthService.NormalizeRoute(href);
+
+        if (targetRoute == "/dashboard")
+        {
+            return currentRoute is "/" or "/dashboard";
+        }
+
+        return currentRoute == targetRoute || currentRoute.StartsWith($"{targetRoute}/", StringComparison.Ordinal);
+    }
+
+    private void NavigateTo(string href) => Nav.NavigateTo(href);
+
     private Task LogoutAsync() => AuthService.LogoutAsync();
+
+    private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) =>
+        _ = InvokeAsync(StateHasChanged);
+
+    private sealed record NavItem(string Label, string Href);
 }

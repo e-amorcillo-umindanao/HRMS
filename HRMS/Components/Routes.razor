@@ -6,6 +6,7 @@
     <Found Context="routeData">
         @{
             var route = GetCurrentRoute();
+            var defaultRoute = AuthService.DefaultRoute;
         }
 
         @if (!AuthService.IsAuthenticated && !IsAnonymousRoute(route))
@@ -14,11 +15,11 @@
         }
         else if (AuthService.IsAuthenticated && route == "/login")
         {
-            <RedirectTo Href="/dashboard" />
+            <RedirectTo Href="@defaultRoute" />
         }
         else if (AuthService.IsAuthenticated && route != "/" && !AuthService.CanAccessRoute(route))
         {
-            <RedirectTo Href="/dashboard" />
+            <RedirectTo Href="@defaultRoute" />
         }
         else
         {

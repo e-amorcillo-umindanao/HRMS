@@ -1,8 +1,7 @@
 @page "/dashboard"
 @inject ReportService ReportService
 @inject AuthService AuthService
-
-<PageHeader Title="Dashboard" />
+@inject IJSRuntime JS
 
 @if (_isLoading)
 {
@@ -10,155 +9,151 @@
 }
 else if (AuthService.IsHomeowner())
 {
+    <PageHeader Title="Dashboard"
+                Subtitle="A quick view of your account activity and standing." />
+
     @if (_homeownerDashboard is null)
     {
-        <MudPaper Class="hrms-page-card" Elevation="0">
+        <div class="card border border-base-300 bg-base-100 shadow-none">
             <EmptyState Title="No dashboard data available"
                         Subtitle="This account is not linked to a homeowner profile yet."
-                        Icon="@Icons.Material.Filled.Dashboard" />
-        </MudPaper>
+                        Icon="○" />
+        </div>
     }
     else
     {
-        <MudGrid>
-            <MudItem xs="12" md="6">
-                <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-                    <MudText Style="color: #64748B; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div class="card border border-base-300 bg-base-100 shadow-none">
+                <div class="card-body p-5">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-base-content/50">
                         Engagement Score
-                    </MudText>
-                    <MudText Style="color: #1E293B; font-size: 2rem; font-weight: 700; margin-top: 6px;">
+                    </p>
+                    <p class="mt-1 text-4xl font-bold text-base-content">
                         @_homeownerDashboard.EngagementScore.ToString("0.##")
-                    </MudText>
-                    <div style="margin-top: 12px;">
-                        <EngagementBadge Label="@_homeownerDashboard.EngagementLabel" />
+                    </p>
+                    <div class="mt-3">
+                        <EngagementBadge Score="@_homeownerDashboard.EngagementScore" />
                     </div>
-                </MudPaper>
-            </MudItem>
-            <MudItem xs="12" sm="4" md="2">
-                <KpiCard Title="Unpaid Dues"
-                         Value="@_homeownerDashboard.UnpaidDuesCount.ToString()" />
-            </MudItem>
-            <MudItem xs="12" sm="4" md="2">
-                <KpiCard Title="Open Violations"
-                         Value="@_homeownerDashboard.OpenViolationCount.ToString()" />
-            </MudItem>
-            <MudItem xs="12" sm="4" md="2">
-                <KpiCard Title="Pending Clearances"
-                         Value="@_homeownerDashboard.PendingClearanceCount.ToString()" />
-            </MudItem>
-        </MudGrid>
+                    <p class="mt-3 text-xs text-base-content/40">
+                        @_homeownerDashboard.EngagementLabel
+                    </p>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 md:grid-cols-1 xl:grid-cols-3">
+                <KpiCard Label="Unpaid Dues"
+                         Value="@_homeownerDashboard.UnpaidDuesCount.ToString()"
+                         Accent="warning" />
+                <KpiCard Label="Open Violations"
+                         Value="@_homeownerDashboard.OpenViolationCount.ToString()"
+                         Accent="error" />
+                <KpiCard Label="Pending Clearances"
+                         Value="@_homeownerDashboard.PendingClearanceCount.ToString()"
+                         Accent="warning" />
+            </div>
+        </div>
     }
 }
 else
 {
-    <MudGrid Style="margin-bottom: 24px;">
-        <MudItem xs="12" sm="6" lg="2">
-            <KpiCard Title="Total Homeowners" Value="@_dashboardKpis.TotalHomeowners.ToString()" />
-        </MudItem>
-        <MudItem xs="12" sm="6" lg="2">
-            <KpiCard Title="Active Homeowners" Value="@_dashboardKpis.ActiveHomeowners.ToString()" />
-        </MudItem>
-        <MudItem xs="12" sm="6" lg="2">
-            <KpiCard Title="Total Units" Value="@_dashboardKpis.TotalUnits.ToString()" />
-        </MudItem>
-        <MudItem xs="12" sm="6" lg="2">
-            <KpiCard Title="Open Violations" Value="@_dashboardKpis.OpenViolations.ToString()" />
-        </MudItem>
-        <MudItem xs="12" sm="6" lg="2">
-            <KpiCard Title="Unpaid / Overdue Dues" Value="@_dashboardKpis.UnpaidOrOverdueDues.ToString()" />
-        </MudItem>
-        <MudItem xs="12" sm="6" lg="2">
-            <KpiCard Title="Pending Clearances" Value="@_dashboardKpis.PendingClearances.ToString()" />
-        </MudItem>
-    </MudGrid>
+    <PageHeader Title="Dashboard"
+                Subtitle="ERP/CRM overview and key performance metrics." />
+
+    <div class="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-3">
+        <KpiCard Label="Total Homeowners" Value="@_dashboardKpis.TotalHomeowners.ToString()" Accent="primary" />
+        <KpiCard Label="Active Homeowners" Value="@_dashboardKpis.ActiveHomeowners.ToString()" Accent="success" />
+        <KpiCard Label="Total Units" Value="@_dashboardKpis.TotalUnits.ToString()" Accent="ghost" />
+        <KpiCard Label="Open Violations" Value="@_dashboardKpis.OpenViolations.ToString()" Accent="error" />
+        <KpiCard Label="Unpaid / Overdue Dues" Value="@_dashboardKpis.UnpaidOrOverdueDues.ToString()" Accent="warning" />
+        <KpiCard Label="Pending Clearances" Value="@_dashboardKpis.PendingClearances.ToString()" Accent="warning" />
+    </div>
 
     @if (AuthService.IsAtLeast("Staff"))
     {
-        <MudGrid Style="margin-bottom: 24px;">
-            <MudItem xs="12" lg="6">
-                <MudPaper Class="hrms-page-card" Style="padding: 24px; min-height: 380px;" Elevation="0">
-                    <MudText Style="color: #1E293B; font-size: 1rem; font-weight: 700; margin-bottom: 6px;">
-                        Engagement Trend
-                    </MudText>
-                    <MudText Style="color: #64748B; margin-bottom: 16px;">
-                        Average homeowner engagement score across the last 6 months.
-                    </MudText>
+        <div class="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div class="card border border-base-300 bg-base-100 shadow-none">
+                <div class="card-body p-0">
+                    <div class="border-b border-base-300 p-5">
+                        <p class="text-sm font-semibold text-base-content">Engagement Trend</p>
+                        <p class="mt-0.5 text-xs text-base-content/40">
+                            Average homeowner engagement score across the last 6 months.
+                        </p>
+                    </div>
+                    <div class="p-5">
+                        @if (_engagementTrend.Count == 0 || _engagementTrend.All(point => point.Value == 0))
+                        {
+                            <EmptyState Title="No engagement trend data"
+                                        Subtitle="Engagement data will appear here once homeowners, events, and interactions are recorded."
+                                        Icon="○" />
+                        }
+                        else
+                        {
+                            <canvas id="engagementCanvas" height="220"></canvas>
+                        }
+                    </div>
+                </div>
+            </div>
 
-                    @if (_engagementTrend.Count == 0 || _engagementTrend.All(point => point.Value == 0))
-                    {
-                        <EmptyState Title="No engagement trend data"
-                                    Subtitle="Engagement data will appear here once homeowners, events, and interactions are recorded."
-                                    Icon="@Icons.Material.Filled.ShowChart" />
-                    }
-                    else
-                    {
-                        <MudChart T="double"
-                                  ChartType="ChartType.Line"
-                                  ChartSeries="@EngagementTrendSeries"
-                                  ChartLabels="@EngagementTrendLabels"
-                                  Width="100%"
-                                  Height="280px" />
-                    }
-                </MudPaper>
-            </MudItem>
-
-            <MudItem xs="12" lg="6">
-                <MudPaper Class="hrms-page-card" Style="padding: 24px; min-height: 380px;" Elevation="0">
-                    <MudText Style="color: #1E293B; font-size: 1rem; font-weight: 700; margin-bottom: 6px;">
-                        Attendance Trend
-                    </MudText>
-                    <MudText Style="color: #64748B; margin-bottom: 16px;">
-                        Present attendees across the most recent 10 events.
-                    </MudText>
-
-                    @if (_attendanceTrend.Count == 0)
-                    {
-                        <EmptyState Title="No attendance data"
-                                    Subtitle="Create events and record attendance to populate this chart."
-                                    Icon="@Icons.Material.Filled.BarChart" />
-                    }
-                    else
-                    {
-                        <MudChart T="double"
-                                  ChartType="ChartType.Bar"
-                                  ChartSeries="@AttendanceTrendSeries"
-                                  ChartLabels="@AttendanceTrendLabels"
-                                  Width="100%"
-                                  Height="280px" />
-                    }
-                </MudPaper>
-            </MudItem>
-        </MudGrid>
+            <div class="card border border-base-300 bg-base-100 shadow-none">
+                <div class="card-body p-0">
+                    <div class="border-b border-base-300 p-5">
+                        <p class="text-sm font-semibold text-base-content">Attendance Trend</p>
+                        <p class="mt-0.5 text-xs text-base-content/40">
+                            Present attendees across the most recent 10 events.
+                        </p>
+                    </div>
+                    <div class="p-5">
+                        @if (_attendanceTrend.Count == 0)
+                        {
+                            <EmptyState Title="No attendance data"
+                                        Subtitle="Create events and record attendance to populate this chart."
+                                        Icon="○" />
+                        }
+                        else
+                        {
+                            <canvas id="attendanceCanvas" height="220"></canvas>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
     }
 
     @if (AuthService.IsAtLeast("Board Member"))
     {
-        <MudPaper Class="hrms-page-card" Style="padding: 24px;" Elevation="0">
-            <MudText Style="color: #1E293B; font-size: 1rem; font-weight: 700; margin-bottom: 6px;">
-                MSME Analytics
-            </MudText>
-            <MudText Style="color: #64748B; margin-bottom: 16px;">
-                Current registry status breakdown for subdivision businesses.
-            </MudText>
-
-            @if (_msmeStatusBreakdown.All(item => item.Value == 0))
-            {
-                <EmptyState Title="No MSME data yet"
-                            Subtitle="Registered businesses will appear here once the MSME registry has entries."
-                            Icon="@Icons.Material.Filled.Storefront" />
-            }
-            else
-            {
-                <div style="max-width: 480px;">
-                    <MudChart T="double"
-                              ChartType="ChartType.Donut"
-                              ChartSeries="@MsmStatusSeries"
-                              ChartLabels="@MsmStatusLabels"
-                              Width="100%"
-                              Height="320px" />
+        <div class="card border border-base-300 bg-base-100 shadow-none">
+            <div class="card-body p-0">
+                <div class="border-b border-base-300 p-5">
+                    <p class="text-sm font-semibold text-base-content">MSME Analytics</p>
+                    <p class="mt-0.5 text-xs text-base-content/40">
+                        Current registry status breakdown for subdivision businesses.
+                    </p>
                 </div>
-            }
-        </MudPaper>
+                <div class="p-5">
+                    @if (_msmeStatusBreakdown.All(item => item.Value == 0))
+                    {
+                        <EmptyState Title="No MSME data yet"
+                                    Subtitle="Registered businesses will appear here once the MSME registry has entries."
+                                    Icon="○" />
+                    }
+                    else
+                    {
+                        <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                            @foreach (var item in _msmeStatusBreakdown)
+                            {
+                                <div class="rounded-box border border-base-300 bg-base-100 p-4">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-base-content/40">
+                                        @item.Label
+                                    </p>
+                                    <p class="mt-1 text-3xl font-bold text-base-content">
+                                        @item.Value
+                                    </p>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
     }
 }
 
@@ -170,45 +165,33 @@ else
     private List<StatusBreakdownItem> _msmeStatusBreakdown = [];
     private bool _isLoading = true;
 
-    private List<ChartSeries<double>> EngagementTrendSeries =>
-    [
-        new ChartSeries<double>
-        {
-            Name = "Average Score",
-            Data = _engagementTrend.Select(point => point.Value).ToArray()
-        }
-    ];
-
-    private string[] EngagementTrendLabels =>
-        _engagementTrend.Select(point => point.Label).ToArray();
-
-    private List<ChartSeries<double>> AttendanceTrendSeries =>
-    [
-        new ChartSeries<double>
-        {
-            Name = "Present Attendees",
-            Data = _attendanceTrend.Select(point => point.Value).ToArray()
-        }
-    ];
-
-    private string[] AttendanceTrendLabels =>
-        _attendanceTrend.Select(point => point.Label).ToArray();
-
-    private List<ChartSeries<double>> MsmStatusSeries =>
-    [
-        new ChartSeries<double>
-        {
-            Name = "MSME Status",
-            Data = _msmeStatusBreakdown.Select(item => (double)item.Value).ToArray()
-        }
-    ];
-
-    private string[] MsmStatusLabels =>
-        _msmeStatusBreakdown.Select(item => item.Label).ToArray();
-
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_isLoading && !AuthService.IsHomeowner())
+        {
+            if (_engagementTrend.Count > 0 && _engagementTrend.Any(point => point.Value > 0))
+            {
+                await JS.InvokeVoidAsync(
+                    "hrms.renderEngagementChart",
+                    "engagementCanvas",
+                    _engagementTrend.Select(point => point.Label).ToArray(),
+                    _engagementTrend.Select(point => point.Value).ToArray());
+            }
+
+            if (_attendanceTrend.Count > 0)
+            {
+                await JS.InvokeVoidAsync(
+                    "hrms.renderAttendanceChart",
+                    "attendanceCanvas",
+                    _attendanceTrend.Select(point => point.Label).ToArray(),
+                    _attendanceTrend.Select(point => point.Value).ToArray());
+            }
+        }
     }
 
     private async Task LoadAsync()
