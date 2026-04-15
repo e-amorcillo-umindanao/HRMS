@@ -66,13 +66,35 @@
   font-weight: 500;
 }
 
+.select {
+  min-height: 3rem;
+  height: 3rem;
+  line-height: 1.25rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  padding-left: 1rem;
+  padding-right: 2.75rem;
+  background-position: right 0.9rem center;
+}
+
+.select-sm {
+  min-height: 3rem;
+  height: 3rem;
+  font-size: 0.95rem;
+  line-height: 1.25rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  padding-left: 1rem;
+  padding-right: 2.75rem;
+}
+
 @layer components {
   .nav-link {
-    @apply flex items-center gap-2 rounded-md px-2 py-2 text-sm text-neutral-content/70 transition-colors hover:bg-base-content/10 hover:text-neutral-content;
+    @apply rounded-md;
   }
 
   .nav-link.active {
-    @apply bg-base-content/10 text-neutral-content;
+    @apply font-medium;
   }
 }
 
@@ -83,24 +105,68 @@
     color 0.15s ease;
 }
 
-.theme-toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+[data-theme="business"] .bg-base-100 {
+  background-color: oklch(25% 0.01 260) !important;
 }
 
-.icon-sun {
-  display: none;
+[data-theme="business"] .card.bg-base-100,
+[data-theme="business"] .card {
+  background-color: oklch(25% 0.01 260) !important;
 }
 
-.icon-moon {
-  display: block;
+[data-theme="business"] .navbar.bg-base-100 {
+  background-color: oklch(20% 0.01 260) !important;
 }
 
-[data-theme="business"] .icon-sun {
-  display: block;
+[data-theme="business"] .dropdown-content.bg-base-100 {
+  background-color: oklch(25% 0.01 260) !important;
 }
 
-[data-theme="business"] .icon-moon {
-  display: none;
+[data-theme="business"] .modal-box {
+  background-color: oklch(25% 0.01 260) !important;
+}
+
+[data-theme="business"] .input,
+[data-theme="business"] .select,
+[data-theme="business"] .textarea {
+  background-color: oklch(20% 0.01 260) !important;
+  border-color: oklch(35% 0.01 260) !important;
+  color: oklch(85% 0.01 260) !important;
+}
+
+[data-theme="business"] .table tr {
+  border-color: oklch(30% 0.01 260) !important;
+}
+
+.navbar .dropdown > label.btn-ghost {
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
+.navbar .dropdown > label.btn-ghost:hover {
+  background-color: oklch(var(--b2)) !important;
+}
+
+.drawer-side aside {
+  background-color: #1e2433 !important;
+  color: #e2e8f0 !important;
+}
+
+.drawer-side aside .border-t {
+  border-color: rgba(226, 232, 240, 0.1) !important;
+}
+
+.nav-link .nav-dot {
+  background-color: #475569;
+}
+
+.nav-link.active .nav-dot,
+a.active .nav-dot {
+  background-color: #60a5fa !important;
+}
+
+.bg-neutral .btn-ghost:hover,
+.bg-neutral .btn:hover {
+  background-color: oklch(var(--nc) / 0.1) !important;
+  color: oklch(var(--nc) / 0.8) !important;
 }

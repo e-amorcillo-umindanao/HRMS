@@ -7,7 +7,7 @@
 <PageHeader Title="Documents"
             Subtitle="Generate official HOA certificates and letters." />
 
-<div class="card max-w-2xl border border-base-300 bg-base-100 shadow-none">
+<div class="card max-w-4xl border border-base-300 bg-base-100 shadow-none">
     <div class="card-body p-0">
         <div class="border-b border-base-300 p-5">
             <p class="text-sm font-semibold text-base-content">Generate Document</p>
@@ -23,7 +23,7 @@
             }
 
             <FieldGroup Label="Homeowner">
-                <select class="select select-bordered w-full" @bind="_selectedHomeownerId">
+                <select class="select select-bordered w-full px-4 py-3" @bind="_selectedHomeownerId">
                     <option value="">Select homeowner...</option>
                     @foreach (var homeowner in _homeowners.OrderBy(GetHomeownerDisplay))
                     {
@@ -34,7 +34,7 @@
 
             <div>
                 <p class="mb-3 text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">Document Type</p>
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     @foreach (var option in DocumentOptions)
                     {
                         <button type="button"
@@ -129,7 +129,7 @@
     }
 
     private string GetDocCardClass(string type) =>
-        $"{(type == _selectedDocumentType ? "border-2 border-primary bg-primary/10 text-primary font-semibold" : "border border-base-300 bg-base-100 text-base-content hover:border-base-content/30")} min-h-[72px] rounded text-sm flex items-center justify-center p-3 text-center transition-all";
+        $"{(type == _selectedDocumentType ? "border-2 border-primary bg-primary/10 text-primary font-semibold" : "border border-base-300 bg-base-100 text-base-content hover:border-base-content/30")} min-h-[100px] rounded text-sm flex items-center justify-center p-4 text-center transition-all";
 
     private static string GetHomeownerDisplay(Homeowner homeowner)
     {

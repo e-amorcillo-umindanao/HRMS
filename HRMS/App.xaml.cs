@@ -15,7 +15,7 @@ namespace HRMS
 
         protected override Window CreateWindow(IActivationState? activationState)
         {
-            var window = new Window(new MainPage()) { Title = "HRMS" };
+            var window = new Window(new MainPage()) { Title = string.Empty };
             window.Destroying += HandleWindowDestroying;
             return window;
         }

@@ -14,7 +14,7 @@
 </div>
 
 <div class="flex w-full flex-shrink-0 items-center justify-center bg-base-100 p-8 lg:w-[480px]">
-    <div class="flex w-full max-w-[360px] flex-col gap-5">
+    <form class="flex w-full max-w-[360px] flex-col gap-5" @onsubmit="HandleSubmitAsync" @onsubmit:preventDefault>
         <div>
             <h1 class="text-[22px] font-medium tracking-tight text-base-content">Welcome back</h1>
             <p class="mt-1 text-[13px] text-base-content/50">
@@ -30,19 +30,19 @@
         }
 
         <FieldGroup Label="Username">
-            <input class="input input-bordered w-full" @bind="_username" />
+            <input class="input input-bordered w-full" @bind="_username" @bind:event="oninput" />
         </FieldGroup>
 
         <FieldGroup Label="Password">
             <div class="relative">
-                <input type="@(_showPassword ? "text" : "password")" class="input input-bordered w-full pr-10" @bind="_password" @onkeydown="HandleEnter" />
+                <input type="@(_showPassword ? "text" : "password")" class="input input-bordered w-full pr-10" @bind="_password" @bind:event="oninput" />
                 <button type="button" class="btn btn-ghost btn-xs absolute right-2 top-1/2 -translate-y-1/2" @onclick="TogglePasswordVisibility">
                     @(_showPassword ? "Hide" : "Show")
                 </button>
             </div>
         </FieldGroup>
 
-        <button class="btn btn-neutral w-full" @onclick="SubmitAsync" disabled="@_isSubmitting">
+        <button type="submit" class="btn w-full border-[#374151] bg-[#374151] font-medium text-white hover:border-[#4b5563] hover:bg-[#4b5563] disabled:opacity-50" disabled="@_isSubmitting">
             @if (_isSubmitting)
             {
                 <span class="loading loading-spinner loading-sm"></span>
@@ -54,7 +54,7 @@
         </button>
 
         <p class="text-center text-[11.5px] text-base-content/30">&copy; @_hoaName</p>
-    </div>
+    </form>
 </div>
 
 @code {
@@ -80,13 +80,7 @@
         _showPassword = !_showPassword;
     }
 
-    private async Task HandleEnter(KeyboardEventArgs args)
-    {
-        if (args.Key == "Enter")
-        {
-            await SubmitAsync();
-        }
-    }
+    private Task HandleSubmitAsync() => SubmitAsync();
 
     private async Task SubmitAsync()
     {

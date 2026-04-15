@@ -11,34 +11,39 @@
         <span class="text-sm text-base-content/50">@_hoaName</span>
     </div>
     <div class="navbar-end gap-2">
-        <button class="theme-toggle-btn btn btn-ghost btn-sm btn-square"
+        <button type="button"
+                class="flex h-9 w-9 items-center justify-center rounded-md border border-transparent bg-transparent transition-colors hover:bg-base-200"
                 @onclick="OnThemeToggle"
                 title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
             @if (IsDark)
             {
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon-sun h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="4" />
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41 M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
                 </svg>
             }
             else
             {
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon-moon h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
             }
         </button>
         <div class="dropdown dropdown-end">
-            <label tabindex="0" class="btn btn-ghost btn-sm gap-2">
+            <label tabindex="0"
+                   class="flex cursor-pointer items-center gap-2 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-base-content transition-colors hover:bg-base-200">
                 <div class="avatar placeholder">
-                    <div class="w-7 rounded-full bg-primary text-primary-content">
+                    <div class="w-7 rounded-full bg-neutral text-neutral-content flex items-center justify-center">
                         <span class="text-xs font-semibold">@GetInitials()</span>
                     </div>
                 </div>
-                <span class="text-sm">@(AuthService.CurrentUser?.Username ?? "User")</span>
-                <span class="text-xs opacity-50">v</span>
+                <span class="text-sm font-medium text-base-content">@(AuthService.CurrentUser?.Username ?? "User")</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
+                </svg>
             </label>
-            <ul tabindex="0" class="dropdown-content menu menu-sm mt-1 w-40 rounded-box border border-base-300 bg-base-100 shadow">
-                <li><button @onclick="LogoutAsync">Logout</button></li>
+            <ul tabindex="0" class="dropdown-content menu menu-sm z-50 mt-2 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg">
+                <li><button class="text-sm text-base-content hover:bg-base-200" @onclick="LogoutAsync">Logout</button></li>
             </ul>
         </div>
     </div>
