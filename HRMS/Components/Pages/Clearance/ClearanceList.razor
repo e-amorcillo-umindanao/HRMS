@@ -2,13 +2,14 @@
 @inject ClearanceService ClearanceService
 @inject DocumentService DocumentService
 @inject AuthService AuthService
+@inject SubdivisionContextService SubdivisionContextService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 
 <PageHeader Title="Clearance & Documents"
             Subtitle="Track request status, approvals, and generated HOA clearances.">
     <Actions>
-        @if (!AuthService.IsHomeowner())
+        @if (!AuthService.IsHomeowner() && CanWriteClearance)
         {
             <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/clearance/new")'>
                 New Request
@@ -16,6 +17,11 @@
         }
     </Actions>
 </PageHeader>
+
+@if (!AuthService.IsHomeowner())
+{
+    <SubdivisionSelector OnSubdivisionSelected="HandleSubdivisionChange" />
+}
 
 <div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
     <div class="card-body p-4">
@@ -102,7 +108,7 @@
                                             @onclick='() => NavigationManager.NavigateTo($"/clearance/{request.ClearanceId}")'>
                                         View
                                     </button>
-                                    @if (CanManageOfficialClearances && request.Status == "Pending")
+                                    @if (CanApproveClearance && request.Status == "Pending")
                                     {
                                         <button class="btn btn-ghost btn-xs text-success"
                                                 @onclick='() => NavigationManager.NavigateTo($"/clearance/{request.ClearanceId}")'>
@@ -113,7 +119,7 @@
                                             Reject
                                         </button>
                                     }
-                                    @if (CanManageOfficialClearances && request.Status == "Approved")
+                                    @if (CanGenerateDocuments && request.Status == "Approved")
                                     {
                                         <button class="btn btn-ghost btn-xs text-primary"
                                                 @onclick="() => GeneratePdfAsync(request.ClearanceId)">
@@ -145,7 +151,12 @@
     private string _statusFilter = string.Empty;
     private string _clearanceTypeFilter = string.Empty;
     private bool _isLoading = true;
-    private bool CanManageOfficialClearances => AuthService.IsAtLeast("HOA President");
+    private bool CanWriteClearance => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "clearance");
+    private bool CanApproveClearance => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "clearance-approve");
+    private bool CanGenerateDocuments => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "documents");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin
+        ? SubdivisionContextService.SelectedSubdivisionId
+        : AuthService.CurrentSubdivisionId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -154,16 +165,30 @@
 
     private async Task LoadRequestsAsync()
     {
+        if (!AuthService.IsHomeowner() && !ActiveSubdivisionId.HasValue)
+        {
+            _requests = [];
+            _isLoading = false;
+            return;
+        }
+
         _isLoading = true;
         StateHasChanged();
 
         _requests = await ClearanceService.SearchAsync(
+            AuthService.IsHomeowner() ? null : ActiveSubdivisionId,
             NullIfEmpty(_homeownerNameFilter),
             NullIfEmpty(_statusFilter),
             NullIfEmpty(_clearanceTypeFilter),
             AuthService.IsHomeowner() ? AuthService.CurrentUser?.HomeownerId : null);
 
         _isLoading = false;
+    }
+
+    private async Task HandleSubdivisionChange(int? subdivisionId)
+    {
+        await LoadRequestsAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task OnHomeownerNameInput(ChangeEventArgs args)
@@ -186,14 +211,14 @@
 
     private async Task GeneratePdfAsync(int clearanceId)
     {
-        if (AuthService.CurrentRole is null)
+        if (AuthService.CurrentUser is null)
         {
             return;
         }
 
         try
         {
-            var document = await DocumentService.GenerateHoaClearanceAsync(clearanceId, AuthService.CurrentRole);
+            var document = await DocumentService.GenerateHoaClearanceAsync(clearanceId, AuthService.CurrentUser.UserId);
             if (document is null)
             {
                 await JS.InvokeVoidAsync("hrms.showToast", "Unable to generate clearance PDF.", "error");

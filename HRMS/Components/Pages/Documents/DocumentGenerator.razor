@@ -2,19 +2,24 @@
 @inject HomeownerService HomeownerService
 @inject DocumentService DocumentService
 @inject AuthService AuthService
+@inject SubdivisionContextService SubdivisionContextService
 @inject IJSRuntime JS
 
 <PageHeader Title="Documents"
             Subtitle="Generate official HOA certificates and letters." />
 
-<div class="card max-w-4xl border border-base-300 bg-base-100 shadow-none">
-    <div class="card-body p-0">
-        <div class="border-b border-base-300 p-5">
-            <p class="text-sm font-semibold text-base-content">Generate Document</p>
-            <p class="mt-0.5 text-xs text-base-content/40">Select a homeowner and document type to generate.</p>
-        </div>
+<SubdivisionSelector OnSubdivisionSelected="HandleSubdivisionChange" />
 
-        <div class="flex flex-col gap-5 p-6">
+<div class="mx-auto w-full max-w-3xl">
+    <div class="card border border-base-300 bg-base-100 shadow-none">
+        <div class="card-body p-6">
+            <h2 class="text-base font-semibold text-base-content">Generate Document</h2>
+            <p class="mb-5 text-sm text-base-content/50">
+                Select a homeowner and document type to generate.
+            </p>
+
+            <div class="divider mb-4 mt-0"></div>
+
             @if (!string.IsNullOrWhiteSpace(_errorMessage))
             {
                 <div role="alert" class="alert alert-error text-sm">
@@ -22,59 +27,100 @@
                 </div>
             }
 
-            <FieldGroup Label="Homeowner">
-                <select class="select select-bordered w-full px-4 py-3" @bind="_selectedHomeownerId">
+            <div class="mb-5">
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/40">
+                    Homeowner
+                </label>
+                <select class="select select-bordered w-full" @bind="_selectedHomeownerId">
                     <option value="">Select homeowner...</option>
                     @foreach (var homeowner in _homeowners.OrderBy(GetHomeownerDisplay))
                     {
                         <option value="@homeowner.HomeownerId">@GetHomeownerDisplay(homeowner)</option>
                     }
                 </select>
-            </FieldGroup>
+            </div>
 
             <div>
-                <p class="mb-3 text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">Document Type</p>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-base-content/40">
+                    Document Type
+                </label>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     @foreach (var option in DocumentOptions)
                     {
+                        var isSelected = option.Key == _selectedDocumentType;
                         <button type="button"
-                                class="@GetDocCardClass(option.Key)"
+                                class="card min-h-[110px] cursor-pointer border-2 p-4 text-left transition-all @(isSelected ? "border-primary bg-primary/10" : "border-base-300 bg-base-100 hover:border-base-content/30")"
                                 @onclick="() => SelectDocument(option.Key)">
-                            @option.Label
+                            <div class="flex h-full flex-col gap-2">
+                                <div class="flex h-9 w-9 items-center justify-center rounded-lg @(isSelected ? "bg-primary/20 text-primary" : "bg-base-200 text-base-content/40")">
+                                    @RenderDocIcon(option.Icon)
+                                </div>
+                                <p class="text-sm font-semibold leading-tight @(isSelected ? "text-primary" : "text-base-content")">
+                                    @option.Label
+                                </p>
+                                <p class="text-xs leading-snug text-base-content/40">
+                                    @option.Description
+                                </p>
+                            </div>
                         </button>
                     }
                 </div>
             </div>
-        </div>
 
-        <div class="flex justify-end border-t border-base-300 px-6 py-4">
-            <button class="btn btn-primary btn-sm"
-                    disabled="@IsGenerateDisabled"
-                    @onclick="GenerateAsync">
-                Generate PDF
-            </button>
+            <div class="divider mb-2 mt-5"></div>
+            <div class="flex justify-end">
+                @if (CanGenerateDocuments)
+                {
+                    <button class="btn btn-primary gap-2 @(!CanGenerate ? "opacity-40" : "")"
+                            disabled="@(_isGenerating || IsGenerateDisabled)"
+                            @onclick="GenerateAsync">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h4.5m-4.5 3h7.5m-3-15v3.75m0 0H8.25m4.5 0 3 3m-3-3-3 3" />
+                        </svg>
+                        @if (_isGenerating)
+                        {
+                            <span class="loading loading-spinner loading-xs"></span>
+                        }
+                        Generate PDF
+                    </button>
+                }
+            </div>
         </div>
     </div>
 </div>
 
 @code {
-    private static readonly (string Key, string Label)[] DocumentOptions =
+    private static readonly (string Key, string Label, string Description, string Icon)[] DocumentOptions =
     [
-        ("Residency", "Certificate of Residency"),
-        ("GoodStanding", "Certificate of Good Standing"),
-        ("OfficialLetter", "Official Letter")
+        ("Residency", "Certificate of Residency", "Confirms the homeowner's current residence in the subdivision.", "home"),
+        ("GoodStanding", "Certificate of Good Standing", "Attests to the homeowner's compliance with HOA rules and dues.", "shield-check"),
+        ("OfficialLetter", "Official Letter", "General purpose official communication from the HOA.", "envelope")
     ];
 
     private List<Homeowner> _homeowners = [];
     private int? _selectedHomeownerId;
     private string _selectedDocumentType = string.Empty;
     private string? _errorMessage;
+    private bool _isGenerating;
 
-    private bool IsGenerateDisabled => !_selectedHomeownerId.HasValue || string.IsNullOrWhiteSpace(_selectedDocumentType);
+    private bool CanGenerateDocuments => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "documents");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin
+        ? SubdivisionContextService.SelectedSubdivisionId
+        : AuthService.CurrentSubdivisionId;
+    private bool IsGenerateDisabled => !CanGenerateDocuments || !_selectedHomeownerId.HasValue || string.IsNullOrWhiteSpace(_selectedDocumentType);
+    private bool CanGenerate => !IsGenerateDisabled && !_isGenerating;
 
     protected override async Task OnInitializedAsync()
     {
-        _homeowners = await HomeownerService.GetAllActiveAsync();
+        await LoadHomeownersAsync();
+    }
+
+    private async Task LoadHomeownersAsync()
+    {
+        _homeowners = ActiveSubdivisionId.HasValue
+            ? await HomeownerService.GetAllActiveAsync(ActiveSubdivisionId.Value)
+            : [];
     }
 
     private void SelectDocument(string key)
@@ -94,11 +140,12 @@
 
         try
         {
+            _isGenerating = true;
             GeneratedDocumentResult? document = _selectedDocumentType switch
             {
-                "Residency" when AuthService.CurrentRole is not null => await DocumentService.GenerateCertificateOfResidencyAsync(_selectedHomeownerId.Value, AuthService.CurrentRole),
-                "GoodStanding" when AuthService.CurrentRole is not null => await DocumentService.GenerateCertificateOfGoodStandingAsync(_selectedHomeownerId.Value, AuthService.CurrentRole),
-                "OfficialLetter" when AuthService.CurrentRole is not null => await DocumentService.GenerateOfficialLetterAsync(_selectedHomeownerId.Value, AuthService.CurrentRole),
+                "Residency" when AuthService.CurrentUser is not null => await DocumentService.GenerateCertificateOfResidencyAsync(_selectedHomeownerId.Value, AuthService.CurrentUser.UserId),
+                "GoodStanding" when AuthService.CurrentUser is not null => await DocumentService.GenerateCertificateOfGoodStandingAsync(_selectedHomeownerId.Value, AuthService.CurrentUser.UserId),
+                "OfficialLetter" when AuthService.CurrentUser is not null => await DocumentService.GenerateOfficialLetterAsync(_selectedHomeownerId.Value, AuthService.CurrentUser.UserId),
                 _ => null
             };
 
@@ -126,10 +173,19 @@
             _errorMessage = exception.Message;
             await JS.InvokeVoidAsync("hrms.showToast", exception.Message, "error");
         }
+        finally
+        {
+            _isGenerating = false;
+        }
     }
 
-    private string GetDocCardClass(string type) =>
-        $"{(type == _selectedDocumentType ? "border-2 border-primary bg-primary/10 text-primary font-semibold" : "border border-base-300 bg-base-100 text-base-content hover:border-base-content/30")} min-h-[100px] rounded text-sm flex items-center justify-center p-4 text-center transition-all";
+    private async Task HandleSubdivisionChange(int? subdivisionId)
+    {
+        _selectedHomeownerId = null;
+        _selectedDocumentType = string.Empty;
+        await LoadHomeownersAsync();
+        await InvokeAsync(StateHasChanged);
+    }
 
     private static string GetHomeownerDisplay(Homeowner homeowner)
     {
@@ -138,4 +194,27 @@
 
         return string.Join(" ", parts);
     }
+
+    private static RenderFragment RenderDocIcon(string icon) => builder =>
+    {
+        var path = icon switch
+        {
+            "home" => "M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25",
+            "shield-check" => "M9 12.75 11.25 15 15 9.75m6.75-3a45.108 45.108 0 00-9-3 45.09 45.09 0 00-9 3V12a12.08 12.08 0 003.567 8.559A12.08 12.08 0 0012 23.25c1.71-1.009 3.18-2.39 4.433-4.066A12.08 12.08 0 0020.25 12V6.75z",
+            _ => "M21.75 6.75v10.5A2.25 2.25 0 0119.5 19.5h-15A2.25 2.25 0 012.25 17.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.909A2.25 2.25 0 012.25 6.993V6.75"
+        };
+
+        builder.OpenElement(0, "svg");
+        builder.AddAttribute(1, "class", "h-5 w-5");
+        builder.AddAttribute(2, "fill", "none");
+        builder.AddAttribute(3, "viewBox", "0 0 24 24");
+        builder.AddAttribute(4, "stroke", "currentColor");
+        builder.AddAttribute(5, "stroke-width", "1.5");
+        builder.OpenElement(6, "path");
+        builder.AddAttribute(7, "stroke-linecap", "round");
+        builder.AddAttribute(8, "stroke-linejoin", "round");
+        builder.AddAttribute(9, "d", path);
+        builder.CloseElement();
+        builder.CloseElement();
+    };
 }

@@ -1,4 +1,5 @@
 using HRMS.Data;
+using HRMS.Helpers;
 using HRMS.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,9 +16,9 @@ public class DuesService
         _auditService = auditService;
     }
 
-    public async Task<List<DuesRecord>> GetAllAsync()
+    public async Task<List<DuesRecord>> GetAllAsync(int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .OrderByDescending(record => record.Year)
             .ThenByDescending(record => record.Month)
             .ThenBy(record => record.Homeowner.LastName)
@@ -25,15 +26,15 @@ public class DuesService
             .ToListAsync();
     }
 
-    public async Task<DuesRecord?> GetByIdAsync(int id)
+    public async Task<DuesRecord?> GetByIdAsync(int id, int? subdivisionId = null)
     {
-        return await BaseQuery(includeCreator: true)
+        return await BaseQuery(subdivisionId, includeCreator: true)
             .SingleOrDefaultAsync(record => record.DuesId == id);
     }
 
-    public async Task<List<DuesRecord>> GetByHomeownerAsync(int homeownerId)
+    public async Task<List<DuesRecord>> GetByHomeownerAsync(int homeownerId, int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .Where(record => record.HomeownerId == homeownerId)
             .OrderByDescending(record => record.Year)
             .ThenByDescending(record => record.Month)
@@ -43,9 +44,9 @@ public class DuesService
     public Task<List<DuesRecord>> GetByHomeownerIdAsync(int homeownerId) =>
         GetByHomeownerAsync(homeownerId);
 
-    public async Task<List<DuesRecord>> GetByMonthYearAsync(int month, int year)
+    public async Task<List<DuesRecord>> GetByMonthYearAsync(int month, int year, int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .Where(record => record.Month == month && record.Year == year)
             .OrderBy(record => record.Homeowner.LastName)
             .ThenBy(record => record.Homeowner.FirstName)
@@ -54,6 +55,8 @@ public class DuesService
 
     public async Task<DuesRecord> AddAsync(DuesRecord dues, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "dues", "You do not have write access to the Dues module.");
+        dues.SubdivisionId = await ResolveSubdivisionIdAsync(dues.SubdivisionId, dues.HomeownerId, actorUserId);
         await EnsureUniqueAsync(dues.HomeownerId, dues.Month, dues.Year, null);
 
         dues.Status = NormalizeStatus(dues.Status);
@@ -72,6 +75,7 @@ public class DuesService
 
     public async Task<DuesRecord?> UpdateAsync(DuesRecord dues, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "dues", "You do not have write access to the Dues module.");
         var existing = await _context.DuesRecords
             .SingleOrDefaultAsync(record => record.DuesId == dues.DuesId);
 
@@ -83,6 +87,7 @@ public class DuesService
         await EnsureUniqueAsync(dues.HomeownerId, dues.Month, dues.Year, dues.DuesId);
 
         existing.HomeownerId = dues.HomeownerId;
+        existing.SubdivisionId = dues.SubdivisionId == 0 ? existing.SubdivisionId : dues.SubdivisionId;
         existing.Month = dues.Month;
         existing.Year = dues.Year;
         existing.Amount = dues.Amount;
@@ -99,6 +104,7 @@ public class DuesService
 
     public async Task<bool> DeleteAsync(int id, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "dues", "You do not have write access to the Dues module.");
         var existing = await _context.DuesRecords
             .SingleOrDefaultAsync(record => record.DuesId == id);
 
@@ -117,6 +123,7 @@ public class DuesService
 
     public async Task<DuesRecord?> MarkAsPaidAsync(int duesId, DateTime paidDate, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "dues", "You do not have write access to the Dues module.");
         var existing = await _context.DuesRecords
             .SingleOrDefaultAsync(record => record.DuesId == duesId);
 
@@ -135,12 +142,18 @@ public class DuesService
         return existing;
     }
 
-    private IQueryable<DuesRecord> BaseQuery(bool includeCreator = false)
+    private IQueryable<DuesRecord> BaseQuery(int? subdivisionId, bool includeCreator = false)
     {
         IQueryable<DuesRecord> query = _context.DuesRecords
             .AsNoTracking()
+            .Include(record => record.Subdivision)
             .Include(record => record.Homeowner)
             .ThenInclude(homeowner => homeowner.Unit);
+
+        if (subdivisionId.HasValue)
+        {
+            query = query.Where(record => record.SubdivisionId == subdivisionId.Value);
+        }
 
         if (includeCreator)
         {
@@ -148,6 +161,38 @@ public class DuesService
         }
 
         return query;
+    }
+
+    private async Task<int> ResolveSubdivisionIdAsync(int subdivisionId, int homeownerId, int actorUserId)
+    {
+        if (subdivisionId > 0)
+        {
+            return subdivisionId;
+        }
+
+        var homeownerSubdivisionId = await _context.Homeowners
+            .AsNoTracking()
+            .Where(homeowner => homeowner.HomeownerId == homeownerId && !homeowner.IsDeleted)
+            .Select(homeowner => homeowner.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (homeownerSubdivisionId > 0)
+        {
+            return homeownerSubdivisionId;
+        }
+
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue)
+        {
+            return actorSubdivisionId.Value;
+        }
+
+        throw new InvalidOperationException("Subdivision is required for dues records.");
     }
 
     private async Task EnsureUniqueAsync(int homeownerId, int month, int year, int? existingId)
@@ -161,6 +206,24 @@ public class DuesService
         if (duplicateExists)
         {
             throw new InvalidOperationException("A dues record already exists for this homeowner, month, and year.");
+        }
+    }
+
+    private async Task<string?> GetActorRoleAsync(int actorUserId)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.Role.RoleName)
+            .SingleOrDefaultAsync();
+    }
+
+    private async Task EnsureCanWriteAsync(int actorUserId, string module, string message)
+    {
+        var role = await GetActorRoleAsync(actorUserId);
+        if (!AccessHelper.CanWrite(role ?? string.Empty, module))
+        {
+            throw new UnauthorizedAccessException(message);
         }
     }
 

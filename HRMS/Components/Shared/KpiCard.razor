@@ -1,11 +1,21 @@
-<div class="card kpi-card border border-base-300 bg-base-100 shadow-none @ResolveAccentClass()">
+<div class="card kpi-card border border-base-300 border-l-4 bg-base-100 shadow-none @ResolveAccentClass()">
     <div class="card-body p-5">
-        <p class="text-xs font-semibold uppercase tracking-wide text-base-content/50">@DisplayLabel</p>
-        <p class="mt-1 text-3xl font-bold text-base-content">@DisplayValue</p>
-        @if (!string.IsNullOrWhiteSpace(DisplaySubtitle))
-        {
-            <p class="mt-0.5 text-xs text-base-content/40">@DisplaySubtitle</p>
-        }
+        <div class="flex items-start justify-between">
+            <div class="min-w-0 flex-1">
+                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-base-content/40">@DisplayLabel</p>
+                <p class="text-3xl font-bold leading-none text-base-content">@DisplayValue</p>
+                @if (!string.IsNullOrWhiteSpace(DisplaySubtitle))
+                {
+                    <p class="mt-1.5 text-xs text-base-content/40">@DisplaySubtitle</p>
+                }
+            </div>
+            @if (Icon is not null)
+            {
+                <div class="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-200 opacity-50">
+                    @Icon
+                </div>
+            }
+        </div>
     </div>
 </div>
 
@@ -30,6 +40,9 @@
 
     [Parameter]
     public string Accent { get; set; } = string.Empty;
+
+    [Parameter]
+    public RenderFragment? Icon { get; set; }
 
     private string DisplayLabel => string.IsNullOrWhiteSpace(Label) ? Title : Label;
     private string DisplayValue => Value;

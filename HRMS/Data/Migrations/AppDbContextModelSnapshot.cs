@@ -130,6 +130,9 @@ namespace HRMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("SubdivisionId")
+                        .HasColumnType("int");
+
                     b.Property<string>("ValidUntil")
                         .HasColumnType("nvarchar(max)");
 
@@ -138,6 +141,8 @@ namespace HRMS.Data.Migrations
                     b.HasIndex("HomeownerId");
 
                     b.HasIndex("ProcessedBy");
+
+                    b.HasIndex("SubdivisionId");
 
                     b.ToTable("ClearanceRequests");
                 });
@@ -177,12 +182,17 @@ namespace HRMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("SubdivisionId")
+                        .HasColumnType("int");
+
                     b.Property<int>("Year")
                         .HasColumnType("int");
 
                     b.HasKey("DuesId");
 
                     b.HasIndex("CreatedBy");
+
+                    b.HasIndex("SubdivisionId");
 
                     b.HasIndex("HomeownerId", "Month", "Year")
                         .IsUnique();
@@ -216,6 +226,9 @@ namespace HRMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("SubdivisionId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -227,6 +240,8 @@ namespace HRMS.Data.Migrations
 
                     b.HasIndex("CreatedBy");
 
+                    b.HasIndex("SubdivisionId");
+
                     b.ToTable("Events");
                 });
 
@@ -234,8 +249,9 @@ namespace HRMS.Data.Migrations
                 {
                     b.Property<int>("SettingId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SettingId"));
 
                     b.Property<string>("City")
                         .IsRequired()
@@ -265,6 +281,9 @@ namespace HRMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("SubdivisionId")
+                        .HasColumnType("int");
+
                     b.Property<string>("TreasurerName")
                         .HasColumnType("nvarchar(max)");
 
@@ -276,6 +295,9 @@ namespace HRMS.Data.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("SettingId");
+
+                    b.HasIndex("SubdivisionId")
+                        .IsUnique();
 
                     b.HasIndex("UpdatedBy");
 
@@ -345,6 +367,9 @@ namespace HRMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("SubdivisionId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("UnitId")
                         .HasColumnType("int");
 
@@ -353,6 +378,8 @@ namespace HRMS.Data.Migrations
                     b.HasIndex("CreatedBy");
 
                     b.HasIndex("PhaseId");
+
+                    b.HasIndex("SubdivisionId");
 
                     b.HasIndex("UnitId");
 
@@ -392,6 +419,9 @@ namespace HRMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("SubdivisionId")
+                        .HasColumnType("int");
+
                     b.HasKey("InteractionLogId");
 
                     b.HasIndex("CreatedBy");
@@ -399,6 +429,8 @@ namespace HRMS.Data.Migrations
                     b.HasIndex("HomeownerId");
 
                     b.HasIndex("MSMEId");
+
+                    b.HasIndex("SubdivisionId");
 
                     b.ToTable("InteractionLogs");
                 });
@@ -446,6 +478,9 @@ namespace HRMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("SubdivisionId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("UnitId")
                         .HasColumnType("int");
 
@@ -454,6 +489,8 @@ namespace HRMS.Data.Migrations
                     b.HasIndex("CreatedBy");
 
                     b.HasIndex("HomeownerId");
+
+                    b.HasIndex("SubdivisionId");
 
                     b.HasIndex("UnitId");
 
@@ -479,7 +516,12 @@ namespace HRMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("SubdivisionId")
+                        .HasColumnType("int");
+
                     b.HasKey("PhaseId");
+
+                    b.HasIndex("SubdivisionId");
 
                     b.ToTable("Phases");
                 });
@@ -499,6 +541,59 @@ namespace HRMS.Data.Migrations
                     b.HasKey("RoleId");
 
                     b.ToTable("Roles");
+                });
+
+            modelBuilder.Entity("HRMS.Models.Subdivision", b =>
+                {
+                    b.Property<int>("SubdivisionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SubdivisionId"));
+
+                    b.Property<string>("Address")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("City")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ContactNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CreatedAt")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Province")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SubscriptionEnd")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SubscriptionStart")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("SubdivisionId");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Subdivisions");
                 });
 
             modelBuilder.Entity("HRMS.Models.Unit", b =>
@@ -526,6 +621,9 @@ namespace HRMS.Data.Migrations
                     b.Property<int?>("PhaseId")
                         .HasColumnType("int");
 
+                    b.Property<int>("SubdivisionId")
+                        .HasColumnType("int");
+
                     b.Property<string>("UnitNumber")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -537,6 +635,8 @@ namespace HRMS.Data.Migrations
                     b.HasIndex("HeadHomeownerId");
 
                     b.HasIndex("PhaseId");
+
+                    b.HasIndex("SubdivisionId");
 
                     b.ToTable("Units");
                 });
@@ -569,6 +669,9 @@ namespace HRMS.Data.Migrations
                     b.Property<int>("RoleId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("SubdivisionId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
@@ -580,6 +683,8 @@ namespace HRMS.Data.Migrations
                         .HasFilter("[HomeownerId] IS NOT NULL");
 
                     b.HasIndex("RoleId");
+
+                    b.HasIndex("SubdivisionId");
 
                     b.HasIndex("Username")
                         .IsUnique();
@@ -620,6 +725,9 @@ namespace HRMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("SubdivisionId")
+                        .HasColumnType("int");
+
                     b.Property<string>("UpdatedAt")
                         .HasColumnType("nvarchar(max)");
 
@@ -643,6 +751,8 @@ namespace HRMS.Data.Migrations
                     b.HasIndex("FiledBy");
 
                     b.HasIndex("HomeownerId");
+
+                    b.HasIndex("SubdivisionId");
 
                     b.HasIndex("UpdatedBy");
 
@@ -703,9 +813,17 @@ namespace HRMS.Data.Migrations
                         .HasForeignKey("ProcessedBy")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("HRMS.Models.Subdivision", "Subdivision")
+                        .WithMany("ClearanceRequests")
+                        .HasForeignKey("SubdivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Homeowner");
 
                     b.Navigation("ProcessedByUser");
+
+                    b.Navigation("Subdivision");
                 });
 
             modelBuilder.Entity("HRMS.Models.DuesRecord", b =>
@@ -722,9 +840,17 @@ namespace HRMS.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("HRMS.Models.Subdivision", "Subdivision")
+                        .WithMany("DuesRecords")
+                        .HasForeignKey("SubdivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("Homeowner");
+
+                    b.Navigation("Subdivision");
                 });
 
             modelBuilder.Entity("HRMS.Models.Event", b =>
@@ -735,16 +861,32 @@ namespace HRMS.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("HRMS.Models.Subdivision", "Subdivision")
+                        .WithMany("Events")
+                        .HasForeignKey("SubdivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("Subdivision");
                 });
 
             modelBuilder.Entity("HRMS.Models.HOASettings", b =>
                 {
+                    b.HasOne("HRMS.Models.Subdivision", "SubdivisionEntity")
+                        .WithMany("HOASettings")
+                        .HasForeignKey("SubdivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HRMS.Models.User", "UpdatedByUser")
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("SubdivisionEntity");
 
                     b.Navigation("UpdatedByUser");
                 });
@@ -762,6 +904,12 @@ namespace HRMS.Data.Migrations
                         .HasForeignKey("PhaseId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("HRMS.Models.Subdivision", "Subdivision")
+                        .WithMany("Homeowners")
+                        .HasForeignKey("SubdivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HRMS.Models.Unit", "Unit")
                         .WithMany("Homeowners")
                         .HasForeignKey("UnitId")
@@ -770,6 +918,8 @@ namespace HRMS.Data.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("Phase");
+
+                    b.Navigation("Subdivision");
 
                     b.Navigation("Unit");
                 });
@@ -792,11 +942,19 @@ namespace HRMS.Data.Migrations
                         .HasForeignKey("MSMEId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("HRMS.Models.Subdivision", "Subdivision")
+                        .WithMany("InteractionLogs")
+                        .HasForeignKey("SubdivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("Homeowner");
 
                     b.Navigation("MSME");
+
+                    b.Navigation("Subdivision");
                 });
 
             modelBuilder.Entity("HRMS.Models.MSME", b =>
@@ -813,6 +971,12 @@ namespace HRMS.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("HRMS.Models.Subdivision", "Subdivision")
+                        .WithMany("MSMEs")
+                        .HasForeignKey("SubdivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HRMS.Models.Unit", "Unit")
                         .WithMany()
                         .HasForeignKey("UnitId")
@@ -822,7 +986,20 @@ namespace HRMS.Data.Migrations
 
                     b.Navigation("Homeowner");
 
+                    b.Navigation("Subdivision");
+
                     b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("HRMS.Models.Phase", b =>
+                {
+                    b.HasOne("HRMS.Models.Subdivision", "Subdivision")
+                        .WithMany("Phases")
+                        .HasForeignKey("SubdivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Subdivision");
                 });
 
             modelBuilder.Entity("HRMS.Models.Unit", b =>
@@ -843,11 +1020,19 @@ namespace HRMS.Data.Migrations
                         .HasForeignKey("PhaseId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("HRMS.Models.Subdivision", "Subdivision")
+                        .WithMany("Units")
+                        .HasForeignKey("SubdivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("HeadHomeowner");
 
                     b.Navigation("Phase");
+
+                    b.Navigation("Subdivision");
                 });
 
             modelBuilder.Entity("HRMS.Models.User", b =>
@@ -863,9 +1048,16 @@ namespace HRMS.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("HRMS.Models.Subdivision", "Subdivision")
+                        .WithMany("Users")
+                        .HasForeignKey("SubdivisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Homeowner");
 
                     b.Navigation("Role");
+
+                    b.Navigation("Subdivision");
                 });
 
             modelBuilder.Entity("HRMS.Models.ViolationRecord", b =>
@@ -881,6 +1073,12 @@ namespace HRMS.Data.Migrations
                         .HasForeignKey("HomeownerId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("HRMS.Models.Subdivision", "Subdivision")
+                        .WithMany("ViolationRecords")
+                        .HasForeignKey("SubdivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HRMS.Models.User", "UpdatedByUser")
                         .WithMany()
                         .HasForeignKey("UpdatedBy")
@@ -889,6 +1087,8 @@ namespace HRMS.Data.Migrations
                     b.Navigation("FiledByUser");
 
                     b.Navigation("Homeowner");
+
+                    b.Navigation("Subdivision");
 
                     b.Navigation("UpdatedByUser");
                 });
@@ -908,6 +1108,31 @@ namespace HRMS.Data.Migrations
                     b.Navigation("Homeowners");
 
                     b.Navigation("Units");
+                });
+
+            modelBuilder.Entity("HRMS.Models.Subdivision", b =>
+                {
+                    b.Navigation("ClearanceRequests");
+
+                    b.Navigation("DuesRecords");
+
+                    b.Navigation("Events");
+
+                    b.Navigation("HOASettings");
+
+                    b.Navigation("Homeowners");
+
+                    b.Navigation("InteractionLogs");
+
+                    b.Navigation("MSMEs");
+
+                    b.Navigation("Phases");
+
+                    b.Navigation("Units");
+
+                    b.Navigation("Users");
+
+                    b.Navigation("ViolationRecords");
                 });
 
             modelBuilder.Entity("HRMS.Models.Unit", b =>

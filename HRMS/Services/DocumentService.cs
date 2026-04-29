@@ -16,8 +16,9 @@ public class DocumentService
         _duesService = duesService;
     }
 
-    public async Task<GeneratedDocumentResult?> GenerateDuesStatementAsync(int homeownerId)
+    public async Task<GeneratedDocumentResult?> GenerateDuesStatementAsync(int homeownerId, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "documents", "You do not have permission to generate documents.");
         var homeowner = await _context.Homeowners
             .AsNoTracking()
             .Include(record => record.Unit)
@@ -44,9 +45,9 @@ public class DocumentService
         };
     }
 
-    public async Task<GeneratedDocumentResult?> GenerateHoaClearanceAsync(int clearanceId, string actorRole)
+    public async Task<GeneratedDocumentResult?> GenerateHoaClearanceAsync(int clearanceId, int actorUserId)
     {
-        EnsurePresidentOrAbove(actorRole, "Only the HOA President and Super Admin can generate HOA clearance PDFs.");
+        await EnsureCanWriteAsync(actorUserId, "documents", "You do not have permission to generate documents.");
 
         var request = await _context.ClearanceRequests
             .AsNoTracking()
@@ -66,9 +67,9 @@ public class DocumentService
         return CreatePdfResult(fileName, bytes);
     }
 
-    public async Task<GeneratedDocumentResult?> GenerateCertificateOfResidencyAsync(int homeownerId, string actorRole)
+    public async Task<GeneratedDocumentResult?> GenerateCertificateOfResidencyAsync(int homeownerId, int actorUserId)
     {
-        EnsurePresidentOrAbove(actorRole, "Only the HOA President and Super Admin can generate official documents.");
+        await EnsureCanWriteAsync(actorUserId, "documents", "You do not have permission to generate documents.");
 
         var homeowner = await GetHomeownerAsync(homeownerId);
         if (homeowner is null)
@@ -83,9 +84,9 @@ public class DocumentService
         return CreatePdfResult(fileName, bytes);
     }
 
-    public async Task<GeneratedDocumentResult?> GenerateCertificateOfGoodStandingAsync(int homeownerId, string actorRole)
+    public async Task<GeneratedDocumentResult?> GenerateCertificateOfGoodStandingAsync(int homeownerId, int actorUserId)
     {
-        EnsurePresidentOrAbove(actorRole, "Only the HOA President and Super Admin can generate official documents.");
+        await EnsureCanWriteAsync(actorUserId, "documents", "You do not have permission to generate documents.");
 
         var homeowner = await GetHomeownerAsync(homeownerId);
         if (homeowner is null)
@@ -114,9 +115,9 @@ public class DocumentService
         return CreatePdfResult(fileName, bytes);
     }
 
-    public async Task<GeneratedDocumentResult?> GenerateOfficialLetterAsync(int homeownerId, string actorRole, string? purpose = null)
+    public async Task<GeneratedDocumentResult?> GenerateOfficialLetterAsync(int homeownerId, int actorUserId, string? purpose = null)
     {
-        EnsurePresidentOrAbove(actorRole, "Only the HOA President and Super Admin can generate official documents.");
+        await EnsureCanWriteAsync(actorUserId, "documents", "You do not have permission to generate documents.");
 
         var homeowner = await GetHomeownerAsync(homeownerId);
         if (homeowner is null)
@@ -132,9 +133,9 @@ public class DocumentService
         return CreatePdfResult(fileName, bytes);
     }
 
-    public async Task<GeneratedDocumentResult?> GenerateViolationReportAsync(int violationId, string actorRole)
+    public async Task<GeneratedDocumentResult?> GenerateViolationReportAsync(int violationId, int actorUserId)
     {
-        EnsurePresidentOrAbove(actorRole, "Only the HOA President and Super Admin can generate violation report PDFs.");
+        await EnsureCanWriteAsync(actorUserId, "violation-pdf", "You do not have permission to generate violation PDF reports.");
 
         var violation = await _context.ViolationRecords
             .AsNoTracking()
@@ -201,14 +202,22 @@ public class DocumentService
         return string.Join(" ", parts);
     }
 
-    private static void EnsurePresidentOrAbove(string actorRole, string message)
+    private async Task<string?> GetActorRoleAsync(int actorUserId)
     {
-        if (actorRole is "HOA President" or "Super Admin")
-        {
-            return;
-        }
+        return await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.Role.RoleName)
+            .SingleOrDefaultAsync();
+    }
 
-        throw new UnauthorizedAccessException(message);
+    private async Task EnsureCanWriteAsync(int actorUserId, string module, string message)
+    {
+        var role = await GetActorRoleAsync(actorUserId);
+        if (!AccessHelper.CanWrite(role ?? string.Empty, module))
+        {
+            throw new UnauthorizedAccessException(message);
+        }
     }
 }
 

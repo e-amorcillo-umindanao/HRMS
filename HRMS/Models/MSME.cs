@@ -3,6 +3,7 @@ namespace HRMS.Models;
 public class MSME
 {
     public int MSMEId { get; set; }
+    public int SubdivisionId { get; set; }
     public string BusinessName { get; set; } = string.Empty;
     public string BusinessType { get; set; } = string.Empty;
     public int HomeownerId { get; set; }
@@ -15,6 +16,7 @@ public class MSME
     public string CreatedAt { get; set; } = string.Empty;
     public int CreatedBy { get; set; }
 
+    public Subdivision Subdivision { get; set; } = null!;
     public Homeowner Homeowner { get; set; } = null!;
     public Unit? Unit { get; set; }
     public User CreatedByUser { get; set; } = null!;

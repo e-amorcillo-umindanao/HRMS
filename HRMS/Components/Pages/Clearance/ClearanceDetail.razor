@@ -23,7 +23,7 @@ else
     <PageHeader Title="@_request.ClearanceType" Subtitle="Clearance request details.">
         <Actions>
             <button class="btn btn-ghost btn-sm" @onclick="GoBack">Back</button>
-            @if (CanManageOfficialClearances && _request.Status == "Approved")
+            @if (CanGenerateDocuments && _request.Status == "Approved")
             {
                 <button class="btn btn-outline btn-sm" @onclick="GeneratePdfAsync">Generate PDF</button>
             }
@@ -31,6 +31,13 @@ else
     </PageHeader>
 
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        @if (!string.IsNullOrWhiteSpace(_loadErrorMessage))
+        {
+            <div role="alert" class="alert alert-error xl:col-span-3">
+                <span>@_loadErrorMessage</span>
+            </div>
+        }
+
         <div class="card border border-base-300 bg-base-100 shadow-none xl:col-span-2">
             <div class="card-body p-0">
                 <div class="border-b border-base-300 p-5">
@@ -62,7 +69,7 @@ else
                     </div>
                 </div>
                 <div class="p-5">
-                    @if (CanManageOfficialClearances && _request.Status == "Pending")
+                    @if (CanApproveClearance && _request.Status == "Pending")
                     {
                         @if (!string.IsNullOrWhiteSpace(_errorMessage))
                         {
@@ -110,17 +117,29 @@ else
     private string _remarks = string.Empty;
     private bool _isLoading = true;
     private string? _errorMessage;
-    private bool CanManageOfficialClearances => AuthService.IsAtLeast("HOA President");
+    private string? _loadErrorMessage;
+    private bool CanApproveClearance => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "clearance-approve");
+    private bool CanGenerateDocuments => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "documents");
 
     protected override async Task OnParametersSetAsync()
     {
         _isLoading = true;
-        _request = await ClearanceService.GetByIdAsync(Id);
+        _loadErrorMessage = null;
 
-        if (_request is not null && AuthService.IsHomeowner() && _request.HomeownerId != AuthService.CurrentUser?.HomeownerId)
+        try
         {
-            NavigationManager.NavigateTo("/clearance");
-            return;
+            _request = await ClearanceService.GetByIdAsync(Id);
+
+            if (_request is not null && AuthService.IsHomeowner() && _request.HomeownerId != AuthService.CurrentUser?.HomeownerId)
+            {
+                NavigationManager.NavigateTo("/clearance");
+                return;
+            }
+        }
+        catch (Exception exception)
+        {
+            _request = null;
+            _loadErrorMessage = $"Unable to load clearance details: {exception.Message}";
         }
 
         _isLoading = false;
@@ -189,14 +208,14 @@ else
 
     private async Task GeneratePdfAsync()
     {
-        if (AuthService.CurrentRole is null)
+        if (AuthService.CurrentUser is null)
         {
             return;
         }
 
         try
         {
-            var document = await DocumentService.GenerateHoaClearanceAsync(Id, AuthService.CurrentRole);
+            var document = await DocumentService.GenerateHoaClearanceAsync(Id, AuthService.CurrentUser.UserId);
             if (document is null)
             {
                 await JS.InvokeVoidAsync("hrms.showToast", "Unable to generate clearance PDF.", "error");
@@ -223,8 +242,13 @@ else
     private static string FormatHtmlDate(DateTime? value) =>
         value?.ToString("yyyy-MM-dd") ?? string.Empty;
 
-    private static string GetFullName(Homeowner homeowner)
+    private static string GetFullName(Homeowner? homeowner)
     {
+        if (homeowner is null)
+        {
+            return "-";
+        }
+
         var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
             .Where(value => !string.IsNullOrWhiteSpace(value));
 

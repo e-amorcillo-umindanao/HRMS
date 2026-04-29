@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>HRMS</title>
     <base href="/" />
+    <style>
+      html, body {
+        height: 100%;
+        overflow: hidden;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
     <link href="css/output.css" rel="stylesheet" />
     <link href="css/app.css" rel="stylesheet" />
     <link href="HRMS.styles.css" rel="stylesheet" />
@@ -22,8 +30,51 @@
     </div>
 
     <script>
+        window.hrmsDiagnostics = {
+            show: function (message) {
+                let panel = document.getElementById('hrms-startup-diagnostics');
+                if (!panel) {
+                    panel = document.createElement('pre');
+                    panel.id = 'hrms-startup-diagnostics';
+                    panel.style.position = 'fixed';
+                    panel.style.left = '12px';
+                    panel.style.top = '56px';
+                    panel.style.right = '12px';
+                    panel.style.maxHeight = '40vh';
+                    panel.style.overflow = 'auto';
+                    panel.style.padding = '12px';
+                    panel.style.margin = '0';
+                    panel.style.background = '#fff7ed';
+                    panel.style.border = '1px solid #fdba74';
+                    panel.style.color = '#9a3412';
+                    panel.style.font = '12px/1.4 Consolas, monospace';
+                    panel.style.whiteSpace = 'pre-wrap';
+                    panel.style.zIndex = '99999';
+                    document.body.appendChild(panel);
+                }
+
+                panel.textContent = message;
+            }
+        };
+
+        window.addEventListener('error', function (event) {
+            const message = event.error && event.error.stack
+                ? event.error.stack
+                : (event.message || 'Unknown startup error');
+            window.hrmsDiagnostics.show('window.onerror\n' + message);
+        });
+
+        window.addEventListener('unhandledrejection', function (event) {
+            const reason = event.reason && event.reason.stack
+                ? event.reason.stack
+                : String(event.reason || 'Unknown promise rejection');
+            window.hrmsDiagnostics.show('unhandledrejection\n' + reason);
+        });
+
         document.addEventListener('mousedown', function (e) {
-            Blazor.dispatch('mousedown', e);
+            if (window.Blazor && typeof window.Blazor.dispatch === 'function') {
+                window.Blazor.dispatch('mousedown', e);
+            }
         });
 
         window.hrmsSession = {
@@ -65,7 +116,6 @@
     </script>
     <script src="js/chart.umd.min.js"></script>
     <script src="js/hrms.js"></script>
-    <script src="js/charts.js"></script>
     <script src="js/dropdown.js"></script>
     <script src="js/modal.js"></script>
     <script src="js/toast.js"></script>

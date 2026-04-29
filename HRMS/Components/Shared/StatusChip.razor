@@ -1,6 +1,4 @@
-<span class="badge badge-sm @GetClass()">
-    @DisplayStatus
-</span>
+<span class="@BadgeClass">@DisplayStatus</span>
 
 @code {
     [Parameter]
@@ -11,24 +9,30 @@
 
     private string DisplayStatus => string.IsNullOrWhiteSpace(Status) ? (string.IsNullOrWhiteSpace(Label) ? "-" : Label!) : Status!;
 
-    private string GetClass() => DisplayStatus switch
+    private string BadgeClass => DisplayStatus switch
     {
-        "Active" => "badge-success",
-        "Approved" => "badge-success",
-        "Paid" => "badge-success",
-        "Resolved" => "badge-success",
-        "Pending" => "badge-warning",
-        "Unpaid" => "badge-warning",
-        "Under Review" => "badge-warning",
-        "Suspended" => "badge-warning",
-        "Rejected" => "badge-error",
-        "Overdue" => "badge-error",
-        "Open" => "badge-error",
-        "Deceased" => "badge-error",
-        "Expired" => "badge-error",
-        "Inactive" => "badge-ghost",
-        "Closed" => "badge-ghost",
-        "Transferred" => "badge-info",
-        _ => "badge-ghost"
+        "Active" => "badge badge-sm badge-success",
+        "Paid" => "badge badge-sm badge-success",
+        "Approved" => "badge badge-sm badge-success",
+        "Resolved" => "badge badge-sm badge-success",
+        "High" => "badge badge-sm badge-success",
+        "High Engagement" => "badge badge-sm badge-success",
+        "Pending" => "badge badge-sm badge-warning",
+        "Unpaid" => "badge badge-sm badge-warning",
+        "Under Review" => "badge badge-sm badge-warning",
+        "Suspended" => "badge badge-sm badge-warning",
+        "Medium" => "badge badge-sm badge-warning",
+        "Medium Engagement" => "badge badge-sm badge-warning",
+        "Open" => "badge badge-sm badge-error",
+        "Rejected" => "badge badge-sm badge-error",
+        "Overdue" => "badge badge-sm badge-error",
+        "Deceased" => "badge badge-sm badge-error",
+        "Expired" => "badge badge-sm badge-error",
+        "Low" => "badge badge-sm badge-error",
+        "Low Engagement" => "badge badge-sm badge-error",
+        "Inactive" => "badge badge-sm badge-ghost",
+        "Closed" => "badge badge-sm badge-ghost",
+        "Transferred" => "badge badge-sm badge-info",
+        _ => "badge badge-sm badge-ghost"
     };
 }

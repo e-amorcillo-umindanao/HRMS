@@ -2,10 +2,12 @@
 @inject AuthService AuthService
 @inject NavigationManager Nav
 
-<aside class="flex min-h-full w-[220px] flex-col" style="background-color: #1e2433; color: #e2e8f0;">
-    <div class="px-4 py-5 text-base font-medium tracking-tight">HRMS</div>
+<aside class="flex min-h-full h-full flex-col" style="background-color: #1e2433; color: #e2e8f0;">
+    <div class="px-4 py-5 text-base font-medium tracking-tight">
+        @(IsCollapsed ? "H" : "HRMS")
+    </div>
 
-    <nav class="flex-1 px-3">
+    <nav class="flex-1 @(IsCollapsed ? "px-2" : "px-3")">
         @if (AuthService.IsHomeowner())
         {
             @RenderSection("Main", HomeownerItems)
@@ -23,13 +25,26 @@
     </nav>
 
     <div class="border-t border-base-content/10 p-3">
-        <button type="button" class="btn btn-sm w-full justify-start border-transparent bg-transparent text-[#94a3b8] hover:border-transparent hover:bg-white/5 hover:text-[#e2e8f0]" @onclick="LogoutAsync">
-            Logout
+        <button type="button"
+                class="btn btn-sm w-full border-transparent bg-transparent text-[#94a3b8] hover:border-transparent hover:bg-white/5 hover:text-[#e2e8f0] @(IsCollapsed ? "justify-center px-0" : "justify-start")"
+                title="Logout"
+                @onclick="LogoutAsync">
+            @if (IsCollapsed)
+            {
+                <span class="text-[11px] font-semibold uppercase">LO</span>
+            }
+            else
+            {
+                <span>Logout</span>
+            }
         </button>
     </div>
 </aside>
 
 @code {
+    [Parameter]
+    public bool IsCollapsed { get; set; }
+
     protected override void OnInitialized()
     {
         AuthService.StateChanged += HandleStateChanged;
@@ -126,11 +141,14 @@
         }
 
         var sequence = 0;
-        builder.OpenElement(sequence++, "p");
-        builder.AddAttribute(sequence++, "class", "mt-4 mb-2 px-2 text-[9.5px] font-semibold uppercase tracking-widest");
-        builder.AddAttribute(sequence++, "style", "color: rgba(226, 232, 240, 0.6); letter-spacing: 0.08em;");
-        builder.AddContent(sequence++, label);
-        builder.CloseElement();
+        if (!IsCollapsed)
+        {
+            builder.OpenElement(sequence++, "p");
+            builder.AddAttribute(sequence++, "class", "mt-4 mb-2 px-2 text-[9.5px] font-semibold uppercase tracking-widest");
+            builder.AddAttribute(sequence++, "style", "color: rgba(226, 232, 240, 0.6); letter-spacing: 0.08em;");
+            builder.AddContent(sequence++, label);
+            builder.CloseElement();
+        }
 
         builder.OpenElement(sequence++, "ul");
         builder.AddAttribute(sequence++, "class", "menu menu-compact gap-0.5");
@@ -141,15 +159,26 @@
             builder.OpenElement(sequence++, "button");
             builder.AddAttribute(sequence++, "type", "button");
             builder.AddAttribute(sequence++, "class", GetNavItemClass(item.Href));
+            builder.AddAttribute(sequence++, "title", item.Label);
             builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => NavigateTo(item.Href)));
 
-            builder.OpenElement(sequence++, "span");
-            builder.AddAttribute(sequence++, "class", "nav-dot h-2 w-2 rounded-full flex-shrink-0");
-            builder.CloseElement();
+            if (IsCollapsed)
+            {
+                builder.OpenElement(sequence++, "span");
+                builder.AddAttribute(sequence++, "class", "flex h-8 w-8 items-center justify-center rounded-md bg-white/5 text-[11px] font-semibold uppercase");
+                builder.AddContent(sequence++, GetAbbreviation(item.Label));
+                builder.CloseElement();
+            }
+            else
+            {
+                builder.OpenElement(sequence++, "span");
+                builder.AddAttribute(sequence++, "class", "nav-dot h-2 w-2 rounded-full flex-shrink-0");
+                builder.CloseElement();
 
-            builder.OpenElement(sequence++, "span");
-            builder.AddContent(sequence++, item.Label);
-            builder.CloseElement();
+                builder.OpenElement(sequence++, "span");
+                builder.AddContent(sequence++, item.Label);
+                builder.CloseElement();
+            }
 
             builder.CloseElement();
             builder.CloseElement();
@@ -160,8 +189,8 @@
 
     private string GetNavItemClass(string href) =>
         IsActive(href)
-            ? "nav-link active flex items-center gap-2 rounded px-2 py-2 text-sm font-medium bg-white/10 text-[#e2e8f0] transition-colors"
-            : "nav-link flex items-center gap-2 rounded px-2 py-2 text-sm text-[#94a3b8] transition-colors hover:bg-white/5 hover:text-[#e2e8f0]";
+            ? $"nav-link active flex items-center rounded py-2 text-sm font-medium bg-white/10 text-[#e2e8f0] transition-colors {(IsCollapsed ? "justify-center px-0" : "gap-2 px-2")}"
+            : $"nav-link flex items-center rounded py-2 text-sm text-[#94a3b8] transition-colors hover:bg-white/5 hover:text-[#e2e8f0] {(IsCollapsed ? "justify-center px-0" : "gap-2 px-2")}";
 
     private bool IsActive(string href)
     {
@@ -179,6 +208,23 @@
     private void NavigateTo(string href) => Nav.NavigateTo(href);
 
     private Task LogoutAsync() => AuthService.LogoutAsync();
+
+    private static string GetAbbreviation(string label)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return "?";
+        }
+
+        var parts = label
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Take(2)
+            .ToArray();
+
+        return parts.Length == 0
+            ? label[..1].ToUpperInvariant()
+            : string.Concat(parts.Select(part => part[0])).ToUpperInvariant();
+    }
 
     private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
 

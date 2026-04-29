@@ -1,0 +1,67 @@
+@inject AuthService AuthSvc
+@inject SubdivisionService SubdivisionSvc
+@inject SubdivisionContextService CtxSvc
+
+@if (AuthSvc.IsSuperAdmin)
+{
+    <div class="mb-4 flex items-center gap-3 px-1">
+        <span class="whitespace-nowrap text-xs font-semibold uppercase tracking-widest text-base-content/40">
+            Viewing
+        </span>
+        <select class="select select-sm select-bordered max-w-xs"
+                @bind="selectedId"
+                @bind:after="OnSelectionChanged">
+            <option value="0">Select a subdivision...</option>
+            @foreach (var subdivision in subdivisions)
+            {
+                <option value="@subdivision.SubdivisionId">@subdivision.Name</option>
+            }
+        </select>
+        @if (CtxSvc.SelectedSubdivisionId.HasValue && IsReadOnly)
+        {
+            <span class="badge badge-warning badge-sm font-medium">Read-only</span>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<int?> OnSubdivisionSelected { get; set; }
+    [Parameter] public bool IsReadOnly { get; set; } = true;
+
+    private List<Subdivision> subdivisions = [];
+    private int selectedId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        subdivisions = await SubdivisionSvc.GetAllAsync();
+
+        if (CtxSvc.SelectedSubdivisionId.HasValue)
+        {
+            selectedId = CtxSvc.SelectedSubdivisionId.Value;
+        }
+        else
+        {
+            var firstActive = subdivisions.FirstOrDefault(subdivision => subdivision.Status == "Active");
+            if (firstActive is not null)
+            {
+                selectedId = firstActive.SubdivisionId;
+                CtxSvc.SetSubdivision(firstActive.SubdivisionId, firstActive.Name);
+                await OnSubdivisionSelected.InvokeAsync(firstActive.SubdivisionId);
+            }
+        }
+    }
+
+    private async Task OnSelectionChanged()
+    {
+        if (selectedId > 0)
+        {
+            var subdivision = subdivisions.First(item => item.SubdivisionId == selectedId);
+            CtxSvc.SetSubdivision(subdivision.SubdivisionId, subdivision.Name);
+            await OnSubdivisionSelected.InvokeAsync(subdivision.SubdivisionId);
+            return;
+        }
+
+        CtxSvc.Clear();
+        await OnSubdivisionSelected.InvokeAsync(null);
+    }
+}

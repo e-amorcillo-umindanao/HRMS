@@ -1,4 +1,5 @@
 using HRMS.Data;
+using HRMS.Helpers;
 using HRMS.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,22 +16,22 @@ public class MSMEService
         _auditService = auditService;
     }
 
-    public async Task<List<MSME>> GetAllAsync()
+    public async Task<List<MSME>> GetAllAsync(int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .OrderBy(msme => msme.BusinessName)
             .ToListAsync();
     }
 
-    public async Task<MSME?> GetByIdAsync(int id)
+    public async Task<MSME?> GetByIdAsync(int id, int? subdivisionId = null)
     {
-        return await BaseQuery(includeCreator: true)
+        return await BaseQuery(subdivisionId, includeCreator: true)
             .SingleOrDefaultAsync(msme => msme.MSMEId == id);
     }
 
-    public async Task<List<MSME>> SearchAsync(string? name, string? status, string? businessType)
+    public async Task<List<MSME>> SearchAsync(int? subdivisionId, string? name, string? status, string? businessType)
     {
-        var query = BaseQuery();
+        var query = BaseQuery(subdivisionId);
 
         if (!string.IsNullOrWhiteSpace(name))
         {
@@ -52,8 +53,13 @@ public class MSMEService
             .ToListAsync();
     }
 
+    public Task<List<MSME>> SearchAsync(string? name, string? status, string? businessType) =>
+        SearchAsync(null, name, status, businessType);
+
     public async Task<MSME> AddAsync(MSME msme, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "msme", "Only Super Admin can manage MSME records.");
+        msme.SubdivisionId = await ResolveSubdivisionIdAsync(msme.SubdivisionId, msme.HomeownerId, actorUserId);
         msme.BusinessName = msme.BusinessName.Trim();
         msme.BusinessType = msme.BusinessType.Trim();
         msme.ContactNumber = NormalizeOptional(msme.ContactNumber);
@@ -74,6 +80,7 @@ public class MSMEService
 
     public async Task<MSME?> UpdateAsync(MSME msme, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "msme", "Only Super Admin can manage MSME records.");
         var existing = await _context.MSMEs
             .SingleOrDefaultAsync(record => record.MSMEId == msme.MSMEId);
 
@@ -84,6 +91,7 @@ public class MSMEService
 
         existing.BusinessName = msme.BusinessName.Trim();
         existing.BusinessType = msme.BusinessType.Trim();
+        existing.SubdivisionId = msme.SubdivisionId == 0 ? existing.SubdivisionId : msme.SubdivisionId;
         existing.HomeownerId = msme.HomeownerId;
         existing.UnitId = msme.UnitId;
         existing.ContactNumber = NormalizeOptional(msme.ContactNumber);
@@ -101,6 +109,7 @@ public class MSMEService
 
     public async Task<bool> DeleteAsync(int id, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "msme", "Only Super Admin can manage MSME records.");
         var existing = await _context.MSMEs
             .SingleOrDefaultAsync(record => record.MSMEId == id);
 
@@ -117,21 +126,27 @@ public class MSMEService
         return true;
     }
 
-    public async Task<List<MSME>> GetByHomeownerAsync(int homeownerId)
+    public async Task<List<MSME>> GetByHomeownerAsync(int homeownerId, int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .Where(msme => msme.HomeownerId == homeownerId)
             .OrderBy(msme => msme.BusinessName)
             .ToListAsync();
     }
 
-    private IQueryable<MSME> BaseQuery(bool includeCreator = false)
+    private IQueryable<MSME> BaseQuery(int? subdivisionId, bool includeCreator = false)
     {
         IQueryable<MSME> query = _context.MSMEs
             .AsNoTracking()
+            .Include(msme => msme.Subdivision)
             .Include(msme => msme.Homeowner)
             .Include(msme => msme.Unit)
             .Include(msme => msme.InteractionLogs);
+
+        if (subdivisionId.HasValue)
+        {
+            query = query.Where(msme => msme.SubdivisionId == subdivisionId.Value);
+        }
 
         if (includeCreator)
         {
@@ -139,6 +154,56 @@ public class MSMEService
         }
 
         return query;
+    }
+
+    private async Task<int> ResolveSubdivisionIdAsync(int subdivisionId, int homeownerId, int actorUserId)
+    {
+        if (subdivisionId > 0)
+        {
+            return subdivisionId;
+        }
+
+        var homeownerSubdivisionId = await _context.Homeowners
+            .AsNoTracking()
+            .Where(homeowner => homeowner.HomeownerId == homeownerId && !homeowner.IsDeleted)
+            .Select(homeowner => homeowner.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (homeownerSubdivisionId > 0)
+        {
+            return homeownerSubdivisionId;
+        }
+
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue)
+        {
+            return actorSubdivisionId.Value;
+        }
+
+        throw new InvalidOperationException("Subdivision is required for MSME records.");
+    }
+
+    private async Task<string?> GetActorRoleAsync(int actorUserId)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.Role.RoleName)
+            .SingleOrDefaultAsync();
+    }
+
+    private async Task EnsureCanWriteAsync(int actorUserId, string module, string message)
+    {
+        var role = await GetActorRoleAsync(actorUserId);
+        if (!AccessHelper.CanWrite(role ?? string.Empty, module))
+        {
+            throw new UnauthorizedAccessException(message);
+        }
     }
 
     private static string? NormalizeOptional(string? value) =>

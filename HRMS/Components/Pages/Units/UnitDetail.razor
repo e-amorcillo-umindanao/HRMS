@@ -23,10 +23,13 @@ else
     <PageHeader Title="@_unit.UnitNumber" Subtitle="Unit details and occupant assignments.">
         <Actions>
             <button class="btn btn-ghost btn-sm" @onclick="GoBack">Back</button>
-            <button class="btn btn-primary btn-sm"
-                    @onclick='() => NavigationManager.NavigateTo($"/units/{_unit.UnitId}/edit")'>
-                Edit
-            </button>
+            @if (CanWriteUnits)
+            {
+                <button class="btn btn-primary btn-sm"
+                        @onclick='() => NavigationManager.NavigateTo($"/units/{_unit.UnitId}/edit")'>
+                    Edit
+                </button>
+            }
         </Actions>
     </PageHeader>
 
@@ -52,23 +55,26 @@ else
                     <p class="mt-0.5 text-xs text-base-content/40">Assign existing homeowners to this unit.</p>
                 </div>
 
-                <div class="border-b border-base-300 p-5">
-                    <div class="flex flex-wrap items-end gap-3">
-                        <div class="form-control min-w-[260px] flex-1">
-                            <label class="label py-0 pb-1">
-                                <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Add Occupant</span>
-                            </label>
-                            <select class="select select-bordered w-full" @bind="_selectedOccupantId">
-                                <option value="">Select homeowner...</option>
-                                @foreach (var homeowner in AssignableHomeowners)
-                                {
-                                    <option value="@homeowner.HomeownerId">@GetHomeownerDisplay(homeowner)</option>
-                                }
-                            </select>
+                @if (CanWriteUnits)
+                {
+                    <div class="border-b border-base-300 p-5">
+                        <div class="flex flex-wrap items-end gap-3">
+                            <div class="form-control min-w-[260px] flex-1">
+                                <label class="label py-0 pb-1">
+                                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Add Occupant</span>
+                                </label>
+                                <select class="select select-bordered w-full" @bind="_selectedOccupantId">
+                                    <option value="">Select homeowner...</option>
+                                    @foreach (var homeowner in AssignableHomeowners)
+                                    {
+                                        <option value="@homeowner.HomeownerId">@GetHomeownerDisplay(homeowner)</option>
+                                    }
+                                </select>
+                            </div>
+                            <button class="btn btn-primary btn-sm" @onclick="AssignOccupantAsync">Assign Homeowner</button>
                         </div>
-                        <button class="btn btn-primary btn-sm" @onclick="AssignOccupantAsync">Assign Homeowner</button>
                     </div>
-                </div>
+                }
 
                 <div class="p-5">
                     @if (_occupants.Count == 0)
@@ -117,6 +123,7 @@ else
     private List<Homeowner> _activeHomeowners = [];
     private int? _selectedOccupantId;
     private bool _isLoading = true;
+    private bool CanWriteUnits => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "units");
 
     private IEnumerable<Homeowner> AssignableHomeowners
     {

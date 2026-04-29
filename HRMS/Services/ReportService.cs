@@ -20,24 +20,24 @@ public class ReportService
         _engagementService = engagementService;
     }
 
-    public async Task<DashboardKpiSummary> GetDashboardKPIsAsync()
+    public async Task<DashboardKpiSummary> GetDashboardKPIsAsync(int? subdivisionId = null)
     {
         return new DashboardKpiSummary
         {
-            TotalHomeowners = await _context.Homeowners.AsNoTracking().CountAsync(record => !record.IsDeleted),
-            ActiveHomeowners = await _context.Homeowners.AsNoTracking().CountAsync(record => !record.IsDeleted && record.Status == "Active"),
-            TotalUnits = await _context.Units.AsNoTracking().CountAsync(),
-            TotalMSMEs = await _context.MSMEs.AsNoTracking().CountAsync(),
-            ActiveMSMEs = await _context.MSMEs.AsNoTracking().CountAsync(record => record.Status == "Active"),
-            OpenViolations = await _context.ViolationRecords.AsNoTracking().CountAsync(record => record.Status == "Open" || record.Status == "Under Review"),
-            UnpaidOrOverdueDues = await _context.DuesRecords.AsNoTracking().CountAsync(record => record.Status == "Unpaid" || record.Status == "Overdue"),
-            PendingClearances = await _context.ClearanceRequests.AsNoTracking().CountAsync(record => record.Status == "Pending")
+            TotalHomeowners = await _context.Homeowners.AsNoTracking().CountAsync(record => !record.IsDeleted && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)),
+            ActiveHomeowners = await _context.Homeowners.AsNoTracking().CountAsync(record => !record.IsDeleted && record.Status == "Active" && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)),
+            TotalUnits = await _context.Units.AsNoTracking().CountAsync(record => !subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value),
+            TotalMSMEs = await _context.MSMEs.AsNoTracking().CountAsync(record => !subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value),
+            ActiveMSMEs = await _context.MSMEs.AsNoTracking().CountAsync(record => record.Status == "Active" && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)),
+            OpenViolations = await _context.ViolationRecords.AsNoTracking().CountAsync(record => (record.Status == "Open" || record.Status == "Under Review") && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)),
+            UnpaidOrOverdueDues = await _context.DuesRecords.AsNoTracking().CountAsync(record => (record.Status == "Unpaid" || record.Status == "Overdue") && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)),
+            PendingClearances = await _context.ClearanceRequests.AsNoTracking().CountAsync(record => record.Status == "Pending" && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value))
         };
     }
 
-    public async Task<HomeownerDashboardSummary?> GetHomeownerDashboardAsync(int homeownerId)
+    public async Task<HomeownerDashboardSummary?> GetHomeownerDashboardAsync(int homeownerId, int? subdivisionId = null)
     {
-        var engagement = await _engagementService.GetEngagementSummaryAsync(homeownerId);
+        var engagement = await _engagementService.GetEngagementSummaryAsync(homeownerId, subdivisionId);
         if (engagement is null)
         {
             return null;
@@ -68,12 +68,12 @@ public class ReportService
         };
     }
 
-    public async Task<List<TrendPoint>> GetEngagementTrendAsync()
+    public async Task<List<TrendPoint>> GetEngagementTrendAsync(int? subdivisionId = null)
     {
         var referenceMonths = GetReferenceMonths(6);
         var activeHomeowners = await _context.Homeowners
             .AsNoTracking()
-            .Where(record => !record.IsDeleted && record.Status == "Active")
+            .Where(record => !record.IsDeleted && record.Status == "Active" && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value))
             .Select(record => record.HomeownerId)
             .ToListAsync();
 
@@ -177,11 +177,12 @@ public class ReportService
             .ToList();
     }
 
-    public async Task<List<TrendPoint>> GetAttendanceTrendAsync()
+    public async Task<List<TrendPoint>> GetAttendanceTrendAsync(int? subdivisionId = null)
     {
         var events = await _context.Events
             .AsNoTracking()
             .Include(record => record.Attendances)
+            .Where(record => !subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)
             .ToListAsync();
 
         return events
@@ -202,10 +203,11 @@ public class ReportService
             .ToList();
     }
 
-    public async Task<List<StatusBreakdownItem>> GetMSMEStatusBreakdownAsync()
+    public async Task<List<StatusBreakdownItem>> GetMSMEStatusBreakdownAsync(int? subdivisionId = null)
     {
         var counts = await _context.MSMEs
             .AsNoTracking()
+            .Where(record => !subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)
             .GroupBy(record => record.Status)
             .Select(group => new StatusBreakdownItem
             {
@@ -223,11 +225,11 @@ public class ReportService
             .ToList();
     }
 
-    public async Task<List<StatusBreakdownItem>> GetHomeownerStatusBreakdownAsync()
+    public async Task<List<StatusBreakdownItem>> GetHomeownerStatusBreakdownAsync(int? subdivisionId = null)
     {
         var counts = await _context.Homeowners
             .AsNoTracking()
-            .Where(record => !record.IsDeleted)
+            .Where(record => !record.IsDeleted && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value))
             .GroupBy(record => record.Status)
             .Select(group => new StatusBreakdownItem
             {
@@ -245,11 +247,11 @@ public class ReportService
             .ToList();
     }
 
-    public async Task<DuesCollectionSummary> GetDuesCollectionSummaryAsync(int month, int year)
+    public async Task<DuesCollectionSummary> GetDuesCollectionSummaryAsync(int month, int year, int? subdivisionId = null)
     {
         var records = await _context.DuesRecords
             .AsNoTracking()
-            .Where(record => record.Month == month && record.Year == year)
+            .Where(record => record.Month == month && record.Year == year && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value))
             .ToListAsync();
 
         return new DuesCollectionSummary
@@ -265,13 +267,14 @@ public class ReportService
         };
     }
 
-    public async Task<byte[]> ExportHomeownersToPdfAsync()
+    public async Task<byte[]> ExportHomeownersToPdfAsync(int? subdivisionId, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
         var homeowners = await _context.Homeowners
             .AsNoTracking()
             .Include(record => record.Phase)
             .Include(record => record.Unit)
-            .Where(record => !record.IsDeleted)
+            .Where(record => !record.IsDeleted && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value))
             .OrderBy(record => record.LastName)
             .ThenBy(record => record.FirstName)
             .ToListAsync();
@@ -296,13 +299,14 @@ public class ReportService
             rows);
     }
 
-    public async Task<byte[]> ExportHomeownersToExcelAsync()
+    public async Task<byte[]> ExportHomeownersToExcelAsync(int? subdivisionId, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
         var homeowners = await _context.Homeowners
             .AsNoTracking()
             .Include(record => record.Phase)
             .Include(record => record.Unit)
-            .Where(record => !record.IsDeleted)
+            .Where(record => !record.IsDeleted && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value))
             .OrderBy(record => record.LastName)
             .ThenBy(record => record.FirstName)
             .ToListAsync();
@@ -326,12 +330,13 @@ public class ReportService
             rows);
     }
 
-    public async Task<byte[]> ExportDuesToPdfAsync(int? month, int? year)
+    public async Task<byte[]> ExportDuesToPdfAsync(int? month, int? year, int? subdivisionId, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
         var query = _context.DuesRecords
             .AsNoTracking()
             .Include(record => record.Homeowner)
-            .Where(record => !record.Homeowner.IsDeleted);
+            .Where(record => !record.Homeowner.IsDeleted && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value));
 
         if (month.HasValue)
         {
@@ -369,12 +374,13 @@ public class ReportService
             rows);
     }
 
-    public async Task<byte[]> ExportDuesToExcelAsync(int? month, int? year)
+    public async Task<byte[]> ExportDuesToExcelAsync(int? month, int? year, int? subdivisionId, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
         var query = _context.DuesRecords
             .AsNoTracking()
             .Include(record => record.Homeowner)
-            .Where(record => !record.Homeowner.IsDeleted);
+            .Where(record => !record.Homeowner.IsDeleted && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value));
 
         if (month.HasValue)
         {
@@ -411,11 +417,13 @@ public class ReportService
             rows);
     }
 
-    public async Task<byte[]> ExportViolationsToPdfAsync()
+    public async Task<byte[]> ExportViolationsToPdfAsync(int? subdivisionId, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
         var violations = await _context.ViolationRecords
             .AsNoTracking()
             .Include(record => record.FiledByUser)
+            .Where(record => !subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)
             .OrderByDescending(record => record.FiledAt)
             .ToListAsync();
 
@@ -438,11 +446,13 @@ public class ReportService
             rows);
     }
 
-    public async Task<byte[]> ExportViolationsToExcelAsync()
+    public async Task<byte[]> ExportViolationsToExcelAsync(int? subdivisionId, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
         var violations = await _context.ViolationRecords
             .AsNoTracking()
             .Include(record => record.FiledByUser)
+            .Where(record => !subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)
             .OrderByDescending(record => record.FiledAt)
             .ToListAsync();
 
@@ -464,12 +474,14 @@ public class ReportService
             rows);
     }
 
-    public async Task<byte[]> ExportClearancesToPdfAsync()
+    public async Task<byte[]> ExportClearancesToPdfAsync(int? subdivisionId, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
         var clearances = await _context.ClearanceRequests
             .AsNoTracking()
             .Include(record => record.Homeowner)
             .Include(record => record.ProcessedByUser)
+            .Where(record => !subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)
             .OrderByDescending(record => record.RequestedAt)
             .ToListAsync();
 
@@ -492,12 +504,14 @@ public class ReportService
             rows);
     }
 
-    public async Task<byte[]> ExportClearancesToExcelAsync()
+    public async Task<byte[]> ExportClearancesToExcelAsync(int? subdivisionId, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
         var clearances = await _context.ClearanceRequests
             .AsNoTracking()
             .Include(record => record.Homeowner)
             .Include(record => record.ProcessedByUser)
+            .Where(record => !subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)
             .OrderByDescending(record => record.RequestedAt)
             .ToListAsync();
 
@@ -524,6 +538,24 @@ public class ReportService
         return await _context.HOASettings
             .AsNoTracking()
             .FirstOrDefaultAsync();
+    }
+
+    private async Task<string?> GetActorRoleAsync(int actorUserId)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.Role.RoleName)
+            .SingleOrDefaultAsync();
+    }
+
+    private async Task EnsureCanWriteAsync(int actorUserId, string module, string message)
+    {
+        var role = await GetActorRoleAsync(actorUserId);
+        if (!AccessHelper.CanWrite(role ?? string.Empty, module))
+        {
+            throw new UnauthorizedAccessException(message);
+        }
     }
 
     private static List<DateTime> GetReferenceMonths(int count)

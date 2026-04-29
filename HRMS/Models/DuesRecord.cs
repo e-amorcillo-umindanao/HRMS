@@ -6,6 +6,7 @@ public class DuesRecord
 {
     [Key]
     public int DuesId { get; set; }
+    public int SubdivisionId { get; set; }
     public int HomeownerId { get; set; }
     public int Month { get; set; }
     public int Year { get; set; }
@@ -16,6 +17,7 @@ public class DuesRecord
     public string CreatedAt { get; set; } = string.Empty;
     public int CreatedBy { get; set; }
 
+    public Subdivision Subdivision { get; set; } = null!;
     public Homeowner Homeowner { get; set; } = null!;
     public User CreatedByUser { get; set; } = null!;
 }

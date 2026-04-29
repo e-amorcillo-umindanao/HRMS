@@ -1,4 +1,5 @@
 using HRMS.Data;
+using HRMS.Helpers;
 using HRMS.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,18 +16,18 @@ public class InteractionService
         _auditService = auditService;
     }
 
-    public async Task<List<InteractionLog>> GetByHomeownerAsync(int homeownerId)
+    public async Task<List<InteractionLog>> GetByHomeownerAsync(int homeownerId, int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .Where(log => log.HomeownerId == homeownerId)
             .OrderByDescending(log => log.InteractionDate)
             .ThenByDescending(log => log.CreatedAt)
             .ToListAsync();
     }
 
-    public async Task<List<InteractionLog>> GetByMSMEAsync(int msmeId)
+    public async Task<List<InteractionLog>> GetByMSMEAsync(int msmeId, int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .Where(log => log.MSMEId == msmeId)
             .OrderByDescending(log => log.InteractionDate)
             .ThenByDescending(log => log.CreatedAt)
@@ -35,6 +36,7 @@ public class InteractionService
 
     public async Task<InteractionLog> AddAsync(InteractionLog log, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "engagement", "You do not have write access to the Engagement module.");
         ValidateSubject(log.HomeownerId, log.MSMEId);
 
         if (string.IsNullOrWhiteSpace(log.InteractionType))
@@ -44,6 +46,7 @@ public class InteractionService
 
         var entity = new InteractionLog
         {
+            SubdivisionId = await ResolveSubdivisionIdAsync(log.SubdivisionId, log.HomeownerId, log.MSMEId, actorUserId),
             HomeownerId = log.HomeownerId,
             MSMEId = log.MSMEId,
             InteractionType = log.InteractionType.Trim(),
@@ -58,12 +61,13 @@ public class InteractionService
 
         await _auditService.LogAsync(actorUserId, "Create", "InteractionLogs", entity.InteractionLogId, "Created interaction log.");
 
-        return await BaseQuery()
+        return await BaseQuery(null)
             .SingleAsync(record => record.InteractionLogId == entity.InteractionLogId);
     }
 
     public async Task<InteractionLog?> UpdateAsync(InteractionLog log, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "engagement", "You do not have write access to the Engagement module.");
         ValidateSubject(log.HomeownerId, log.MSMEId);
 
         if (string.IsNullOrWhiteSpace(log.InteractionType))
@@ -81,6 +85,9 @@ public class InteractionService
 
         existing.HomeownerId = log.HomeownerId;
         existing.MSMEId = log.MSMEId;
+        existing.SubdivisionId = log.SubdivisionId == 0
+            ? existing.SubdivisionId
+            : log.SubdivisionId;
         existing.InteractionType = log.InteractionType.Trim();
         existing.Notes = string.IsNullOrWhiteSpace(log.Notes) ? string.Empty : log.Notes.Trim();
         existing.InteractionDate = NormalizeDate(log.InteractionDate);
@@ -89,12 +96,13 @@ public class InteractionService
 
         await _auditService.LogAsync(actorUserId, "Update", "InteractionLogs", existing.InteractionLogId, "Updated interaction log.");
 
-        return await BaseQuery()
+        return await BaseQuery(null)
             .SingleAsync(record => record.InteractionLogId == existing.InteractionLogId);
     }
 
     public async Task<bool> DeleteAsync(int id, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "engagement", "You do not have write access to the Engagement module.");
         var existing = await _context.InteractionLogs
             .SingleOrDefaultAsync(record => record.InteractionLogId == id);
 
@@ -111,13 +119,21 @@ public class InteractionService
         return true;
     }
 
-    private IQueryable<InteractionLog> BaseQuery()
+    private IQueryable<InteractionLog> BaseQuery(int? subdivisionId)
     {
-        return _context.InteractionLogs
+        IQueryable<InteractionLog> query = _context.InteractionLogs
             .AsNoTracking()
+            .Include(log => log.Subdivision)
             .Include(log => log.Homeowner)
             .Include(log => log.MSME)
             .Include(log => log.CreatedByUser);
+
+        if (subdivisionId.HasValue)
+        {
+            query = query.Where(log => log.SubdivisionId == subdivisionId.Value);
+        }
+
+        return query;
     }
 
     private static void ValidateSubject(int? homeownerId, int? msmeId)
@@ -139,5 +155,72 @@ public class InteractionService
         }
 
         return DateTime.UtcNow.ToString("o");
+    }
+
+    private async Task<string?> GetActorRoleAsync(int actorUserId)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.Role.RoleName)
+            .SingleOrDefaultAsync();
+    }
+
+    private async Task EnsureCanWriteAsync(int actorUserId, string module, string message)
+    {
+        var role = await GetActorRoleAsync(actorUserId);
+        if (!AccessHelper.CanWrite(role ?? string.Empty, module))
+        {
+            throw new UnauthorizedAccessException(message);
+        }
+    }
+
+    private async Task<int> ResolveSubdivisionIdAsync(int subdivisionId, int? homeownerId, int? msmeId, int actorUserId)
+    {
+        if (subdivisionId > 0)
+        {
+            return subdivisionId;
+        }
+
+        if (homeownerId.HasValue)
+        {
+            var homeownerSubdivisionId = await _context.Homeowners
+                .AsNoTracking()
+                .Where(homeowner => homeowner.HomeownerId == homeownerId.Value && !homeowner.IsDeleted)
+                .Select(homeowner => homeowner.SubdivisionId)
+                .SingleOrDefaultAsync();
+
+            if (homeownerSubdivisionId > 0)
+            {
+                return homeownerSubdivisionId;
+            }
+        }
+
+        if (msmeId.HasValue)
+        {
+            var msmeSubdivisionId = await _context.MSMEs
+                .AsNoTracking()
+                .Where(msme => msme.MSMEId == msmeId.Value)
+                .Select(msme => msme.SubdivisionId)
+                .SingleOrDefaultAsync();
+
+            if (msmeSubdivisionId > 0)
+            {
+                return msmeSubdivisionId;
+            }
+        }
+
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue)
+        {
+            return actorSubdivisionId.Value;
+        }
+
+        throw new InvalidOperationException("Subdivision is required for interaction logs.");
     }
 }

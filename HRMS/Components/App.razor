@@ -1,1 +1,70 @@
-<Routes />
+@implements IDisposable
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<Router AppAssembly="typeof(MauiProgram).Assembly">
+    <Found Context="routeData">
+        @{
+            var route = GetCurrentRoute();
+            var defaultRoute = AuthService.DefaultRoute;
+        }
+
+        @if (!AuthService.IsAuthenticated && route == "/")
+        {
+            <RedirectTo Href="/login" />
+        }
+        else if (!AuthService.IsAuthenticated && route != "/login")
+        {
+            <RedirectTo Href="/login" />
+        }
+        else if (AuthService.IsAuthenticated && (route == "/" || route == "/login"))
+        {
+            <RedirectTo Href="@defaultRoute" />
+        }
+        else if (AuthService.IsAuthenticated && !AuthService.CanAccessRoute(route))
+        {
+            <RedirectTo Href="@defaultRoute" />
+        }
+        else if (route == "/login")
+        {
+            <HRMS.Components.Pages.Auth.Login />
+        }
+        else
+        {
+            <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        }
+    </Found>
+    <NotFound>
+        @if (!AuthService.IsAuthenticated)
+        {
+            <RedirectTo Href="/login" />
+        }
+        else
+        {
+            <LayoutView Layout="typeof(MainLayout)">
+                <DynamicComponent Type="typeof(HRMS.Components.Pages.NotFound)" />
+            </LayoutView>
+        }
+    </NotFound>
+</Router>
+
+@code {
+    protected override void OnInitialized()
+    {
+        AuthService.StateChanged += HandleStateChanged;
+    }
+
+    public void Dispose()
+    {
+        AuthService.StateChanged -= HandleStateChanged;
+    }
+
+    private string GetCurrentRoute() =>
+        HRMS.Services.AuthService.NormalizeRoute(NavigationManager.ToBaseRelativePath(NavigationManager.Uri));
+
+    private void HandleStateChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+}

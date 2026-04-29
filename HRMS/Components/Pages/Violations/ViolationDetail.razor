@@ -27,7 +27,10 @@ else
             {
                 <button class="btn btn-outline btn-sm" @onclick="GeneratePdfAsync">Generate PDF Report</button>
             }
-            <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo($"/violations/edit/{_violation.ViolationId}")'>Edit</button>
+            @if (CanWriteViolations)
+            {
+                <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo($"/violations/edit/{_violation.ViolationId}")'>Edit</button>
+            }
         </Actions>
     </PageHeader>
 
@@ -53,7 +56,8 @@ else
 
     private ViolationRecord? _violation;
     private bool _isLoading = true;
-    private bool CanGenerateViolationPdf => AuthService.IsAtLeast("HOA President");
+    private bool CanWriteViolations => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "violations");
+    private bool CanGenerateViolationPdf => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "violation-pdf");
 
     protected override async Task OnParametersSetAsync()
     {
@@ -69,14 +73,14 @@ else
 
     private async Task GeneratePdfAsync()
     {
-        if (AuthService.CurrentRole is null)
+        if (AuthService.CurrentUser is null)
         {
             return;
         }
 
         try
         {
-            var document = await DocumentService.GenerateViolationReportAsync(Id, AuthService.CurrentRole);
+            var document = await DocumentService.GenerateViolationReportAsync(Id, AuthService.CurrentUser.UserId);
             if (document is null)
             {
                 await JS.InvokeVoidAsync("hrms.showToast", "Unable to generate violation report.", "error");

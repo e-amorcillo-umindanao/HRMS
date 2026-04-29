@@ -1,0 +1,134 @@
+@page "/subscriptions/add"
+@page "/subscriptions/edit/{SubdivisionId:int}"
+@inject SubdivisionService SubdivisionService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageHeader Title="@(IsEdit ? "Edit Subscription" : "Add Subscription")"
+            Subtitle="@(IsEdit ? "Update subdivision details." : "Register a new subdivision.")" />
+
+<div class="card max-w-3xl border border-base-300 bg-base-100 shadow-none">
+    <div class="card-body p-6">
+        <p class="text-xs font-semibold uppercase tracking-wide text-base-content/40">Subdivision Details</p>
+        <div class="divider my-1 mb-3"></div>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <FieldGroup Label="Subdivision Name">
+                <input class="input input-bordered input-sm w-full" @bind="model.Name" />
+            </FieldGroup>
+            <FieldGroup Label="Status">
+                <select class="select select-bordered select-sm w-full" @bind="model.Status">
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="Suspended">Suspended</option>
+                </select>
+            </FieldGroup>
+            <FieldGroup Label="Address">
+                <input class="input input-bordered input-sm w-full" @bind="model.Address" />
+            </FieldGroup>
+            <FieldGroup Label="Contact Number">
+                <input class="input input-bordered input-sm w-full" @bind="model.ContactNumber" />
+            </FieldGroup>
+            <FieldGroup Label="City">
+                <input class="input input-bordered input-sm w-full" @bind="model.City" />
+            </FieldGroup>
+            <FieldGroup Label="Province">
+                <input class="input input-bordered input-sm w-full" @bind="model.Province" />
+            </FieldGroup>
+        </div>
+
+        <p class="mt-6 text-xs font-semibold uppercase tracking-wide text-base-content/40">Subscription Period</p>
+        <div class="divider my-1 mb-3"></div>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <FieldGroup Label="Subscription Start Date">
+                <input type="date" class="input input-bordered input-sm w-full" @bind="subscriptionStart" />
+            </FieldGroup>
+            <FieldGroup Label="Subscription End Date">
+                <input type="date" class="input input-bordered input-sm w-full" @bind="subscriptionEnd" />
+            </FieldGroup>
+        </div>
+
+        <p class="mt-6 text-xs font-semibold uppercase tracking-wide text-base-content/40">Notes</p>
+        <div class="divider my-1 mb-3"></div>
+        <FieldGroup Label="Notes">
+            <textarea class="textarea textarea-bordered textarea-sm h-24 w-full" @bind="model.Notes"></textarea>
+        </FieldGroup>
+
+        <div class="mt-4 flex justify-end gap-2 border-t border-base-300 pt-4">
+            <a href="/subscriptions" class="btn btn-ghost btn-sm">Cancel</a>
+            <button class="btn btn-primary btn-sm" @onclick="SaveAsync" disabled="@isSaving">
+                @if (isSaving)
+                {
+                    <span class="loading loading-spinner loading-xs mr-1"></span>
+                }
+                @(IsEdit ? "Save Changes" : "Add Subscription")
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int SubdivisionId { get; set; }
+
+    private Subdivision model = new() { Status = "Active" };
+    private DateTime? subscriptionStart;
+    private DateTime? subscriptionEnd;
+    private bool isSaving;
+    private bool IsEdit => SubdivisionId > 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsSuperAdmin)
+        {
+            NavigationManager.NavigateTo("/dashboard");
+            return;
+        }
+
+        if (!IsEdit)
+        {
+            return;
+        }
+
+        var existing = await SubdivisionService.GetByIdAsync(SubdivisionId);
+        if (existing is null)
+        {
+            NavigationManager.NavigateTo("/subscriptions");
+            return;
+        }
+
+        model = existing;
+        if (DateTime.TryParse(existing.SubscriptionStart, out var startDate))
+        {
+            subscriptionStart = startDate;
+        }
+
+        if (DateTime.TryParse(existing.SubscriptionEnd, out var endDate))
+        {
+            subscriptionEnd = endDate;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(model.Name) || AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        isSaving = true;
+        model.SubscriptionStart = (subscriptionStart ?? DateTime.UtcNow.Date).ToString("o");
+        model.SubscriptionEnd = subscriptionEnd?.ToString("o");
+
+        if (IsEdit)
+        {
+            await SubdivisionService.UpdateAsync(model, AuthService.CurrentUser.UserId);
+        }
+        else
+        {
+            model.CreatedAt = DateTime.UtcNow.ToString("o");
+            model.CreatedBy = AuthService.CurrentUser.UserId;
+            await SubdivisionService.AddAsync(model, AuthService.CurrentUser.UserId);
+        }
+
+        NavigationManager.NavigateTo("/subscriptions");
+    }
+}

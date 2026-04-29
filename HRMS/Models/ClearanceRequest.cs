@@ -6,6 +6,7 @@ public class ClearanceRequest
 {
     [Key]
     public int ClearanceId { get; set; }
+    public int SubdivisionId { get; set; }
     public int HomeownerId { get; set; }
     public string ClearanceType { get; set; } = string.Empty;
     public string Purpose { get; set; } = string.Empty;
@@ -16,6 +17,7 @@ public class ClearanceRequest
     public string? Remarks { get; set; }
     public string? ValidUntil { get; set; }
 
+    public Subdivision Subdivision { get; set; } = null!;
     public Homeowner Homeowner { get; set; } = null!;
     public User? ProcessedByUser { get; set; }
 }

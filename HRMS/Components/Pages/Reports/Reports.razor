@@ -1,29 +1,59 @@
 @page "/reports"
 @inject ReportService ReportService
+@inject AuthService AuthService
+@inject SubdivisionContextService SubdivisionContextService
 @inject IJSRuntime JS
 
 <PageHeader Title="Reports"
             Subtitle="Export homeowner, dues, violation, and clearance data to PDF or Excel." />
 
-<div class="flex flex-col gap-4">
-@foreach (var reportItem in ReportSections)
-{
-    <div class="card border border-base-300 bg-base-100 shadow-none">
-        <div class="card-body p-0">
-            <div class="border-b border-base-300 p-5">
-                <p class="text-sm font-semibold text-base-content">@reportItem.Title</p>
-                <p class="mt-0.5 text-xs text-base-content/40">@reportItem.Description</p>
-            </div>
+<SubdivisionSelector OnSubdivisionSelected="HandleSubdivisionChange" />
 
-            @if (reportItem.Key == "dues")
-            {
-                    <div class="px-5 pt-5">
-                        <div class="flex flex-wrap gap-3">
-                            <div class="form-control min-w-[160px]">
-                                <label class="label py-0 pb-1">
-                                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Month</span>
-                                </label>
-                                <select class="select select-bordered select-sm" value="@GetNullableIntValue(_selectedMonth)" @onchange="OnMonthChanged">
+<div class="flex flex-col gap-4">
+    @foreach (var reportItem in ReportSections)
+    {
+        <div class="card border border-base-300 bg-base-100 shadow-none">
+            <div class="card-body p-5">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg @reportItem.IconBgClass">
+                            @RenderReportIcon(reportItem.Icon)
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-base-content">@reportItem.Title</h3>
+                            <p class="mt-0.5 text-xs text-base-content/50">@reportItem.Description</p>
+                        </div>
+                    </div>
+
+                    <div class="flex shrink-0 items-center gap-2">
+                        <button class="btn btn-outline btn-sm gap-1.5"
+                                disabled="@(_isExporting || !CanExportReports)"
+                                @onclick="() => ExportPdfAsync(reportItem.Key)">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                      d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h4.5m-4.5 3h7.5m-3-15v3.75m0 0H8.25m4.5 0 3 3m-3-3-3 3" />
+                            </svg>
+                            PDF
+                        </button>
+                        <button class="btn btn-outline btn-sm gap-1.5"
+                                disabled="@(_isExporting || !CanExportReports)"
+                                @onclick="() => ExportExcelAsync(reportItem.Key)">
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                      d="M3.75 3.75h16.5v16.5H3.75V3.75zm5.25 0v16.5m5.25-16.5v16.5M3.75 9h16.5m-16.5 6h16.5" />
+                            </svg>
+                            Excel
+                        </button>
+                    </div>
+                </div>
+
+                @if (reportItem.Key == "dues")
+                {
+                    <div class="mt-4 border-t border-base-200 pt-4">
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/40">Month</label>
+                                <select class="select select-sm select-bordered w-full" value="@GetNullableIntValue(_selectedMonth)" @onchange="OnMonthChanged">
                                     <option value="">All Months</option>
                                     @foreach (var month in Enumerable.Range(1, 12))
                                     {
@@ -31,11 +61,9 @@
                                     }
                                 </select>
                             </div>
-                            <div class="form-control min-w-[140px]">
-                                <label class="label py-0 pb-1">
-                                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Year</span>
-                                </label>
-                                <select class="select select-bordered select-sm" value="@GetNullableIntValue(_selectedYear)" @onchange="OnYearChanged">
+                            <div>
+                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/40">Year</label>
+                                <select class="select select-sm select-bordered w-full" value="@GetNullableIntValue(_selectedYear)" @onchange="OnYearChanged">
                                     <option value="">All Years</option>
                                     @foreach (var year in _yearOptions)
                                     {
@@ -46,19 +74,6 @@
                         </div>
                     </div>
                 }
-
-                <div class="flex gap-3 p-5">
-                    <button class="btn btn-primary btn-sm"
-                            disabled="@_isExporting"
-                            @onclick="() => ExportPdfAsync(reportItem.Key)">
-                        Export to PDF
-                    </button>
-                    <button class="btn btn-outline btn-primary btn-sm"
-                            disabled="@_isExporting"
-                            @onclick="() => ExportExcelAsync(reportItem.Key)">
-                        Export to Excel
-                    </button>
-                </div>
             </div>
         </div>
     }
@@ -67,16 +82,20 @@
 @code {
     private static readonly ReportSection[] ReportSections =
     [
-        new("homeowners", "Homeowners", "All registered homeowner profiles and status records."),
-        new("dues", "Dues", "Monthly dues records with payment status."),
-        new("violations", "Violations", "Filed violation and incident reports."),
-        new("clearances", "Clearances", "HOA clearance and document requests.")
+        new("homeowners", "Homeowners", "All registered homeowner profiles and status records.", "users", "bg-primary/10 text-primary"),
+        new("dues", "Dues", "Monthly dues records with payment status.", "credit-card", "bg-warning/10 text-warning"),
+        new("violations", "Violations", "Filed violation and incident reports.", "alert", "bg-error/10 text-error"),
+        new("clearances", "Clearances", "HOA clearance and document requests.", "file-check", "bg-success/10 text-success")
     ];
 
     private bool _isExporting;
     private int? _selectedMonth;
     private int? _selectedYear = DateTime.UtcNow.Year;
     private List<int> _yearOptions = [];
+    private bool CanExportReports => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "reports");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin
+        ? SubdivisionContextService.SelectedSubdivisionId
+        : AuthService.CurrentSubdivisionId;
 
     protected override void OnInitialized()
     {
@@ -88,38 +107,53 @@
 
     private async Task ExportPdfAsync(string key)
     {
+        if (AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
         switch (key)
         {
             case "homeowners":
-                await ExportAsync(() => ReportService.ExportHomeownersToPdfAsync(), $"homeowners_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
+                await ExportAsync(() => ReportService.ExportHomeownersToPdfAsync(ActiveSubdivisionId, AuthService.CurrentUser.UserId), $"homeowners_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
                 break;
             case "dues":
-                await ExportAsync(() => ReportService.ExportDuesToPdfAsync(_selectedMonth, _selectedYear), $"dues_report_{BuildDuesFileSuffix()}.pdf");
+                await ExportAsync(() => ReportService.ExportDuesToPdfAsync(_selectedMonth, _selectedYear, ActiveSubdivisionId, AuthService.CurrentUser.UserId), $"dues_report_{BuildDuesFileSuffix()}.pdf");
                 break;
             case "violations":
-                await ExportAsync(() => ReportService.ExportViolationsToPdfAsync(), $"violations_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
+                await ExportAsync(() => ReportService.ExportViolationsToPdfAsync(ActiveSubdivisionId, AuthService.CurrentUser.UserId), $"violations_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
                 break;
             case "clearances":
-                await ExportAsync(() => ReportService.ExportClearancesToPdfAsync(), $"clearances_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
+                await ExportAsync(() => ReportService.ExportClearancesToPdfAsync(ActiveSubdivisionId, AuthService.CurrentUser.UserId), $"clearances_report_{DateTime.UtcNow:yyyyMMdd}.pdf");
                 break;
         }
     }
 
+    private async Task HandleSubdivisionChange(int? subdivisionId)
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async Task ExportExcelAsync(string key)
     {
+        if (AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
         switch (key)
         {
             case "homeowners":
-                await ExportAsync(() => ReportService.ExportHomeownersToExcelAsync(), $"homeowners_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
+                await ExportAsync(() => ReportService.ExportHomeownersToExcelAsync(ActiveSubdivisionId, AuthService.CurrentUser.UserId), $"homeowners_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
                 break;
             case "dues":
-                await ExportAsync(() => ReportService.ExportDuesToExcelAsync(_selectedMonth, _selectedYear), $"dues_report_{BuildDuesFileSuffix()}.xlsx");
+                await ExportAsync(() => ReportService.ExportDuesToExcelAsync(_selectedMonth, _selectedYear, ActiveSubdivisionId, AuthService.CurrentUser.UserId), $"dues_report_{BuildDuesFileSuffix()}.xlsx");
                 break;
             case "violations":
-                await ExportAsync(() => ReportService.ExportViolationsToExcelAsync(), $"violations_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
+                await ExportAsync(() => ReportService.ExportViolationsToExcelAsync(ActiveSubdivisionId, AuthService.CurrentUser.UserId), $"violations_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
                 break;
             case "clearances":
-                await ExportAsync(() => ReportService.ExportClearancesToExcelAsync(), $"clearances_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
+                await ExportAsync(() => ReportService.ExportClearancesToExcelAsync(ActiveSubdivisionId, AuthService.CurrentUser.UserId), $"clearances_report_{DateTime.UtcNow:yyyyMMdd}.xlsx");
                 break;
         }
     }
@@ -179,5 +213,29 @@
         return System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
     }
 
-    private sealed record ReportSection(string Key, string Title, string Description);
+    private static RenderFragment RenderReportIcon(string icon) => builder =>
+    {
+        var path = icon switch
+        {
+            "users" => "M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z",
+            "credit-card" => "M2.25 8.25h19.5M3 9.75h18A1.5 1.5 0 0122.5 11.25v7.5A1.5 1.5 0 0121 20.25H3A1.5 1.5 0 011.5 18.75v-7.5A1.5 1.5 0 013 9.75zm0-6h18A1.5 1.5 0 0122.5 5.25v1.5A1.5 1.5 0 0121 8.25H3A1.5 1.5 0 011.5 6.75v-1.5A1.5 1.5 0 013 3.75z",
+            "alert" => "M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 7.5h.008v.008H12v-.008z",
+            _ => "M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h4.5m-4.5 3h7.5m3-9-3 3m0 0-3-3m3 3V3.75"
+        };
+
+        builder.OpenElement(0, "svg");
+        builder.AddAttribute(1, "class", "h-5 w-5");
+        builder.AddAttribute(2, "fill", "none");
+        builder.AddAttribute(3, "viewBox", "0 0 24 24");
+        builder.AddAttribute(4, "stroke", "currentColor");
+        builder.AddAttribute(5, "stroke-width", "1.5");
+        builder.OpenElement(6, "path");
+        builder.AddAttribute(7, "stroke-linecap", "round");
+        builder.AddAttribute(8, "stroke-linejoin", "round");
+        builder.AddAttribute(9, "d", path);
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private sealed record ReportSection(string Key, string Title, string Description, string Icon, string IconBgClass);
 }

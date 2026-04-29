@@ -1,110 +1,297 @@
 @inherits LayoutComponentBase
-@implements IAsyncDisposable
-@inject IJSRuntime JSRuntime
-@inject AuthService AuthService
-@inject SessionHelper SessionHelper
-@inject ThemeService ThemeService
+@inject AuthService AuthSvc
+@inject ThemeService ThemeSvc
+@inject NavigationManager Nav
+@implements IDisposable
 
-<div class="drawer drawer-open min-h-screen">
-    <input id="sidebar-toggle" type="checkbox" class="drawer-toggle" checked />
+<div class="hrms-layout @(sidebarCollapsed ? "sidebar-collapsed" : "")" data-theme="@ThemeSvc.CurrentTheme">
 
-    <div class="drawer-side z-50">
-        <label for="sidebar-toggle" class="drawer-overlay"></label>
-        <Sidebar />
-    </div>
+    <aside class="hrms-sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-logo">HRMS</span>
+            <button class="sidebar-toggle-btn" @onclick="ToggleSidebar" title="Toggle sidebar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+            </button>
+        </div>
 
-    <div class="drawer-content flex flex-col">
-        <TopBar IsDark="@ThemeService.IsDark"
-                OnThemeToggle="ToggleThemeAsync" />
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <span class="nav-group-label">Main</span>
+                @if (AccessHelper.CanRead(CurrentRole, "dashboard"))
+                {
+                    <NavLink class="nav-item" href="/dashboard" Match="NavLinkMatch.All">
+                        <span class="nav-dot"></span>
+                        <span class="nav-label">Dashboard</span>
+                    </NavLink>
+                }
+                @if (AccessHelper.CanRead(CurrentRole, "homeowners"))
+                {
+                    <NavLink class="nav-item" href="/homeowners">
+                        <span class="nav-dot"></span>
+                        <span class="nav-label">Homeowners</span>
+                    </NavLink>
+                }
+                @if (AccessHelper.CanRead(CurrentRole, "units"))
+                {
+                    <NavLink class="nav-item" href="/units">
+                        <span class="nav-dot"></span>
+                        <span class="nav-label">Units</span>
+                    </NavLink>
+                }
+                @if (IsHomeowner)
+                {
+                    <NavLink class="nav-item" href="/profile" Match="NavLinkMatch.All">
+                        <span class="nav-dot"></span>
+                        <span class="nav-label">My Profile</span>
+                    </NavLink>
+                }
+            </div>
 
-        <main class="flex-1 overflow-y-auto bg-base-200 p-6">
+            @if (!IsHomeowner)
+            {
+                <div class="nav-group">
+                    <span class="nav-group-label">Operations</span>
+                    @if (AccessHelper.CanRead(CurrentRole, "engagement"))
+                    {
+                        <NavLink class="nav-item" href="/engagement">
+                            <span class="nav-dot"></span>
+                            <span class="nav-label">Engagement</span>
+                        </NavLink>
+                    }
+                    @if (AccessHelper.CanRead(CurrentRole, "events"))
+                    {
+                        <NavLink class="nav-item" href="/events">
+                            <span class="nav-dot"></span>
+                            <span class="nav-label">Events</span>
+                        </NavLink>
+                    }
+                    @if (AccessHelper.CanRead(CurrentRole, "msme"))
+                    {
+                        <NavLink class="nav-item" href="/msme">
+                            <span class="nav-dot"></span>
+                            <span class="nav-label">MSME</span>
+                        </NavLink>
+                    }
+                    @if (AccessHelper.CanRead(CurrentRole, "dues"))
+                    {
+                        <NavLink class="nav-item" href="/dues">
+                            <span class="nav-dot"></span>
+                            <span class="nav-label">Dues</span>
+                        </NavLink>
+                    }
+                    @if (AccessHelper.CanRead(CurrentRole, "violations"))
+                    {
+                        <NavLink class="nav-item" href="/violations">
+                            <span class="nav-dot"></span>
+                            <span class="nav-label">Violations</span>
+                        </NavLink>
+                    }
+                    @if (AccessHelper.CanRead(CurrentRole, "clearance"))
+                    {
+                        <NavLink class="nav-item" href="/clearance">
+                            <span class="nav-dot"></span>
+                            <span class="nav-label">Clearance</span>
+                        </NavLink>
+                    }
+                    @if (AccessHelper.CanRead(CurrentRole, "documents"))
+                    {
+                        <NavLink class="nav-item" href="/documents">
+                            <span class="nav-dot"></span>
+                            <span class="nav-label">Documents</span>
+                        </NavLink>
+                    }
+                    @if (AccessHelper.CanRead(CurrentRole, "reports"))
+                    {
+                        <NavLink class="nav-item" href="/reports">
+                            <span class="nav-dot"></span>
+                            <span class="nav-label">Reports</span>
+                        </NavLink>
+                    }
+                </div>
+            }
+
+            @if (IsSuperAdmin)
+            {
+                <div class="nav-group">
+                    <span class="nav-group-label">Admin</span>
+                    <NavLink class="nav-item" href="/settings">
+                        <span class="nav-dot"></span>
+                        <span class="nav-label">Settings</span>
+                    </NavLink>
+                    <NavLink class="nav-item" href="/subscriptions">
+                        <span class="nav-dot"></span>
+                        <span class="nav-label">Subscriptions</span>
+                    </NavLink>
+                </div>
+            }
+        </nav>
+
+        <div class="sidebar-footer">
+            <button class="logout-btn" @onclick="Logout">Logout</button>
+        </div>
+    </aside>
+
+    <div class="hrms-main">
+        <header class="hrms-topbar">
+            <div class="topbar-left">
+                <button class="sidebar-toggle-btn topbar-toggle" @onclick="ToggleSidebar" title="Toggle sidebar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" y1="6" x2="21" y2="6" />
+                        <line x1="3" y1="12" x2="21" y2="12" />
+                        <line x1="3" y1="18" x2="21" y2="18" />
+                    </svg>
+                </button>
+                <span class="topbar-title">@currentPageTitle</span>
+            </div>
+            <div class="topbar-center">
+                <span class="topbar-hoa">@hoaName</span>
+            </div>
+            <div class="topbar-right">
+                <button class="icon-btn" @onclick="ToggleTheme" title="Toggle dark mode">
+                    @if (ThemeSvc.IsDark)
+                    {
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="#e5e7eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="5" />
+                            <line x1="12" y1="1" x2="12" y2="3" />
+                            <line x1="12" y1="21" x2="12" y2="23" />
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                            <line x1="1" y1="12" x2="3" y2="12" />
+                            <line x1="21" y1="12" x2="23" y2="12" />
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                        </svg>
+                    }
+                    else
+                    {
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                        </svg>
+                    }
+                </button>
+
+                <div class="user-dropdown">
+                    <button class="user-btn" @onclick="ToggleUserMenu">
+                        <div class="user-avatar">
+                            @(AuthSvc.CurrentUser?.Username?[0].ToString().ToUpper() ?? "?")
+                        </div>
+                        <span class="user-name">@AuthSvc.CurrentUser?.Username</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                    @if (userMenuOpen)
+                    {
+                        <div class="user-menu">
+                            <button class="user-menu-item text-error" @onclick="Logout">Logout</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </header>
+
+        <main class="hrms-content">
             @Body
         </main>
     </div>
 </div>
 
 @code {
-    private DotNetObjectReference<MainLayout>? _layoutReference;
-    private bool _isActivityRegistered;
+    private bool sidebarCollapsed;
+    private bool userMenuOpen;
+    private string currentPageTitle = "Dashboard";
+    private string hoaName = "Homeowners Association";
+    private string CurrentRole => AuthSvc.CurrentRole ?? string.Empty;
 
-    protected override void OnInitialized()
+    private bool IsSuperAdmin => AuthSvc.HasRole("Super Admin");
+    private bool IsPresidentOrAbove => AuthSvc.IsAtLeast("HOA President");
+    private bool IsBoardOrAbove => AuthSvc.IsAtLeast("Board Member");
+    private bool IsStaffOrAbove => AuthSvc.IsAtLeast("HOA Staff");
+    private bool IsHomeowner => AuthSvc.IsHomeowner();
+
+    protected override async Task OnInitializedAsync()
     {
-        AuthService.StateChanged += HandleAuthStateChanged;
-        ThemeService.OnThemeChanged += HandleThemeChanged;
-        SessionHelper.SessionWarningRaised += HandleSessionWarningRaised;
+        ThemeSvc.OnThemeChanged += HandleThemeChanged;
+        AuthSvc.StateChanged += HandleAuthChanged;
+        Nav.LocationChanged += HandleLocationChanged;
+        currentPageTitle = GetPageTitle();
+        await Task.CompletedTask;
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private void ToggleSidebar()
     {
-        if (firstRender)
-        {
-            _layoutReference = DotNetObjectReference.Create(this);
-            var savedTheme = await JSRuntime.InvokeAsync<string>("hrms.initTheme");
-            ThemeService.SetTheme(savedTheme);
-            StateHasChanged();
-        }
-
-        if (AuthService.IsAuthenticated && !_isActivityRegistered && _layoutReference is not null)
-        {
-            await JSRuntime.InvokeVoidAsync("hrmsSession.registerActivity", _layoutReference);
-            _isActivityRegistered = true;
-            SessionHelper.Start();
-        }
-        else if (!AuthService.IsAuthenticated && _isActivityRegistered)
-        {
-            await JSRuntime.InvokeVoidAsync("hrmsSession.unregisterActivity");
-            _isActivityRegistered = false;
-            SessionHelper.Stop();
-        }
+        sidebarCollapsed = !sidebarCollapsed;
     }
 
-    [JSInvokable]
-    public Task HandleUserActivity()
+    private void ToggleTheme()
     {
-        SessionHelper.RecordActivity();
-        return Task.CompletedTask;
+        ThemeSvc.Toggle();
     }
 
-    public async ValueTask DisposeAsync()
+    private void ToggleUserMenu()
     {
-        AuthService.StateChanged -= HandleAuthStateChanged;
-        ThemeService.OnThemeChanged -= HandleThemeChanged;
-        SessionHelper.SessionWarningRaised -= HandleSessionWarningRaised;
-        SessionHelper.Stop();
-
-        if (_isActivityRegistered)
-        {
-            try
-            {
-                await JSRuntime.InvokeVoidAsync("hrmsSession.unregisterActivity");
-            }
-            catch
-            {
-            }
-        }
-
-        _layoutReference?.Dispose();
+        userMenuOpen = !userMenuOpen;
     }
 
-    private void HandleAuthStateChanged()
+    private Task Logout() => AuthSvc.LogoutAsync();
+
+    private void HandleThemeChanged() => InvokeAsync(StateHasChanged);
+
+    private void HandleAuthChanged() => InvokeAsync(StateHasChanged);
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
     {
+        currentPageTitle = GetPageTitle();
+        userMenuOpen = false;
         _ = InvokeAsync(StateHasChanged);
     }
 
-    private void HandleThemeChanged()
+    private string GetPageTitle()
     {
-        _ = InvokeAsync(StateHasChanged);
+        var route = AuthService.NormalizeRoute(Nav.ToBaseRelativePath(Nav.Uri));
+
+        return route switch
+        {
+            "/" or "/dashboard" => "Dashboard",
+            "/homeowners" => "Homeowners",
+            var value when value.StartsWith("/homeowners/", StringComparison.Ordinal) => "Homeowners",
+            "/units" => "Units",
+            var value when value.StartsWith("/units/", StringComparison.Ordinal) => "Units",
+            "/engagement" => "Engagement",
+            var value when value.StartsWith("/engagement/", StringComparison.Ordinal) => "Engagement",
+            "/events" => "Events & Programs",
+            var value when value.StartsWith("/events/", StringComparison.Ordinal) => "Events & Programs",
+            "/msme" => "MSME Registry",
+            var value when value.StartsWith("/msme/", StringComparison.Ordinal) => "MSME Registry",
+            "/dues" => "Dues & Fees",
+            var value when value.StartsWith("/dues/", StringComparison.Ordinal) => "Dues & Fees",
+            "/violations" => "Violations & Incidents",
+            var value when value.StartsWith("/violations/", StringComparison.Ordinal) => "Violations & Incidents",
+            "/clearance" => "Clearance & Documents",
+            var value when value.StartsWith("/clearance/", StringComparison.Ordinal) => "Clearance & Documents",
+            "/documents" => "Documents",
+            "/reports" => "Reports",
+            "/settings" => "Settings",
+            "/subscriptions" => "Subscriptions",
+            var value when value.StartsWith("/subscriptions/", StringComparison.Ordinal) => "Subscriptions",
+            "/profile" => "My Profile",
+            _ => "Dashboard"
+        };
     }
 
-    private void HandleSessionWarningRaised()
+    public void Dispose()
     {
-        _ = InvokeAsync(async () =>
-            await JSRuntime.InvokeVoidAsync("hrms.showToast", "Session will lock in 2 minutes due to inactivity.", "warning"));
-    }
-
-    private async Task ToggleThemeAsync()
-    {
-        ThemeService.Toggle();
-        await JSRuntime.InvokeVoidAsync("hrms.setTheme", ThemeService.CurrentTheme);
+        ThemeSvc.OnThemeChanged -= HandleThemeChanged;
+        AuthSvc.StateChanged -= HandleAuthChanged;
+        Nav.LocationChanged -= HandleLocationChanged;
     }
 }

@@ -1,17 +1,23 @@
 @page "/violations"
 @inject ViolationService ViolationService
 @inject AuthService AuthService
+@inject SubdivisionContextService SubdivisionContextService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 
 <PageHeader Title="Violations & Incidents"
             Subtitle="Track filed cases, status updates, and violation reports.">
     <Actions>
-        <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/violations/add")'>
-            File Violation
-        </button>
+        @if (CanWriteViolations)
+        {
+            <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/violations/add")'>
+                File Violation
+            </button>
+        }
     </Actions>
 </PageHeader>
+
+<SubdivisionSelector OnSubdivisionSelected="HandleSubdivisionChange" />
 
 <div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
     <div class="card-body p-4">
@@ -91,12 +97,18 @@
                                 <td><StatusChip Status="@violation.Status" /></td>
                                 <td class="text-right">
                                     <button class="btn btn-ghost btn-xs" @onclick='() => NavigationManager.NavigateTo($"/violations/{violation.ViolationId}")'>View</button>
-                                    <button class="btn btn-ghost btn-xs" @onclick='() => NavigationManager.NavigateTo($"/violations/edit/{violation.ViolationId}")'>Edit</button>
+                                    @if (CanWriteViolations)
+                                    {
+                                        <button class="btn btn-ghost btn-xs" @onclick='() => NavigationManager.NavigateTo($"/violations/edit/{violation.ViolationId}")'>Edit</button>
+                                    }
                                     @if (CanGeneratePdf)
                                     {
                                         <button class="btn btn-ghost btn-xs text-primary" @onclick='() => NavigationManager.NavigateTo($"/violations/{violation.ViolationId}")'>PDF</button>
                                     }
-                                    <button class="btn btn-ghost btn-xs text-error" @onclick='() => AskDelete(violation)'>Delete</button>
+                                    @if (CanWriteViolations)
+                                    {
+                                        <button class="btn btn-ghost btn-xs text-error" @onclick='() => AskDelete(violation)'>Delete</button>
+                                    }
                                 </td>
                             </tr>
                         }
@@ -133,7 +145,11 @@
     private int? _pendingDeleteId;
     private string _confirmMessage = string.Empty;
 
-    private bool CanGeneratePdf => AuthService.IsAtLeast("HOA President");
+    private bool CanWriteViolations => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "violations");
+    private bool CanGeneratePdf => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "violation-pdf");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin
+        ? SubdivisionContextService.SelectedSubdivisionId
+        : AuthService.CurrentSubdivisionId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -142,15 +158,29 @@
 
     private async Task LoadViolationsAsync()
     {
+        if (!ActiveSubdivisionId.HasValue)
+        {
+            _violations = [];
+            _isLoading = false;
+            return;
+        }
+
         _isLoading = true;
         StateHasChanged();
 
         _violations = await ViolationService.SearchAsync(
+            ActiveSubdivisionId,
             NullIfEmpty(_homeownerNameFilter),
             NullIfEmpty(_statusFilter),
             NullIfEmpty(_typeFilter));
 
         _isLoading = false;
+    }
+
+    private async Task HandleSubdivisionChange(int? subdivisionId)
+    {
+        await LoadViolationsAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task OnNameInput(ChangeEventArgs args)

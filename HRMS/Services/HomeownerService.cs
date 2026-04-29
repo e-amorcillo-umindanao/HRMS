@@ -16,23 +16,23 @@ public class HomeownerService
         _auditService = auditService;
     }
 
-    public async Task<List<Homeowner>> GetAllAsync()
+    public async Task<List<Homeowner>> GetAllAsync(int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .OrderBy(h => h.LastName)
             .ThenBy(h => h.FirstName)
             .ToListAsync();
     }
 
-    public async Task<Homeowner?> GetByIdAsync(int id)
+    public async Task<Homeowner?> GetByIdAsync(int id, int? subdivisionId = null)
     {
-        return await BaseQuery(includeCreator: true)
+        return await BaseQuery(subdivisionId, includeCreator: true)
             .SingleOrDefaultAsync(h => h.HomeownerId == id);
     }
 
-    public async Task<List<Homeowner>> SearchAsync(string? name, string? status, int? phaseId, int? unitId, string? category)
+    public async Task<List<Homeowner>> SearchAsync(int? subdivisionId, string? name, string? status, int? phaseId, int? unitId, string? category)
     {
-        var query = BaseQuery();
+        var query = BaseQuery(subdivisionId);
 
         if (!string.IsNullOrWhiteSpace(name))
         {
@@ -68,8 +68,13 @@ public class HomeownerService
             .ToListAsync();
     }
 
+    public Task<List<Homeowner>> SearchAsync(string? name, string? status, int? phaseId, int? unitId, string? category) =>
+        SearchAsync(null, name, status, phaseId, unitId, category);
+
     public async Task<Homeowner> AddAsync(Homeowner homeowner, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "homeowners", "You do not have write access to the Homeowners module.");
+        homeowner.SubdivisionId = await ResolveSubdivisionIdAsync(homeowner.SubdivisionId, actorUserId);
         homeowner.CreatedBy = actorUserId;
         homeowner.CreatedAt = DateTime.UtcNow.ToString("o");
         homeowner.Status = string.IsNullOrWhiteSpace(homeowner.Status) ? "Active" : homeowner.Status;
@@ -85,6 +90,7 @@ public class HomeownerService
 
     public async Task<Homeowner?> UpdateAsync(Homeowner homeowner, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "homeowners", "You do not have write access to the Homeowners module.");
         var existing = await _context.Homeowners
             .SingleOrDefaultAsync(h => h.HomeownerId == homeowner.HomeownerId && !h.IsDeleted);
 
@@ -102,6 +108,7 @@ public class HomeownerService
         existing.ContactNumber = homeowner.ContactNumber;
         existing.Email = homeowner.Email;
         existing.Address = homeowner.Address;
+        existing.SubdivisionId = homeowner.SubdivisionId == 0 ? existing.SubdivisionId : homeowner.SubdivisionId;
         existing.PhaseId = homeowner.PhaseId;
         existing.UnitId = homeowner.UnitId;
         existing.Status = string.IsNullOrWhiteSpace(homeowner.Status) ? "Active" : homeowner.Status;
@@ -117,6 +124,7 @@ public class HomeownerService
 
     public async Task<bool> SoftDeleteAsync(int id, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "homeowners", "You do not have write access to the Homeowners module.");
         var existing = await _context.Homeowners
             .SingleOrDefaultAsync(h => h.HomeownerId == id && !h.IsDeleted);
 
@@ -135,6 +143,7 @@ public class HomeownerService
 
     public async Task<HomeownerImportResult> ImportFromCsvAsync(Stream csvStream, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "homeowners", "You do not have write access to the Homeowners module.");
         var parseResult = await CsvImportHelper.ParseHomeownersAsync(csvStream);
         var importResult = new HomeownerImportResult();
         importResult.Errors.AddRange(parseResult.Errors);
@@ -166,31 +175,37 @@ public class HomeownerService
         return importResult;
     }
 
-    public async Task<List<Homeowner>> GetByUnitAsync(int unitId)
+    public async Task<List<Homeowner>> GetByUnitAsync(int unitId, int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .Where(h => h.UnitId == unitId)
             .OrderBy(h => h.LastName)
             .ThenBy(h => h.FirstName)
             .ToListAsync();
     }
 
-    public async Task<List<Homeowner>> GetAllActiveAsync()
+    public async Task<List<Homeowner>> GetAllActiveAsync(int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .Where(h => h.Status == "Active")
             .OrderBy(h => h.LastName)
             .ThenBy(h => h.FirstName)
             .ToListAsync();
     }
 
-    private IQueryable<Homeowner> BaseQuery(bool includeCreator = false)
+    private IQueryable<Homeowner> BaseQuery(int? subdivisionId, bool includeCreator = false)
     {
         var query = _context.Homeowners
             .AsNoTracking()
+            .Include(h => h.Subdivision)
             .Include(h => h.Phase)
             .Include(h => h.Unit)
             .Where(h => !h.IsDeleted);
+
+        if (subdivisionId.HasValue)
+        {
+            query = query.Where(h => h.SubdivisionId == subdivisionId.Value);
+        }
 
         if (includeCreator)
         {
@@ -198,6 +213,45 @@ public class HomeownerService
         }
 
         return query;
+    }
+
+    private async Task<int> ResolveSubdivisionIdAsync(int subdivisionId, int actorUserId)
+    {
+        if (subdivisionId > 0)
+        {
+            return subdivisionId;
+        }
+
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue)
+        {
+            return actorSubdivisionId.Value;
+        }
+
+        throw new InvalidOperationException("Subdivision is required for homeowner records.");
+    }
+
+    private async Task<string?> GetActorRoleAsync(int actorUserId)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.Role.RoleName)
+            .SingleOrDefaultAsync();
+    }
+
+    private async Task EnsureCanWriteAsync(int actorUserId, string module, string message)
+    {
+        var role = await GetActorRoleAsync(actorUserId);
+        if (!AccessHelper.CanWrite(role ?? string.Empty, module))
+        {
+            throw new UnauthorizedAccessException(message);
+        }
     }
 
     private static CsvImportError? TryMapCsvRecord(HomeownerCsvRecord record, int actorUserId, out Homeowner? homeowner)

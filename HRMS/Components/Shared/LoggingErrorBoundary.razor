@@ -1,0 +1,26 @@
+@inherits ErrorBoundary
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override Task OnErrorAsync(Exception exception)
+    {
+        try
+        {
+            var logDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "HRMS",
+                "logs");
+
+            Directory.CreateDirectory(logDirectory);
+
+            var logPath = Path.Combine(logDirectory, "blazor-errors.log");
+            var entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {NavigationManager.Uri}{Environment.NewLine}{exception}{Environment.NewLine}{Environment.NewLine}";
+            File.AppendAllText(logPath, entry);
+        }
+        catch
+        {
+        }
+
+        return Task.CompletedTask;
+    }
+}

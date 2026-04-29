@@ -27,9 +27,12 @@ else
 {
     <PageHeader Title="@GetFullName(_homeowner)" Subtitle="Homeowner profile and history.">
         <Actions>
-            <button class="btn btn-outline btn-sm" @onclick="GenerateStatementAsync">Generate Statement</button>
+            @if (AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "documents"))
+            {
+                <button class="btn btn-outline btn-sm" @onclick="GenerateStatementAsync">Generate Statement</button>
+            }
             <button class="btn btn-ghost btn-sm" @onclick="GoBack">Back</button>
-            @if (!AuthService.IsHomeowner())
+            @if (CanWriteHomeowners)
             {
                 <button class="btn btn-primary btn-sm"
                         @onclick='() => NavigationManager.NavigateTo($"/homeowners/{_homeowner.HomeownerId}/edit")'>
@@ -97,7 +100,7 @@ else
                             <p class="text-sm font-semibold text-base-content">Record History</p>
                             <p class="mt-0.5 text-xs text-base-content/40">Attendance, dues, violations, clearances, and interactions.</p>
                         </div>
-                        @if (!AuthService.IsHomeowner() && AuthService.IsAtLeast("Board Member"))
+                        @if (AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "engagement"))
                         {
                             <button class="btn btn-primary btn-sm" @onclick="NavigateToLogInteraction">Log Interaction</button>
                         }
@@ -291,6 +294,7 @@ else
     private List<InteractionLog> _interactionLogs = [];
     private bool _isLoading = true;
     private string _activeTab = "attendance";
+    private bool CanWriteHomeowners => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "homeowners");
 
     protected override async Task OnParametersSetAsync()
     {
@@ -331,12 +335,12 @@ else
 
     private async Task GenerateStatementAsync()
     {
-        if (_homeowner is null)
+        if (_homeowner is null || AuthService.CurrentUser is null)
         {
             return;
         }
 
-        var document = await DocumentService.GenerateDuesStatementAsync(_homeowner.HomeownerId);
+        var document = await DocumentService.GenerateDuesStatementAsync(_homeowner.HomeownerId, AuthService.CurrentUser.UserId);
         if (document is null)
         {
             await JS.InvokeVoidAsync("hrms.showToast", "Unable to generate dues statement.", "error");

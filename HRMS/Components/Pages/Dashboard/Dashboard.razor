@@ -1,6 +1,7 @@
 @page "/dashboard"
 @inject ReportService ReportService
 @inject AuthService AuthService
+@inject SubdivisionContextService SubdivisionContextService
 @inject IJSRuntime JS
 
 @if (_isLoading)
@@ -12,7 +13,17 @@ else if (AuthService.IsHomeowner())
     <PageHeader Title="Dashboard"
                 Subtitle="A quick view of your account activity and standing." />
 
-    @if (_homeownerDashboard is null)
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div role="alert" class="alert alert-error py-2">
+            <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            <span class="text-sm">@_errorMessage</span>
+        </div>
+    }
+    else if (_homeownerDashboard is null)
     {
         <div class="card border border-base-300 bg-base-100 shadow-none">
             <EmptyState Title="No dashboard data available"
@@ -58,67 +69,139 @@ else
     <PageHeader Title="Dashboard"
                 Subtitle="ERP/CRM overview and key performance metrics." />
 
-    <div class="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-3">
-        <KpiCard Label="Total Homeowners" Value="@_dashboardKpis.TotalHomeowners.ToString()" Accent="primary" />
-        <KpiCard Label="Active Homeowners" Value="@_dashboardKpis.ActiveHomeowners.ToString()" Accent="success" />
-        <KpiCard Label="Total Units" Value="@_dashboardKpis.TotalUnits.ToString()" Accent="ghost" />
-        <KpiCard Label="Open Violations" Value="@_dashboardKpis.OpenViolations.ToString()" Accent="error" />
-        <KpiCard Label="Unpaid / Overdue Dues" Value="@_dashboardKpis.UnpaidOrOverdueDues.ToString()" Accent="warning" />
-        <KpiCard Label="Pending Clearances" Value="@_dashboardKpis.PendingClearances.ToString()" Accent="warning" />
-    </div>
+    <SubdivisionSelector OnSubdivisionSelected="HandleSubdivisionChange" />
 
-    @if (AuthService.IsAtLeast("Staff"))
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
     {
-        <div class="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <div class="card border border-base-300 bg-base-100 shadow-none">
-                <div class="card-body p-0">
-                    <div class="border-b border-base-300 p-5">
-                        <p class="text-sm font-semibold text-base-content">Engagement Trend</p>
-                        <p class="mt-0.5 text-xs text-base-content/40">
-                            Average homeowner engagement score across the last 6 months.
-                        </p>
-                    </div>
-                    <div class="p-5">
-                        @if (_engagementTrend.Count == 0 || _engagementTrend.All(point => point.Value == 0))
-                        {
-                            <EmptyState Title="No engagement trend data"
-                                        Subtitle="Engagement data will appear here once homeowners, events, and interactions are recorded."
-                                        Icon="○" />
-                        }
-                        else
-                        {
-                            <canvas id="engagementCanvas" height="220"></canvas>
-                        }
-                    </div>
-                </div>
-            </div>
-
-            <div class="card border border-base-300 bg-base-100 shadow-none">
-                <div class="card-body p-0">
-                    <div class="border-b border-base-300 p-5">
-                        <p class="text-sm font-semibold text-base-content">Attendance Trend</p>
-                        <p class="mt-0.5 text-xs text-base-content/40">
-                            Present attendees across the most recent 10 events.
-                        </p>
-                    </div>
-                    <div class="p-5">
-                        @if (_attendanceTrend.Count == 0)
-                        {
-                            <EmptyState Title="No attendance data"
-                                        Subtitle="Create events and record attendance to populate this chart."
-                                        Icon="○" />
-                        }
-                        else
-                        {
-                            <canvas id="attendanceCanvas" height="220"></canvas>
-                        }
-                    </div>
-                </div>
-            </div>
+        <div role="alert" class="alert alert-error mb-4 py-2">
+            <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            <span class="text-sm">@_errorMessage</span>
         </div>
     }
 
-    @if (AuthService.IsAtLeast("Board Member"))
+    <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <KpiCard Label="Total Homeowners" Value="@_dashboardKpis.TotalHomeowners.ToString()" Accent="primary">
+            <Icon>
+                <svg class="h-5 w-5 text-base-content/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                </svg>
+            </Icon>
+        </KpiCard>
+        <KpiCard Label="Active Homeowners" Value="@_dashboardKpis.ActiveHomeowners.ToString()" Accent="success">
+            <Icon>
+                <svg class="h-5 w-5 text-base-content/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M15 19.128A9.38 9.38 0 0112 19.5a9.38 9.38 0 01-3-.372m6 0A6.375 6.375 0 0012 13.5a6.375 6.375 0 00-3 5.628m6 0a12.318 12.318 0 01-6 0M15 7.5a3 3 0 11-6 0 3 3 0 016 0zm4.5 6 1.5 1.5 3-3" />
+                </svg>
+            </Icon>
+        </KpiCard>
+        <KpiCard Label="Total Units" Value="@_dashboardKpis.TotalUnits.ToString()" Accent="ghost">
+            <Icon>
+                <svg class="h-5 w-5 text-base-content/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" />
+                </svg>
+            </Icon>
+        </KpiCard>
+        <KpiCard Label="Open Violations" Value="@_dashboardKpis.OpenViolations.ToString()" Accent="error">
+            <Icon>
+                <svg class="h-5 w-5 text-base-content/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 7.5h.008v.008H12v-.008z" />
+                </svg>
+            </Icon>
+        </KpiCard>
+        <KpiCard Label="Unpaid / Overdue Dues" Value="@_dashboardKpis.UnpaidOrOverdueDues.ToString()" Accent="warning">
+            <Icon>
+                <svg class="h-5 w-5 text-base-content/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M2.25 8.25h19.5M3 9.75h18A1.5 1.5 0 0122.5 11.25v7.5A1.5 1.5 0 0121 20.25H3A1.5 1.5 0 011.5 18.75v-7.5A1.5 1.5 0 013 9.75zm0-6h18A1.5 1.5 0 0122.5 5.25v1.5A1.5 1.5 0 0121 8.25H3A1.5 1.5 0 011.5 6.75v-1.5A1.5 1.5 0 013 3.75z" />
+                </svg>
+            </Icon>
+        </KpiCard>
+        <KpiCard Label="Pending Clearances" Value="@_dashboardKpis.PendingClearances.ToString()" Accent="warning">
+            <Icon>
+                <svg class="h-5 w-5 text-base-content/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h4.5m-4.5 3h7.5m3-9-3 3m0 0-3-3m3 3V3.75" />
+                </svg>
+            </Icon>
+        </KpiCard>
+    </div>
+
+    @if (AccessHelper.CanRead(AuthService.CurrentRole ?? string.Empty, "engagement") ||
+         AccessHelper.CanRead(AuthService.CurrentRole ?? string.Empty, "events"))
+    {
+        <div class="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+            @if (AccessHelper.CanRead(AuthService.CurrentRole ?? string.Empty, "engagement"))
+            {
+                <div class="card border border-base-300 bg-base-100 shadow-none">
+                    <div class="card-body p-0">
+                        <div class="border-b border-base-300 p-5">
+                            <p class="text-sm font-semibold text-base-content">Engagement Trend</p>
+                            <p class="mt-0.5 text-xs text-base-content/40">
+                                Average homeowner engagement score across the last 6 months.
+                            </p>
+                        </div>
+                        <div class="p-5">
+                            @if (_engagementTrend.Count == 0 || _engagementTrend.All(point => point.Value == 0))
+                            {
+                                <div class="flex h-48 flex-col items-center justify-center gap-2 text-base-content/25">
+                                    <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                              d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zm9.75-9.75c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v16.5c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V3.375zm-9.75 7.5c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v9c0 .621-.504 1.125-1.125 1.125h-2.25A1.125 1.125 0 013 19.875v-9z" />
+                                    </svg>
+                                    <p class="text-sm font-medium">No data yet</p>
+                                    <p class="max-w-[200px] text-center text-xs">Add homeowners and log interactions to populate this chart.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <canvas id="engagementCanvas" height="220"></canvas>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (AccessHelper.CanRead(AuthService.CurrentRole ?? string.Empty, "events"))
+            {
+                <div class="card border border-base-300 bg-base-100 shadow-none">
+                    <div class="card-body p-0">
+                        <div class="border-b border-base-300 p-5">
+                            <p class="text-sm font-semibold text-base-content">Attendance Trend</p>
+                            <p class="mt-0.5 text-xs text-base-content/40">
+                                Present attendees across the most recent 10 events.
+                            </p>
+                        </div>
+                        <div class="p-5">
+                            @if (_attendanceTrend.Count == 0)
+                            {
+                                <div class="flex h-48 flex-col items-center justify-center gap-2 text-base-content/25">
+                                    <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                              d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zm9.75-9.75c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v16.5c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V3.375zm-9.75 7.5c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v9c0 .621-.504 1.125-1.125 1.125h-2.25A1.125 1.125 0 013 19.875v-9z" />
+                                    </svg>
+                                    <p class="text-sm font-medium">No data yet</p>
+                                    <p class="max-w-[200px] text-center text-xs">Create events and record attendance to populate this chart.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <canvas id="attendanceCanvas" height="220"></canvas>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (AccessHelper.CanRead(AuthService.CurrentRole ?? string.Empty, "msme"))
     {
         <div class="card border border-base-300 bg-base-100 shadow-none">
             <div class="card-body p-0">
@@ -164,6 +247,12 @@ else
     private List<TrendPoint> _attendanceTrend = [];
     private List<StatusBreakdownItem> _msmeStatusBreakdown = [];
     private bool _isLoading = true;
+    private bool _shouldRenderCharts;
+    private string? _errorMessage;
+
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin
+        ? SubdivisionContextService.SelectedSubdivisionId
+        : AuthService.CurrentSubdivisionId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -172,8 +261,81 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && !_isLoading && !AuthService.IsHomeowner())
+        if (!_isLoading && !AuthService.IsHomeowner() && _shouldRenderCharts)
         {
+            await RenderChartsAsync();
+            _shouldRenderCharts = false;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            if (AuthService.IsHomeowner())
+            {
+                var homeownerId = AuthService.CurrentUser?.HomeownerId;
+                _homeownerDashboard = homeownerId.HasValue
+                    ? await ReportService.GetHomeownerDashboardAsync(homeownerId.Value)
+                    : null;
+            }
+            else
+            {
+                if (AuthService.IsSuperAdmin && !ActiveSubdivisionId.HasValue)
+                {
+                    _dashboardKpis = new DashboardKpiSummary();
+                    _engagementTrend = [];
+                    _attendanceTrend = [];
+                    _msmeStatusBreakdown = [];
+                    _shouldRenderCharts = false;
+                    _isLoading = false;
+                    return;
+                }
+
+                _dashboardKpis = await ReportService.GetDashboardKPIsAsync(ActiveSubdivisionId);
+                _engagementTrend = AccessHelper.CanRead(AuthService.CurrentRole ?? string.Empty, "engagement")
+                    ? await ReportService.GetEngagementTrendAsync(ActiveSubdivisionId)
+                    : [];
+                _attendanceTrend = AccessHelper.CanRead(AuthService.CurrentRole ?? string.Empty, "events")
+                    ? await ReportService.GetAttendanceTrendAsync(ActiveSubdivisionId)
+                    : [];
+                _shouldRenderCharts = true;
+
+                _msmeStatusBreakdown = AccessHelper.CanRead(AuthService.CurrentRole ?? string.Empty, "msme")
+                    ? await ReportService.GetMSMEStatusBreakdownAsync(ActiveSubdivisionId)
+                    : [];
+            }
+        }
+        catch (Exception exception)
+        {
+            Console.WriteLine(exception);
+            _errorMessage = "Unable to load dashboard data.";
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task HandleSubdivisionChange(int? subdivisionId)
+    {
+        if (AuthService.IsHomeowner())
+        {
+            return;
+        }
+
+        await LoadAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RenderChartsAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("hrms.destroyChart", "engagementCanvas");
+            await JS.InvokeVoidAsync("hrms.destroyChart", "attendanceCanvas");
+
             if (_engagementTrend.Count > 0 && _engagementTrend.Any(point => point.Value > 0))
             {
                 await JS.InvokeVoidAsync(
@@ -192,31 +354,8 @@ else
                     _attendanceTrend.Select(point => point.Value).ToArray());
             }
         }
-    }
-
-    private async Task LoadAsync()
-    {
-        _isLoading = true;
-
-        if (AuthService.IsHomeowner())
+        catch
         {
-            var homeownerId = AuthService.CurrentUser?.HomeownerId;
-            _homeownerDashboard = homeownerId.HasValue
-                ? await ReportService.GetHomeownerDashboardAsync(homeownerId.Value)
-                : null;
         }
-        else
-        {
-            _dashboardKpis = await ReportService.GetDashboardKPIsAsync();
-            _engagementTrend = await ReportService.GetEngagementTrendAsync();
-            _attendanceTrend = await ReportService.GetAttendanceTrendAsync();
-
-            if (AuthService.IsAtLeast("Board Member"))
-            {
-                _msmeStatusBreakdown = await ReportService.GetMSMEStatusBreakdownAsync();
-            }
-        }
-
-        _isLoading = false;
     }
 }

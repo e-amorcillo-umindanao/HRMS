@@ -1,4 +1,5 @@
 using HRMS.Data;
+using HRMS.Helpers;
 using HRMS.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,22 +16,22 @@ public class ClearanceService
         _auditService = auditService;
     }
 
-    public async Task<List<ClearanceRequest>> GetAllAsync()
+    public async Task<List<ClearanceRequest>> GetAllAsync(int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .OrderByDescending(request => request.RequestedAt)
             .ToListAsync();
     }
 
-    public async Task<ClearanceRequest?> GetByIdAsync(int id)
+    public async Task<ClearanceRequest?> GetByIdAsync(int id, int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .SingleOrDefaultAsync(request => request.ClearanceId == id);
     }
 
-    public async Task<List<ClearanceRequest>> GetByHomeownerAsync(int homeownerId)
+    public async Task<List<ClearanceRequest>> GetByHomeownerAsync(int homeownerId, int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .Where(request => request.HomeownerId == homeownerId)
             .OrderByDescending(request => request.RequestedAt)
             .ToListAsync();
@@ -39,9 +40,9 @@ public class ClearanceService
     public Task<List<ClearanceRequest>> GetByHomeownerIdAsync(int homeownerId) =>
         GetByHomeownerAsync(homeownerId);
 
-    public async Task<List<ClearanceRequest>> SearchAsync(string? homeownerName, string? status, string? clearanceType, int? homeownerId = null)
+    public async Task<List<ClearanceRequest>> SearchAsync(int? subdivisionId, string? homeownerName, string? status, string? clearanceType, int? homeownerId = null)
     {
-        var query = BaseQuery();
+        var query = BaseQuery(subdivisionId);
 
         if (homeownerId.HasValue)
         {
@@ -71,8 +72,13 @@ public class ClearanceService
             .ToListAsync();
     }
 
+    public Task<List<ClearanceRequest>> SearchAsync(string? homeownerName, string? status, string? clearanceType, int? homeownerId = null) =>
+        SearchAsync(null, homeownerName, status, clearanceType, homeownerId);
+
     public async Task<ClearanceRequest> AddAsync(ClearanceRequest request, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "clearance", "You do not have write access to the Clearance module.");
+        request.SubdivisionId = await ResolveSubdivisionIdAsync(request.SubdivisionId, request.HomeownerId, actorUserId);
         request.ClearanceType = request.ClearanceType.Trim();
         request.Purpose = request.Purpose.Trim();
         request.Status = "Pending";
@@ -92,7 +98,7 @@ public class ClearanceService
 
     public async Task<ClearanceRequest?> ApproveAsync(int id, int actorUserId, string? remarks, DateTime? validUntil)
     {
-        EnsurePresidentOrAbove(await GetActorRoleAsync(actorUserId));
+        EnsurePresident(await GetActorRoleAsync(actorUserId));
 
         var existing = await _context.ClearanceRequests
             .SingleOrDefaultAsync(request => request.ClearanceId == id);
@@ -119,7 +125,7 @@ public class ClearanceService
 
     public async Task<ClearanceRequest?> RejectAsync(int id, int actorUserId, string remarks)
     {
-        EnsurePresidentOrAbove(await GetActorRoleAsync(actorUserId));
+        EnsurePresident(await GetActorRoleAsync(actorUserId));
 
         var existing = await _context.ClearanceRequests
             .SingleOrDefaultAsync(request => request.ClearanceId == id);
@@ -144,6 +150,7 @@ public class ClearanceService
 
     public async Task<bool> DeleteAsync(int id, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "clearance", "You do not have write access to the Clearance module.");
         var existing = await _context.ClearanceRequests
             .SingleOrDefaultAsync(request => request.ClearanceId == id);
 
@@ -160,13 +167,21 @@ public class ClearanceService
         return true;
     }
 
-    private IQueryable<ClearanceRequest> BaseQuery()
+    private IQueryable<ClearanceRequest> BaseQuery(int? subdivisionId)
     {
-        return _context.ClearanceRequests
+        IQueryable<ClearanceRequest> query = _context.ClearanceRequests
             .AsNoTracking()
+            .Include(request => request.Subdivision)
             .Include(request => request.Homeowner)
             .ThenInclude(homeowner => homeowner.Unit)
             .Include(request => request.ProcessedByUser);
+
+        if (subdivisionId.HasValue)
+        {
+            query = query.Where(request => request.SubdivisionId == subdivisionId.Value);
+        }
+
+        return query;
     }
 
     private static string? NormalizeOptional(string? value) =>
@@ -181,13 +196,54 @@ public class ClearanceService
             .SingleOrDefaultAsync();
     }
 
-    private static void EnsurePresidentOrAbove(string? role)
+    private async Task EnsureCanWriteAsync(int actorUserId, string module, string message)
     {
-        if (role is "HOA President" or "Super Admin")
+        var role = await GetActorRoleAsync(actorUserId);
+        if (!AccessHelper.CanWrite(role ?? string.Empty, module))
+        {
+            throw new UnauthorizedAccessException(message);
+        }
+    }
+
+    private async Task<int> ResolveSubdivisionIdAsync(int subdivisionId, int homeownerId, int actorUserId)
+    {
+        if (subdivisionId > 0)
+        {
+            return subdivisionId;
+        }
+
+        var homeownerSubdivisionId = await _context.Homeowners
+            .AsNoTracking()
+            .Where(homeowner => homeowner.HomeownerId == homeownerId && !homeowner.IsDeleted)
+            .Select(homeowner => homeowner.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (homeownerSubdivisionId > 0)
+        {
+            return homeownerSubdivisionId;
+        }
+
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue)
+        {
+            return actorSubdivisionId.Value;
+        }
+
+        throw new InvalidOperationException("Subdivision is required for clearance requests.");
+    }
+
+    private static void EnsurePresident(string? role)
+    {
+        if (role is "HOA President")
         {
             return;
         }
 
-        throw new UnauthorizedAccessException("Only the HOA President and Super Admin can approve or reject clearance requests.");
+        throw new UnauthorizedAccessException("Only the HOA President can approve or reject clearance requests.");
     }
 }

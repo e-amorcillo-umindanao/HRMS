@@ -1,26 +1,38 @@
 @page "/events"
 @inject EventService EventService
 @inject AuthService AuthService
+@inject SubdivisionContextService SubdivisionContextService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 
 <PageHeader Title="Events & Programs"
             Subtitle="Manage activities, programs, and attendance tracking.">
     <Actions>
-        <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/events/add")'>
-            Add Event
-        </button>
+        @if (CanWriteEvents)
+        {
+            <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/events/add")'>
+                Add Event
+            </button>
+        }
     </Actions>
 </PageHeader>
 
+<SubdivisionSelector OnSubdivisionSelected="HandleSubdivisionChange" />
+
 <div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
     <div class="card-body p-4">
-        <div class="flex flex-wrap items-end gap-3">
-            <div class="form-control min-w-[200px]">
-                <label class="label py-0 pb-1">
-                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Event Type</span>
-                </label>
-                <select class="select select-bordered select-sm" value="@_eventTypeFilter" @onchange="OnEventTypeChanged">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/40">Title</label>
+                <input type="text"
+                       class="input input-sm input-bordered w-full"
+                       placeholder="Search event title..."
+                       value="@_titleFilter"
+                       @oninput="OnTitleInput" />
+            </div>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/40">Event Type</label>
+                <select class="select select-sm select-bordered w-full" value="@_eventTypeFilter" @onchange="OnEventTypeChanged">
                     <option value="">All Event Types</option>
                     @foreach (var eventType in EventTypes)
                     {
@@ -61,8 +73,8 @@
                     <tbody>
                         @foreach (var evt in _events)
                         {
-                            <tr class="h-[52px] hover">
-                                <td class="text-sm text-base-content">@DisplayValue(evt.Title)</td>
+                            <tr class="h-[52px]">
+                                <td class="text-sm font-medium text-base-content">@DisplayValue(evt.Title)</td>
                                 <td>
                                     @if (string.IsNullOrWhiteSpace(evt.EventType))
                                     {
@@ -75,20 +87,37 @@
                                 </td>
                                 <td class="text-sm text-base-content/60">@FormatDateTime(evt.EventDate)</td>
                                 <td class="text-sm text-base-content/60">@DisplayValue(evt.Venue)</td>
-                                <td class="text-sm text-base-content/60">@GetAttendeeCount(evt)</td>
+                                <td>
+                                    @if (GetAttendeeCount(evt) > 0)
+                                    {
+                                        <a href="@($"/events/{evt.EventId}")"
+                                           class="badge badge-neutral badge-sm cursor-pointer transition-colors hover:badge-primary">
+                                            @GetAttendeeCount(evt) @(GetAttendeeCount(evt) == 1 ? "attendee" : "attendees")
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-xs text-base-content/30">No attendance</span>
+                                    }
+                                </td>
                                 <td class="text-right">
+                                    <div class="flex items-center justify-end gap-1">
                                     <button class="btn btn-ghost btn-xs"
                                             @onclick='() => NavigationManager.NavigateTo($"/events/{evt.EventId}")'>
                                         View
                                     </button>
-                                    <button class="btn btn-ghost btn-xs"
-                                            @onclick='() => NavigationManager.NavigateTo($"/events/edit/{evt.EventId}")'>
-                                        Edit
-                                    </button>
-                                    <button class="btn btn-ghost btn-xs text-error"
-                                            @onclick='() => AskDelete(evt)'>
-                                        Delete
-                                    </button>
+                                    @if (CanWriteEvents)
+                                    {
+                                        <button class="btn btn-ghost btn-xs"
+                                                @onclick='() => NavigationManager.NavigateTo($"/events/edit/{evt.EventId}")'>
+                                            Edit
+                                        </button>
+                                        <button class="btn btn-ghost btn-xs text-error"
+                                                @onclick='() => AskDelete(evt)'>
+                                            Delete
+                                        </button>
+                                    }
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -114,8 +143,13 @@
 
 @code {
     private static readonly string[] EventTypes = ["Assembly", "Livelihood", "Health", "Relief", "Other"];
+    private bool CanWriteEvents => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "events");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin
+        ? SubdivisionContextService.SelectedSubdivisionId
+        : AuthService.CurrentSubdivisionId;
 
     private List<Event> _events = [];
+    private string _titleFilter = string.Empty;
     private string _eventTypeFilter = string.Empty;
     private bool _isLoading = true;
     private bool _showConfirm;
@@ -129,15 +163,35 @@
 
     private async Task LoadEventsAsync()
     {
+        if (!ActiveSubdivisionId.HasValue)
+        {
+            _events = [];
+            _isLoading = false;
+            return;
+        }
+
         _isLoading = true;
         StateHasChanged();
 
-        var events = await EventService.GetAllAsync();
-        _events = string.IsNullOrWhiteSpace(_eventTypeFilter)
-            ? events
-            : events.Where(evt => evt.EventType == _eventTypeFilter).ToList();
+        var events = await EventService.GetAllAsync(ActiveSubdivisionId.Value);
+        _events = events
+            .Where(evt => string.IsNullOrWhiteSpace(_titleFilter) || (evt.Title?.Contains(_titleFilter, StringComparison.OrdinalIgnoreCase) ?? false))
+            .Where(evt => string.IsNullOrWhiteSpace(_eventTypeFilter) || evt.EventType == _eventTypeFilter)
+            .ToList();
 
         _isLoading = false;
+    }
+
+    private async Task HandleSubdivisionChange(int? subdivisionId)
+    {
+        await LoadEventsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnTitleInput(ChangeEventArgs args)
+    {
+        _titleFilter = args.Value?.ToString() ?? string.Empty;
+        await LoadEventsAsync();
     }
 
     private async Task OnEventTypeChanged(ChangeEventArgs args)

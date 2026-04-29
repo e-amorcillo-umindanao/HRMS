@@ -14,43 +14,54 @@ public class EngagementService
         _context = context;
     }
 
-    public async Task<EngagementSummary?> GetEngagementSummaryAsync(int homeownerId)
+    public async Task<EngagementSummary?> GetEngagementSummaryAsync(int homeownerId, int? subdivisionId = null)
     {
         var homeowner = await _context.Homeowners
             .AsNoTracking()
             .Include(record => record.Phase)
             .Include(record => record.Unit)
-            .SingleOrDefaultAsync(record => record.HomeownerId == homeownerId && !record.IsDeleted);
+            .SingleOrDefaultAsync(record =>
+                record.HomeownerId == homeownerId &&
+                !record.IsDeleted &&
+                (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value));
 
         if (homeowner is null)
         {
             return null;
         }
 
-        var totalEvents = await GetPastEventCountAsync();
+        var totalEvents = await GetPastEventCountAsync(subdivisionId);
 
         var attendanceRecords = await _context.Attendances
             .AsNoTracking()
             .Include(record => record.Event)
-            .Where(record => record.HomeownerId == homeownerId && record.Status == "Present")
+            .Where(record =>
+                record.HomeownerId == homeownerId &&
+                record.Status == "Present" &&
+                (!subdivisionId.HasValue || record.Event.SubdivisionId == subdivisionId.Value))
             .ToListAsync();
 
         var interactionDates = await _context.InteractionLogs
             .AsNoTracking()
-            .Where(record => record.HomeownerId == homeownerId)
+            .Where(record =>
+                record.HomeownerId == homeownerId &&
+                (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value))
             .Select(record => record.InteractionDate)
             .ToListAsync();
 
         return BuildSummary(homeowner, totalEvents, attendanceRecords, interactionDates);
     }
 
-    public async Task<List<EngagementSummary>> GetAllEngagementSummariesAsync()
+    public async Task<List<EngagementSummary>> GetAllEngagementSummariesAsync(int? subdivisionId = null)
     {
         var homeowners = await _context.Homeowners
             .AsNoTracking()
             .Include(record => record.Phase)
             .Include(record => record.Unit)
-            .Where(record => !record.IsDeleted && record.Status == "Active")
+            .Where(record =>
+                !record.IsDeleted &&
+                record.Status == "Active" &&
+                (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value))
             .OrderBy(record => record.LastName)
             .ThenBy(record => record.FirstName)
             .ToListAsync();
@@ -64,12 +75,15 @@ public class EngagementService
             .Select(record => record.HomeownerId)
             .ToList();
 
-        var totalEvents = await GetPastEventCountAsync();
+        var totalEvents = await GetPastEventCountAsync(subdivisionId);
 
         var attendanceRecords = await _context.Attendances
             .AsNoTracking()
             .Include(record => record.Event)
-            .Where(record => homeownerIds.Contains(record.HomeownerId) && record.Status == "Present")
+            .Where(record =>
+                homeownerIds.Contains(record.HomeownerId) &&
+                record.Status == "Present" &&
+                (!subdivisionId.HasValue || record.Event.SubdivisionId == subdivisionId.Value))
             .ToListAsync();
 
         var attendanceByHomeowner = attendanceRecords
@@ -79,7 +93,10 @@ public class EngagementService
 
         var interactionDates = await _context.InteractionLogs
             .AsNoTracking()
-            .Where(record => record.HomeownerId.HasValue && homeownerIds.Contains(record.HomeownerId.Value))
+            .Where(record =>
+                record.HomeownerId.HasValue &&
+                homeownerIds.Contains(record.HomeownerId.Value) &&
+                (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value))
             .Select(record => new InteractionDateMetric
             {
                 HomeownerId = record.HomeownerId!.Value,
@@ -110,14 +127,17 @@ public class EngagementService
             .ToList();
     }
 
-    private async Task<int> GetPastEventCountAsync()
+    private async Task<int> GetPastEventCountAsync(int? subdivisionId)
     {
-        var eventDates = await _context.Events
+        var query = _context.Events
             .AsNoTracking()
-            .Select(record => record.EventDate)
-            .ToListAsync();
+            .Select(record => new { record.SubdivisionId, record.EventDate });
 
-        return eventDates.Count(IsPastDate);
+        var eventDates = await query.ToListAsync();
+
+        return eventDates.Count(record =>
+            (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value) &&
+            IsPastDate(record.EventDate));
     }
 
     private static EngagementSummary BuildSummary(

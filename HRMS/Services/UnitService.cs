@@ -1,4 +1,5 @@
 using HRMS.Data;
+using HRMS.Helpers;
 using HRMS.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,23 +16,23 @@ public class UnitService
         _auditService = auditService;
     }
 
-    public async Task<List<Unit>> GetAllAsync()
+    public async Task<List<Unit>> GetAllAsync(int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .OrderBy(u => u.UnitNumber)
             .ThenBy(u => u.Address)
             .ToListAsync();
     }
 
-    public async Task<Unit?> GetByIdAsync(int id)
+    public async Task<Unit?> GetByIdAsync(int id, int? subdivisionId = null)
     {
-        return await BaseQuery(includeCreator: true)
+        return await BaseQuery(subdivisionId, includeCreator: true)
             .SingleOrDefaultAsync(u => u.UnitId == id);
     }
 
-    public async Task<List<Unit>> SearchAsync(string? address, int? phaseId)
+    public async Task<List<Unit>> SearchAsync(int? subdivisionId, string? address, int? phaseId)
     {
-        var query = BaseQuery();
+        var query = BaseQuery(subdivisionId);
 
         if (!string.IsNullOrWhiteSpace(address))
         {
@@ -49,8 +50,13 @@ public class UnitService
             .ToListAsync();
     }
 
+    public Task<List<Unit>> SearchAsync(string? address, int? phaseId) =>
+        SearchAsync(null, address, phaseId);
+
     public async Task<Unit> AddAsync(Unit unit, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "units", "You do not have write access to the Units module.");
+        unit.SubdivisionId = await ResolveSubdivisionIdAsync(unit.SubdivisionId, unit.PhaseId, actorUserId);
         unit.CreatedAt = DateTime.UtcNow.ToString("o");
         unit.CreatedBy = actorUserId;
 
@@ -64,6 +70,7 @@ public class UnitService
 
     public async Task<Unit?> UpdateAsync(Unit unit, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "units", "You do not have write access to the Units module.");
         var existing = await _context.Units.SingleOrDefaultAsync(u => u.UnitId == unit.UnitId);
         if (existing is null)
         {
@@ -72,6 +79,7 @@ public class UnitService
 
         existing.UnitNumber = unit.UnitNumber;
         existing.Address = unit.Address;
+        existing.SubdivisionId = unit.SubdivisionId == 0 ? existing.SubdivisionId : unit.SubdivisionId;
         existing.PhaseId = unit.PhaseId;
         existing.HeadHomeownerId = unit.HeadHomeownerId;
 
@@ -84,6 +92,7 @@ public class UnitService
 
     public async Task<UnitOperationResult> DeleteAsync(int id, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "units", "You do not have write access to the Units module.");
         var unit = await _context.Units.SingleOrDefaultAsync(u => u.UnitId == id);
         if (unit is null)
         {
@@ -106,11 +115,18 @@ public class UnitService
         return UnitOperationResult.Successful();
     }
 
-    public async Task<List<Homeowner>> GetOccupantsAsync(int unitId)
+    public async Task<List<Homeowner>> GetOccupantsAsync(int unitId, int? subdivisionId = null)
     {
-        return await _context.Homeowners
+        var query = _context.Homeowners
             .AsNoTracking()
-            .Where(h => h.UnitId == unitId && !h.IsDeleted)
+            .Where(h => h.UnitId == unitId && !h.IsDeleted);
+
+        if (subdivisionId.HasValue)
+        {
+            query = query.Where(h => h.SubdivisionId == subdivisionId.Value);
+        }
+
+        return await query
             .OrderBy(h => h.LastName)
             .ThenBy(h => h.FirstName)
             .ToListAsync();
@@ -118,6 +134,7 @@ public class UnitService
 
     public async Task<UnitOperationResult> AssignHomeownerAsync(int unitId, int homeownerId, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "units", "You do not have write access to the Units module.");
         var unit = await _context.Units.SingleOrDefaultAsync(u => u.UnitId == unitId);
         if (unit is null)
         {
@@ -140,6 +157,7 @@ public class UnitService
 
     public async Task<UnitOperationResult> SetHeadHomeownerAsync(int unitId, int headHomeownerId, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "units", "You do not have write access to the Units module.");
         var unit = await _context.Units.SingleOrDefaultAsync(u => u.UnitId == unitId);
         if (unit is null)
         {
@@ -160,13 +178,19 @@ public class UnitService
         return UnitOperationResult.Successful();
     }
 
-    private IQueryable<Unit> BaseQuery(bool includeCreator = false)
+    private IQueryable<Unit> BaseQuery(int? subdivisionId, bool includeCreator = false)
     {
         IQueryable<Unit> query = _context.Units
             .AsNoTracking()
+            .Include(u => u.Subdivision)
             .Include(u => u.Phase)
             .Include(u => u.HeadHomeowner)
             .Include(u => u.Homeowners);
+
+        if (subdivisionId.HasValue)
+        {
+            query = query.Where(u => u.SubdivisionId == subdivisionId.Value);
+        }
 
         if (includeCreator)
         {
@@ -174,6 +198,59 @@ public class UnitService
         }
 
         return query;
+    }
+
+    private async Task<int> ResolveSubdivisionIdAsync(int subdivisionId, int? phaseId, int actorUserId)
+    {
+        if (subdivisionId > 0)
+        {
+            return subdivisionId;
+        }
+
+        if (phaseId.HasValue)
+        {
+            var phaseSubdivisionId = await _context.Phases
+                .AsNoTracking()
+                .Where(phase => phase.PhaseId == phaseId.Value)
+                .Select(phase => phase.SubdivisionId)
+                .SingleOrDefaultAsync();
+
+            if (phaseSubdivisionId > 0)
+            {
+                return phaseSubdivisionId;
+            }
+        }
+
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue)
+        {
+            return actorSubdivisionId.Value;
+        }
+
+        throw new InvalidOperationException("Subdivision is required for unit records.");
+    }
+
+    private async Task<string?> GetActorRoleAsync(int actorUserId)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.Role.RoleName)
+            .SingleOrDefaultAsync();
+    }
+
+    private async Task EnsureCanWriteAsync(int actorUserId, string module, string message)
+    {
+        var role = await GetActorRoleAsync(actorUserId);
+        if (!AccessHelper.CanWrite(role ?? string.Empty, module))
+        {
+            throw new UnauthorizedAccessException(message);
+        }
     }
 
     private static string GetFullName(Homeowner homeowner)

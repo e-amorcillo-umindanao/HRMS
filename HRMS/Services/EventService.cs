@@ -1,4 +1,5 @@
 using HRMS.Data;
+using HRMS.Helpers;
 using HRMS.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,21 +16,23 @@ public class EventService
         _auditService = auditService;
     }
 
-    public async Task<List<Event>> GetAllAsync()
+    public async Task<List<Event>> GetAllAsync(int? subdivisionId = null)
     {
-        return await BaseQuery()
+        return await BaseQuery(subdivisionId)
             .OrderByDescending(evt => evt.EventDate)
             .ToListAsync();
     }
 
-    public async Task<Event?> GetByIdAsync(int id)
+    public async Task<Event?> GetByIdAsync(int id, int? subdivisionId = null)
     {
-        return await BaseQuery(includeCreator: true)
+        return await BaseQuery(subdivisionId, includeCreator: true)
             .SingleOrDefaultAsync(evt => evt.EventId == id);
     }
 
     public async Task<Event> AddAsync(Event evt, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "events", "You do not have write access to the Events module.");
+        evt.SubdivisionId = await ResolveSubdivisionIdAsync(evt.SubdivisionId, actorUserId);
         evt.CreatedAt = DateTime.UtcNow.ToString("o");
         evt.CreatedBy = actorUserId;
         evt.EventDate = NormalizeDate(evt.EventDate);
@@ -48,6 +51,7 @@ public class EventService
 
     public async Task<Event?> UpdateAsync(Event evt, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "events", "You do not have write access to the Events module.");
         var existing = await _context.Events
             .SingleOrDefaultAsync(record => record.EventId == evt.EventId);
 
@@ -57,6 +61,7 @@ public class EventService
         }
 
         existing.Title = evt.Title.Trim();
+        existing.SubdivisionId = evt.SubdivisionId == 0 ? existing.SubdivisionId : evt.SubdivisionId;
         existing.EventDate = NormalizeDate(evt.EventDate);
         existing.EventType = evt.EventType.Trim();
         existing.Venue = NormalizeOptional(evt.Venue);
@@ -71,6 +76,7 @@ public class EventService
 
     public async Task<bool> DeleteAsync(int id, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "events", "You do not have write access to the Events module.");
         var existing = await _context.Events
             .Include(evt => evt.Attendances)
             .SingleOrDefaultAsync(evt => evt.EventId == id);
@@ -93,12 +99,18 @@ public class EventService
         return true;
     }
 
-    private IQueryable<Event> BaseQuery(bool includeCreator = false)
+    private IQueryable<Event> BaseQuery(int? subdivisionId, bool includeCreator = false)
     {
         IQueryable<Event> query = _context.Events
             .AsNoTracking()
+            .Include(evt => evt.Subdivision)
             .Include(evt => evt.Attendances)
             .ThenInclude(attendance => attendance.Homeowner);
+
+        if (subdivisionId.HasValue)
+        {
+            query = query.Where(evt => evt.SubdivisionId == subdivisionId.Value);
+        }
 
         if (includeCreator)
         {
@@ -106,6 +118,45 @@ public class EventService
         }
 
         return query;
+    }
+
+    private async Task<int> ResolveSubdivisionIdAsync(int subdivisionId, int actorUserId)
+    {
+        if (subdivisionId > 0)
+        {
+            return subdivisionId;
+        }
+
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue)
+        {
+            return actorSubdivisionId.Value;
+        }
+
+        throw new InvalidOperationException("Subdivision is required for event records.");
+    }
+
+    private async Task<string?> GetActorRoleAsync(int actorUserId)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.Role.RoleName)
+            .SingleOrDefaultAsync();
+    }
+
+    private async Task EnsureCanWriteAsync(int actorUserId, string module, string message)
+    {
+        var role = await GetActorRoleAsync(actorUserId);
+        if (!AccessHelper.CanWrite(role ?? string.Empty, module))
+        {
+            throw new UnauthorizedAccessException(message);
+        }
     }
 
     private static string NormalizeDate(string? value)

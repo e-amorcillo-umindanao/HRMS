@@ -5,7 +5,8 @@ namespace HRMS.Models;
 public class HOASettings
 {
     [Key]
-    public int SettingId { get; set; } = 1;
+    public int SettingId { get; set; }
+    public int SubdivisionId { get; set; }
     public string HOAName { get; set; } = string.Empty;
     public string Subdivision { get; set; } = string.Empty;
     public string City { get; set; } = string.Empty;
@@ -18,5 +19,6 @@ public class HOASettings
     public string UpdatedAt { get; set; } = string.Empty;
     public int UpdatedBy { get; set; }
 
+    public Subdivision SubdivisionEntity { get; set; } = null!;
     public User UpdatedByUser { get; set; } = null!;
 }

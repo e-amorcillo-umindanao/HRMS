@@ -1,117 +1,139 @@
 @page "/login"
 @layout AuthLayout
-@inject AuthService AuthService
-@inject NavigationManager NavigationManager
-@inject IDbContextFactory<AppDbContext> DbContextFactory
+@inject AuthService AuthSvc
+@inject NavigationManager Nav
 
-<div class="hidden flex-1 lg:flex relative">
-    <img src="images/login-bg.jpg" class="absolute inset-0 h-full w-full object-cover" alt="" />
-    <div class="absolute inset-0 bg-slate-950/55"></div>
-    <div class="absolute bottom-8 left-8 text-white">
-        <p class="mb-1 text-xs uppercase tracking-widest text-white/60">@_hoaName</p>
-        <p class="text-[22px] font-medium">Homeowners Record Management System</p>
+<div class="login-shell">
+    <div class="login-left">
+        <div class="login-left-overlay"></div>
+        <div class="login-left-text">
+            <h2>@HoaName</h2>
+            <p>Homeowners Record Management System</p>
+        </div>
+    </div>
+
+    <div class="login-right">
+        <div class="login-form-container">
+            <div class="login-brand-mark">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="h-6 w-6 text-white"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="1.5">
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+                </svg>
+            </div>
+
+            <h1 class="login-title">Welcome back</h1>
+            <p class="login-subtitle">Sign in to your account to continue.</p>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div role="alert" class="alert alert-error mb-4 py-2 text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-4 w-4 shrink-0"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>@errorMessage</span>
+                </div>
+            }
+
+            <div class="form-control mb-4">
+                <label class="login-field-label">Username</label>
+                <input type="text"
+                       class="input input-bordered w-full"
+                       @bind="username"
+                       @bind:event="oninput"
+                       @onkeyup="HandleKeyUp" />
+            </div>
+
+            <div class="form-control mb-6">
+                <label class="login-field-label">Password</label>
+                <div class="relative">
+                    <input type="@(showPassword ? "text" : "password")"
+                           class="input input-bordered w-full pr-16"
+                           @bind="password"
+                           @bind:event="oninput"
+                           @onkeyup="HandleKeyUp" />
+                    <button type="button"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-base-content/40 transition-colors hover:text-base-content"
+                            @onclick="() => showPassword = !showPassword">
+                        @(showPassword ? "Hide" : "Show")
+                    </button>
+                </div>
+            </div>
+
+            <button class="login-btn btn w-full"
+                    @onclick="DoLogin"
+                    disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span class="loading loading-spinner loading-xs mr-1"></span>
+                }
+                Login
+            </button>
+
+            <p class="login-copyright">© @DateTime.Now.Year @HoaName</p>
+        </div>
     </div>
 </div>
 
-<div class="flex w-full flex-shrink-0 items-center justify-center bg-base-100 p-8 lg:w-[480px]">
-    <form class="flex w-full max-w-[360px] flex-col gap-5" @onsubmit="HandleSubmitAsync" @onsubmit:preventDefault>
-        <div>
-            <h1 class="text-[22px] font-medium tracking-tight text-base-content">Welcome back</h1>
-            <p class="mt-1 text-[13px] text-base-content/50">
-                Sign in to your account to continue.
-            </p>
-        </div>
-
-        @if (!string.IsNullOrWhiteSpace(_errorMessage))
-        {
-            <div role="alert" class="alert alert-error px-4 py-2 text-sm">
-                <span>@_errorMessage</span>
-            </div>
-        }
-
-        <FieldGroup Label="Username">
-            <input class="input input-bordered w-full" @bind="_username" @bind:event="oninput" />
-        </FieldGroup>
-
-        <FieldGroup Label="Password">
-            <div class="relative">
-                <input type="@(_showPassword ? "text" : "password")" class="input input-bordered w-full pr-10" @bind="_password" @bind:event="oninput" />
-                <button type="button" class="btn btn-ghost btn-xs absolute right-2 top-1/2 -translate-y-1/2" @onclick="TogglePasswordVisibility">
-                    @(_showPassword ? "Hide" : "Show")
-                </button>
-            </div>
-        </FieldGroup>
-
-        <button type="submit" class="btn w-full border-[#374151] bg-[#374151] font-medium text-white hover:border-[#4b5563] hover:bg-[#4b5563] disabled:opacity-50" disabled="@_isSubmitting">
-            @if (_isSubmitting)
-            {
-                <span class="loading loading-spinner loading-sm"></span>
-            }
-            else
-            {
-                <span>Login</span>
-            }
-        </button>
-
-        <p class="text-center text-[11.5px] text-base-content/30">&copy; @_hoaName</p>
-    </form>
-</div>
-
 @code {
-    private string _username = string.Empty;
-    private string _password = string.Empty;
-    private string? _errorMessage;
-    private bool _isSubmitting;
-    private string _hoaName = "Homeowners Association";
-    private bool _showPassword;
+    private const string HoaName = "Golden Fields Homeowners Association";
 
-    protected override async Task OnInitializedAsync()
+    private string username = "";
+    private string password = "";
+    private string errorMessage = "";
+    private bool isLoading;
+    private bool showPassword;
+
+    protected override void OnInitialized()
     {
-        await using var context = await DbContextFactory.CreateDbContextAsync();
-        var settings = await context.HOASettings.AsNoTracking().FirstOrDefaultAsync();
-        if (!string.IsNullOrWhiteSpace(settings?.HOAName))
+        if (AuthSvc.IsAuthenticated)
         {
-            _hoaName = settings.HOAName;
+            Nav.NavigateTo("/dashboard", replace: true);
         }
     }
 
-    private void TogglePasswordVisibility()
+    private async Task DoLogin()
     {
-        _showPassword = !_showPassword;
+        errorMessage = "";
+
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            errorMessage = "Please enter your username and password.";
+            return;
+        }
+
+        isLoading = true;
+        StateHasChanged();
+
+        var success = await AuthSvc.LoginAsync(username.Trim(), password);
+
+        if (success)
+        {
+            Nav.NavigateTo("/dashboard", replace: true);
+            return;
+        }
+
+        errorMessage = "Invalid username or password.";
+        isLoading = false;
     }
 
-    private Task HandleSubmitAsync() => SubmitAsync();
-
-    private async Task SubmitAsync()
+    private async Task HandleKeyUp(KeyboardEventArgs e)
     {
-        if (_isSubmitting)
+        if (e.Key == "Enter")
         {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_username) || string.IsNullOrWhiteSpace(_password))
-        {
-            _errorMessage = "Please enter your username and password.";
-            return;
-        }
-
-        _isSubmitting = true;
-        _errorMessage = null;
-
-        try
-        {
-            var isValid = await AuthService.LoginAsync(_username, _password);
-            if (isValid)
-            {
-                NavigationManager.NavigateTo(AuthService.DefaultRoute);
-                return;
-            }
-
-            _errorMessage = "Invalid username or password.";
-        }
-        finally
-        {
-            _isSubmitting = false;
+            await DoLogin();
         }
     }
 }

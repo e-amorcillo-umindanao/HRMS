@@ -1,4 +1,1 @@
-@page "/"
-@inject AuthService AuthService
-
-<RedirectTo Href="@(AuthService.IsAuthenticated ? AuthService.DefaultRoute : "/login")" />
+@* Root route handled by Login.razor so startup no longer depends on an initial redirect-only page. *@

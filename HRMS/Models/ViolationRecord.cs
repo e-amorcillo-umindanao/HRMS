@@ -6,6 +6,7 @@ public class ViolationRecord
 {
     [Key]
     public int ViolationId { get; set; }
+    public int SubdivisionId { get; set; }
     public string ViolationNumber { get; set; } = string.Empty;
     public int? HomeownerId { get; set; }
     public string HomeownerName { get; set; } = string.Empty;
@@ -19,6 +20,7 @@ public class ViolationRecord
     public string? UpdatedAt { get; set; }
     public int? UpdatedBy { get; set; }
 
+    public Subdivision Subdivision { get; set; } = null!;
     public Homeowner? Homeowner { get; set; }
     public User FiledByUser { get; set; } = null!;
     public User? UpdatedByUser { get; set; }

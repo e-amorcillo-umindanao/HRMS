@@ -1,6 +1,7 @@
 @page "/msme/{Id:int}"
 @inject MSMEService MSMEService
 @inject InteractionService InteractionService
+@inject AuthService AuthService
 @inject NavigationManager NavigationManager
 
 @if (_isLoading)
@@ -21,10 +22,13 @@ else
     <PageHeader Title="@_msme.BusinessName" Subtitle="MSME profile and interaction history.">
         <Actions>
             <button class="btn btn-ghost btn-sm" @onclick="GoBack">Back</button>
-            <button class="btn btn-primary btn-sm"
-                    @onclick='() => NavigationManager.NavigateTo($"/msme/edit/{_msme.MSMEId}")'>
-                Edit
-            </button>
+            @if (AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "msme"))
+            {
+                <button class="btn btn-primary btn-sm"
+                        @onclick='() => NavigationManager.NavigateTo($"/msme/edit/{_msme.MSMEId}")'>
+                    Edit
+                </button>
+            }
         </Actions>
     </PageHeader>
 
@@ -65,7 +69,10 @@ else
                         <p class="text-sm font-semibold text-base-content">Interaction History</p>
                         <p class="mt-0.5 text-xs text-base-content/40">Review all CRM touchpoints logged against this business.</p>
                     </div>
-                    <button class="btn btn-primary btn-sm" @onclick="LogInteraction">Log Interaction</button>
+                    @if (AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "engagement"))
+                    {
+                        <button class="btn btn-primary btn-sm" @onclick="LogInteraction">Log Interaction</button>
+                    }
                 </div>
             </div>
             <div class="p-5">

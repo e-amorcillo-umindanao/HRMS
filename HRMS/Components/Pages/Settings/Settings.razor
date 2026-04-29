@@ -1,10 +1,14 @@
 @page "/settings"
 @inject AppDbContext DbContext
 @inject AuthService AuthService
-@inject AuditService AuditService
+@inject SubdivisionContextService SubdivisionContextService
+@inject SettingsService SettingsService
 @inject IJSRuntime JS
 
 <PageHeader Title="Settings" Subtitle="System configuration, user management, and audit logs." />
+
+<SubdivisionSelector OnSubdivisionSelected="HandleSubdivisionChange"
+                     IsReadOnly="false" />
 
 @if (_isLoading)
 {
@@ -12,11 +16,11 @@
 }
 else
 {
-    <div role="tablist" class="tabs tabs-bordered">
-        <button role="tab" class="tab @(ActiveTab == "hoa" ? "tab-active" : "")" @onclick='() => ActiveTab = "hoa"'>HOA Configuration</button>
-        <button role="tab" class="tab @(ActiveTab == "users" ? "tab-active" : "")" @onclick='() => ActiveTab = "users"'>User Management</button>
-        <button role="tab" class="tab @(ActiveTab == "phases" ? "tab-active" : "")" @onclick='() => ActiveTab = "phases"'>Phase Management</button>
-        <button role="tab" class="tab @(ActiveTab == "audit" ? "tab-active" : "")" @onclick='() => ActiveTab = "audit"'>Audit Log</button>
+    <div role="tablist" class="tabs tabs-bordered mb-0 w-full overflow-x-auto">
+        <button role="tab" class="tab @(ActiveTab == "hoa" ? "tab-active font-semibold" : "")" @onclick='() => ActiveTab = "hoa"'>HOA Configuration</button>
+        <button role="tab" class="tab @(ActiveTab == "users" ? "tab-active font-semibold" : "")" @onclick='() => ActiveTab = "users"'>User Management</button>
+        <button role="tab" class="tab @(ActiveTab == "phases" ? "tab-active font-semibold" : "")" @onclick='() => ActiveTab = "phases"'>Phase Management</button>
+        <button role="tab" class="tab @(ActiveTab == "audit" ? "tab-active font-semibold" : "")" @onclick='() => ActiveTab = "audit"'>Audit Log</button>
     </div>
 
     <div class="card rounded-tl-none border border-base-300 border-t-0 bg-base-100 shadow-none">
@@ -107,7 +111,7 @@ else
                         <FieldGroup Label="Role">
                             <select class="select select-bordered select-sm w-full" @bind="_filterRole">
                                 <option value="">All Roles</option>
-                                <option>Super Admin</option><option>HOA President</option><option>Board Member</option><option>Staff</option><option>Homeowner</option>
+                                <option>Super Admin</option><option>HOA President</option><option>Board Member</option><option>HOA Staff</option><option>Homeowner</option>
                             </select>
                         </FieldGroup>
                         <FieldGroup Label="Status">
@@ -308,6 +312,7 @@ else
     private DateTime? _auditFromDate;
     private DateTime? _auditToDate;
     private string ActiveTab { get; set; } = "hoa";
+    private int? ActiveSubdivisionId => SubdivisionContextService.SelectedSubdivisionId;
 
     private IEnumerable<User> FilteredUsers => _users.Where(user =>
         (string.IsNullOrEmpty(_filterUsername) || user.Username.Contains(_filterUsername, StringComparison.OrdinalIgnoreCase)) &&
@@ -327,19 +332,31 @@ else
     private async Task LoadAsync()
     {
         _isLoading = true;
-        _hoaSettings = await LoadHoaSettingsAsync();
+        _hoaSettings = await LoadHoaSettingsAsync(ActiveSubdivisionId);
         await LoadLogoPreviewAsync(_hoaSettings.LogoPath);
-        _users = await DbContext.Users.AsNoTracking().Include(user => user.Role).Include(user => user.Homeowner).OrderBy(user => user.Username).ToListAsync();
+        _users = await DbContext.Users.AsNoTracking()
+            .Include(user => user.Role)
+            .Include(user => user.Homeowner)
+            .Where(user => !ActiveSubdivisionId.HasValue || user.SubdivisionId == null || user.SubdivisionId == ActiveSubdivisionId.Value)
+            .OrderBy(user => user.Username)
+            .ToListAsync();
         _roles = await DbContext.Roles.AsNoTracking().OrderBy(role => role.RoleName).ToListAsync();
-        _availableHomeowners = await GetAvailableHomeownersAsync();
-        _phases = await DbContext.Phases.AsNoTracking().Include(phase => phase.Homeowners).Include(phase => phase.Units).OrderBy(phase => phase.Name).Select(phase => new PhaseSummaryRow
-        {
-            PhaseId = phase.PhaseId,
-            Name = phase.Name,
-            Description = phase.Description,
-            HomeownerCount = phase.Homeowners.Count(homeowner => !homeowner.IsDeleted),
-            UnitCount = phase.Units.Count
-        }).ToListAsync();
+        _availableHomeowners = await GetAvailableHomeownersAsync(ActiveSubdivisionId);
+        _phases = ActiveSubdivisionId.HasValue
+            ? await DbContext.Phases.AsNoTracking()
+                .Include(phase => phase.Homeowners)
+                .Include(phase => phase.Units)
+                .Where(phase => phase.SubdivisionId == ActiveSubdivisionId.Value)
+                .OrderBy(phase => phase.Name)
+                .Select(phase => new PhaseSummaryRow
+                {
+                    PhaseId = phase.PhaseId,
+                    Name = phase.Name,
+                    Description = phase.Description,
+                    HomeownerCount = phase.Homeowners.Count(homeowner => !homeowner.IsDeleted),
+                    UnitCount = phase.Units.Count
+                }).ToListAsync()
+            : [];
         _auditLogs = await DbContext.AuditLogs.AsNoTracking().Include(log => log.User).OrderByDescending(log => log.Timestamp).ToListAsync();
         _isLoading = false;
     }
@@ -347,41 +364,32 @@ else
     private async Task SaveHoaSettingsAsync()
     {
         if (AuthService.CurrentUser is null) return;
-        if (string.IsNullOrWhiteSpace(_hoaSettings.HOAName) || string.IsNullOrWhiteSpace(_hoaSettings.Subdivision) || string.IsNullOrWhiteSpace(_hoaSettings.City) || string.IsNullOrWhiteSpace(_hoaSettings.Province))
+
+        try
         {
-            await ShowToastAsync("HOA name and address fields are required.", "warning");
-            return;
-        }
+            if (!ActiveSubdivisionId.HasValue)
+            {
+                throw new InvalidOperationException("Select a subdivision first.");
+            }
 
-        var settings = await DbContext.HOASettings.FirstOrDefaultAsync();
-        if (settings is null)
+            await SettingsService.SaveHoaSettingsAsync(_hoaSettings, ActiveSubdivisionId.Value, AuthService.CurrentUser.UserId);
+            _hoaSettings = await LoadHoaSettingsAsync(ActiveSubdivisionId);
+            await LoadLogoPreviewAsync(_hoaSettings.LogoPath);
+            await ShowToastAsync("HOA settings saved.", "success");
+        }
+        catch (InvalidOperationException ex)
         {
-            settings = new HOASettings { SettingId = 1 };
-            DbContext.HOASettings.Add(settings);
+            await ShowToastAsync(ex.Message, "error");
         }
-
-        settings.HOAName = _hoaSettings.HOAName;
-        settings.Subdivision = _hoaSettings.Subdivision;
-        settings.City = _hoaSettings.City;
-        settings.Province = _hoaSettings.Province;
-        settings.PresidentName = NullIfEmpty(_hoaSettings.PresidentName);
-        settings.SecretaryName = NullIfEmpty(_hoaSettings.SecretaryName);
-        settings.TreasurerName = NullIfEmpty(_hoaSettings.TreasurerName);
-        settings.ContactNumber = NullIfEmpty(_hoaSettings.ContactNumber);
-        settings.LogoPath = NullIfEmpty(_hoaSettings.LogoPath);
-        settings.UpdatedAt = DateTime.UtcNow.ToString("o");
-        settings.UpdatedBy = AuthService.CurrentUser.UserId;
-
-        await DbContext.SaveChangesAsync();
-        _hoaSettings = await LoadHoaSettingsAsync();
-        await LoadLogoPreviewAsync(_hoaSettings.LogoPath);
-        await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Update", "HOASettings", settings.SettingId, "Updated HOA settings.");
-        await ShowToastAsync("HOA settings saved.", "success");
+        catch (UnauthorizedAccessException ex)
+        {
+            await ShowToastAsync(ex.Message, "error");
+        }
     }
 
     private async Task DiscardHoaSettingsChangesAsync()
     {
-        _hoaSettings = await LoadHoaSettingsAsync();
+        _hoaSettings = await LoadHoaSettingsAsync(ActiveSubdivisionId);
         await LoadLogoPreviewAsync(_hoaSettings.LogoPath);
         await ShowToastAsync("Unsaved HOA configuration changes were discarded.", "info");
     }
@@ -420,42 +428,30 @@ else
     private async Task AddUserAsync()
     {
         if (AuthService.CurrentUser is null) return;
-        if (string.IsNullOrWhiteSpace(_userForm.Username) || string.IsNullOrWhiteSpace(_userForm.Password) || _userForm.RoleId == 0)
+
+        try
         {
-            await ShowToastAsync("Username, password, and role are required.", "warning");
-            return;
+            await SettingsService.AddUserAsync(
+                _userForm.Username,
+                _userForm.Password,
+                _userForm.RoleId,
+                _userForm.HomeownerId,
+                ActiveSubdivisionId,
+                AuthService.CurrentUser.UserId);
+
+            await ShowToastAsync("User created successfully.", "success");
+            _userForm = new UserFormModel();
+            _showAddUserForm = false;
+            await LoadAsync();
         }
-
-        var username = _userForm.Username.Trim();
-        if (await DbContext.Users.AnyAsync(user => user.Username == username))
+        catch (InvalidOperationException ex)
         {
-            await ShowToastAsync("That username is already in use.", "error");
-            return;
+            await ShowToastAsync(ex.Message, "error");
         }
-
-        if (_userForm.HomeownerId.HasValue && await DbContext.Users.AnyAsync(user => user.HomeownerId == _userForm.HomeownerId.Value))
+        catch (UnauthorizedAccessException ex)
         {
-            await ShowToastAsync("That homeowner is already linked to another user.", "error");
-            return;
+            await ShowToastAsync(ex.Message, "error");
         }
-
-        var user = new User
-        {
-            Username = username,
-            PasswordHash = HashHelper.Hash(_userForm.Password),
-            RoleId = _userForm.RoleId,
-            HomeownerId = _userForm.HomeownerId,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow.ToString("o")
-        };
-
-        DbContext.Users.Add(user);
-        await DbContext.SaveChangesAsync();
-        await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Create", "Users", user.UserId, $"Created user '{user.Username}'.");
-        await ShowToastAsync("User created successfully.", "success");
-        _userForm = new UserFormModel();
-        _showAddUserForm = false;
-        await LoadAsync();
     }
 
     private void BeginPasswordReset(User user)
@@ -473,48 +469,46 @@ else
     private async Task SavePasswordResetAsync()
     {
         if (AuthService.CurrentUser is null || _resetPasswordUser is null) return;
-        if (string.IsNullOrWhiteSpace(_resetPasswordValue))
-        {
-            await ShowToastAsync("Enter a new password first.", "warning");
-            return;
-        }
 
-        var user = await DbContext.Users.FirstOrDefaultAsync(item => item.UserId == _resetPasswordUser.UserId);
-        if (user is null)
+        try
         {
-            await ShowToastAsync("The selected user could not be found.", "error");
-            return;
-        }
+            await SettingsService.ResetPasswordAsync(
+                _resetPasswordUser.UserId,
+                _resetPasswordValue,
+                AuthService.CurrentUser.UserId);
 
-        user.PasswordHash = HashHelper.Hash(_resetPasswordValue);
-        await DbContext.SaveChangesAsync();
-        await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Update", "Users", user.UserId, $"Reset password for '{user.Username}'.");
-        await ShowToastAsync("Password updated successfully.", "success");
-        CancelPasswordReset();
-        await LoadAsync();
+            await ShowToastAsync("Password updated successfully.", "success");
+            CancelPasswordReset();
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            await ShowToastAsync(ex.Message, "error");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            await ShowToastAsync(ex.Message, "error");
+        }
     }
 
     private async Task DeactivateUserAsync(int userId)
     {
         if (AuthService.CurrentUser is null) return;
-        if (AuthService.CurrentUser.UserId == userId)
-        {
-            await ShowToastAsync("You cannot deactivate your own account.", "warning");
-            return;
-        }
 
-        var user = await DbContext.Users.FirstOrDefaultAsync(item => item.UserId == userId);
-        if (user is null)
+        try
         {
-            await ShowToastAsync("The selected user could not be found.", "error");
-            return;
+            await SettingsService.DeactivateUserAsync(userId, AuthService.CurrentUser.UserId);
+            await ShowToastAsync("User deactivated.", "success");
+            await LoadAsync();
         }
-
-        user.IsActive = false;
-        await DbContext.SaveChangesAsync();
-        await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Update", "Users", user.UserId, $"Deactivated user '{user.Username}'.");
-        await ShowToastAsync("User deactivated.", "success");
-        await LoadAsync();
+        catch (InvalidOperationException ex)
+        {
+            await ShowToastAsync(ex.Message, "error");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            await ShowToastAsync(ex.Message, "error");
+        }
     }
 
     private void BeginAddPhase()
@@ -547,67 +541,78 @@ else
     private async Task SavePhaseAsync()
     {
         if (AuthService.CurrentUser is null) return;
-        if (string.IsNullOrWhiteSpace(_phaseForm.Name))
-        {
-            await ShowToastAsync("Phase name is required.", "warning");
-            return;
-        }
 
-        if (_editingPhaseId.HasValue)
+        try
         {
-            var phase = await DbContext.Phases.FirstOrDefaultAsync(item => item.PhaseId == _editingPhaseId.Value);
-            if (phase is null)
+            if (_editingPhaseId.HasValue)
             {
-                await ShowToastAsync("The selected phase could not be found.", "error");
-                return;
+                await SettingsService.UpdatePhaseAsync(
+                    _editingPhaseId.Value,
+                    _phaseForm.Name,
+                    _phaseForm.Description,
+                    AuthService.CurrentUser.UserId);
+
+                await ShowToastAsync("Phase updated.", "success");
+            }
+            else
+            {
+                if (!ActiveSubdivisionId.HasValue)
+                {
+                    throw new InvalidOperationException("Select a subdivision first.");
+                }
+
+                await SettingsService.AddPhaseAsync(
+                    _phaseForm.Name,
+                    _phaseForm.Description,
+                    ActiveSubdivisionId.Value,
+                    AuthService.CurrentUser.UserId);
+
+                await ShowToastAsync("Phase created.", "success");
             }
 
-            phase.Name = _phaseForm.Name.Trim();
-            phase.Description = NullIfEmpty(_phaseForm.Description);
-            await DbContext.SaveChangesAsync();
-            await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Update", "Phases", phase.PhaseId, $"Updated phase '{phase.Name}'.");
-            await ShowToastAsync("Phase updated.", "success");
+            CancelPhaseForm();
+            await LoadAsync();
         }
-        else
+        catch (InvalidOperationException ex)
         {
-            var phase = new Phase { Name = _phaseForm.Name.Trim(), Description = NullIfEmpty(_phaseForm.Description), CreatedAt = DateTime.UtcNow.ToString("o") };
-            DbContext.Phases.Add(phase);
-            await DbContext.SaveChangesAsync();
-            await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Create", "Phases", phase.PhaseId, $"Created phase '{phase.Name}'.");
-            await ShowToastAsync("Phase created.", "success");
+            await ShowToastAsync(ex.Message, "error");
         }
-
-        CancelPhaseForm();
-        await LoadAsync();
+        catch (UnauthorizedAccessException ex)
+        {
+            await ShowToastAsync(ex.Message, "error");
+        }
     }
 
     private async Task DeletePhaseAsync(int phaseId)
     {
         if (AuthService.CurrentUser is null) return;
 
-        var assignedHomeowners = await DbContext.Homeowners.CountAsync(homeowner => !homeowner.IsDeleted && homeowner.PhaseId == phaseId);
-        var assignedUnits = await DbContext.Units.CountAsync(unit => unit.PhaseId == phaseId);
-        if (assignedHomeowners > 0 || assignedUnits > 0)
+        try
         {
-            await ShowToastAsync("This phase cannot be deleted while homeowners or units are still assigned to it.", "error");
-            return;
-        }
+            if (!ActiveSubdivisionId.HasValue)
+            {
+                throw new InvalidOperationException("Select a subdivision first.");
+            }
 
-        var phase = await DbContext.Phases.FirstOrDefaultAsync(item => item.PhaseId == phaseId);
-        if (phase is null)
+            await SettingsService.DeletePhaseAsync(
+                phaseId,
+                ActiveSubdivisionId.Value,
+                AuthService.CurrentUser.UserId);
+
+            await ShowToastAsync("Phase deleted.", "success");
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
         {
-            await ShowToastAsync("The selected phase could not be found.", "error");
-            return;
+            await ShowToastAsync(ex.Message, "error");
         }
-
-        DbContext.Phases.Remove(phase);
-        await DbContext.SaveChangesAsync();
-        await AuditService.LogAsync(AuthService.CurrentUser.UserId, "Delete", "Phases", phase.PhaseId, $"Deleted phase '{phase.Name}'.");
-        await ShowToastAsync("Phase deleted.", "success");
-        await LoadAsync();
+        catch (UnauthorizedAccessException ex)
+        {
+            await ShowToastAsync(ex.Message, "error");
+        }
     }
 
-    private async Task<List<Homeowner>> GetAvailableHomeownersAsync()
+    private async Task<List<Homeowner>> GetAvailableHomeownersAsync(int? subdivisionId)
     {
         var linkedHomeownerIds = await DbContext.Users.AsNoTracking()
             .Where(user => user.HomeownerId.HasValue)
@@ -615,20 +620,27 @@ else
             .ToListAsync();
 
         return await DbContext.Homeowners.AsNoTracking()
-            .Where(homeowner => !homeowner.IsDeleted && !linkedHomeownerIds.Contains(homeowner.HomeownerId))
+            .Where(homeowner =>
+                !homeowner.IsDeleted &&
+                !linkedHomeownerIds.Contains(homeowner.HomeownerId) &&
+                (!subdivisionId.HasValue || homeowner.SubdivisionId == subdivisionId.Value))
             .OrderBy(homeowner => homeowner.LastName)
             .ThenBy(homeowner => homeowner.FirstName)
             .ToListAsync();
     }
 
-    private async Task<HOASettings> LoadHoaSettingsAsync()
+    private async Task<HOASettings> LoadHoaSettingsAsync(int? subdivisionId)
     {
-        var settings = await DbContext.HOASettings.AsNoTracking().FirstOrDefaultAsync();
+        var settings = subdivisionId.HasValue
+            ? await DbContext.HOASettings.AsNoTracking().FirstOrDefaultAsync(item => item.SubdivisionId == subdivisionId.Value)
+            : null;
+
         return settings is null
-            ? new HOASettings { SettingId = 1, HOAName = "Homeowners Association", Subdivision = "Sample Subdivision", City = "Davao City", Province = "Davao del Sur" }
+            ? new HOASettings { SubdivisionId = subdivisionId ?? 0, HOAName = "Homeowners Association", Subdivision = "Sample Subdivision", City = "Davao City", Province = "Davao del Sur" }
             : new HOASettings
             {
                 SettingId = settings.SettingId,
+                SubdivisionId = settings.SubdivisionId,
                 HOAName = settings.HOAName,
                 Subdivision = settings.Subdivision,
                 City = settings.City,
@@ -641,6 +653,12 @@ else
                 UpdatedAt = settings.UpdatedAt,
                 UpdatedBy = settings.UpdatedBy
             };
+    }
+
+    private async Task HandleSubdivisionChange(int? subdivisionId)
+    {
+        await LoadAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task LoadLogoPreviewAsync(string? path)

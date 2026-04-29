@@ -3,25 +3,29 @@
 @inject HomeownerService HomeownerService
 @inject DocumentService DocumentService
 @inject AuthService AuthService
+@inject SubdivisionContextService SubdivisionContextService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 
 <PageHeader Title="Dues & Fees"
             Subtitle="Track monthly dues, payment status, and homeowner statements.">
     <Actions>
-        <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/dues/add")'>
-            Record Dues
-        </button>
+        @if (CanWriteDues)
+        {
+            <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/dues/add")'>
+                Record Dues
+            </button>
+        }
     </Actions>
 </PageHeader>
 
+<SubdivisionSelector OnSubdivisionSelected="HandleSubdivisionChange" />
+
 <div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
     <div class="card-body p-4">
-        <div class="flex flex-wrap items-end gap-3">
-            <div class="form-control min-w-[220px] flex-1">
-                <label class="label py-0 pb-1">
-                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Homeowner</span>
-                </label>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/40">Homeowner</label>
                 <select class="select select-bordered select-sm w-full" @bind="_selectedHomeownerId" @bind:after="LoadDuesAsync">
                     <option value="">All Homeowners</option>
                     @foreach (var homeowner in _activeHomeowners.OrderBy(GetHomeownerDisplay))
@@ -31,10 +35,8 @@
                 </select>
             </div>
 
-            <div class="form-control min-w-[148px]">
-                <label class="label py-0 pb-1">
-                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Status</span>
-                </label>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/40">Status</label>
                 <select class="select select-bordered select-sm" @bind="_statusFilter" @bind:after="LoadDuesAsync">
                     <option value="">All Statuses</option>
                     @foreach (var status in StatusOptions)
@@ -44,10 +46,8 @@
                 </select>
             </div>
 
-            <div class="form-control min-w-[140px]">
-                <label class="label py-0 pb-1">
-                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Month</span>
-                </label>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/40">Month</label>
                 <select class="select select-bordered select-sm" @bind="_monthFilter" @bind:after="LoadDuesAsync">
                     <option value="">All Months</option>
                     @foreach (var month in Enumerable.Range(1, 12))
@@ -57,10 +57,8 @@
                 </select>
             </div>
 
-            <div class="form-control min-w-[120px]">
-                <label class="label py-0 pb-1">
-                    <span class="label-text text-[10px] font-semibold uppercase tracking-wide text-base-content/50">Year</span>
-                </label>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/40">Year</label>
                 <select class="select select-bordered select-sm" @bind="_yearFilter" @bind:after="LoadDuesAsync">
                     <option value="">All Years</option>
                     @foreach (var year in _yearOptions)
@@ -97,28 +95,42 @@
                             <th>Due Date</th>
                             <th>Paid Date</th>
                             <th>Status</th>
-                            <th class="text-right">Actions</th>
+                            @if (CanShowActions)
+                            {
+                                <th class="text-right">Actions</th>
+                            }
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var dues in _duesRecords)
                         {
-                            <tr class="h-[52px] hover">
-                                <td class="text-sm text-base-content">@DisplayValue(GetFullName(dues.Homeowner))</td>
+                            <tr class="h-[52px]">
+                                <td class="text-sm font-medium text-base-content">@DisplayValue(GetFullName(dues.Homeowner))</td>
                                 <td class="text-sm text-base-content/60">@FormatMonthYear(dues.Month, dues.Year)</td>
                                 <td class="text-sm font-medium text-base-content">@FormatCurrency(dues.Amount)</td>
                                 <td class="text-sm text-base-content/60">@FormatDate(dues.DueDate)</td>
                                 <td class="text-sm text-base-content/60">@FormatDate(dues.PaidDate)</td>
                                 <td><StatusChip Status="@dues.Status" /></td>
-                                <td class="text-right">
-                                    <button class="btn btn-ghost btn-xs" @onclick='() => GenerateStatementAsync(dues.HomeownerId)'>Statement</button>
-                                    @if (dues.Status != "Paid")
-                                    {
-                                        <button class="btn btn-ghost btn-xs text-success" @onclick='() => MarkAsPaidAsync(dues.DuesId)'>Mark as Paid</button>
-                                    }
-                                    <button class="btn btn-ghost btn-xs" @onclick='() => NavigationManager.NavigateTo($"/dues/edit/{dues.DuesId}")'>Edit</button>
-                                    <button class="btn btn-ghost btn-xs text-error" @onclick='() => AskDelete(dues)'>Delete</button>
-                                </td>
+                                @if (CanShowActions)
+                                {
+                                    <td class="text-right">
+                                        <div class="flex items-center justify-end gap-1">
+                                            @if (CanGenerateDocuments)
+                                            {
+                                                <button class="btn btn-ghost btn-xs" @onclick='() => GenerateStatementAsync(dues.HomeownerId)'>Statement</button>
+                                            }
+                                            @if (CanWriteDues)
+                                            {
+                                                @if (dues.Status != "Paid")
+                                                {
+                                                    <button class="btn btn-ghost btn-xs text-success" @onclick='() => MarkAsPaidAsync(dues.DuesId)'>Mark as Paid</button>
+                                                }
+                                                <button class="btn btn-ghost btn-xs" @onclick='() => NavigationManager.NavigateTo($"/dues/edit/{dues.DuesId}")'>Edit</button>
+                                                <button class="btn btn-ghost btn-xs text-error" @onclick='() => AskDelete(dues)'>Delete</button>
+                                            }
+                                        </div>
+                                    </td>
+                                }
                             </tr>
                         }
                     </tbody>
@@ -143,6 +155,12 @@
 
 @code {
     private static readonly string[] StatusOptions = ["Paid", "Unpaid", "Overdue"];
+    private bool CanWriteDues => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "dues");
+    private bool CanGenerateDocuments => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "documents");
+    private bool CanShowActions => CanWriteDues || CanGenerateDocuments;
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin
+        ? SubdivisionContextService.SelectedSubdivisionId
+        : AuthService.CurrentSubdivisionId;
 
     private List<DuesRecord> _duesRecords = [];
     private List<Homeowner> _activeHomeowners = [];
@@ -158,17 +176,31 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _activeHomeowners = await HomeownerService.GetAllActiveAsync();
+        await LoadHomeownersAsync();
         _yearOptions = BuildYearOptions([]);
         await LoadDuesAsync();
     }
 
+    private async Task LoadHomeownersAsync()
+    {
+        _activeHomeowners = ActiveSubdivisionId.HasValue
+            ? await HomeownerService.GetAllActiveAsync(ActiveSubdivisionId.Value)
+            : [];
+    }
+
     private async Task LoadDuesAsync()
     {
+        if (!ActiveSubdivisionId.HasValue)
+        {
+            _duesRecords = [];
+            _isLoading = false;
+            return;
+        }
+
         _isLoading = true;
         StateHasChanged();
 
-        var records = await DuesService.GetAllAsync();
+        var records = await DuesService.GetAllAsync(ActiveSubdivisionId.Value);
         _yearOptions = BuildYearOptions(records);
 
         _duesRecords = records
@@ -181,9 +213,22 @@
         _isLoading = false;
     }
 
+    private async Task HandleSubdivisionChange(int? subdivisionId)
+    {
+        _selectedHomeownerId = null;
+        await LoadHomeownersAsync();
+        await LoadDuesAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async Task GenerateStatementAsync(int homeownerId)
     {
-        var document = await DocumentService.GenerateDuesStatementAsync(homeownerId);
+        if (AuthService.CurrentUser is null)
+        {
+            return;
+        }
+
+        var document = await DocumentService.GenerateDuesStatementAsync(homeownerId, AuthService.CurrentUser.UserId);
         if (document is null)
         {
             await JS.InvokeVoidAsync("hrms.showToast", "Unable to generate dues statement.", "error");
@@ -201,7 +246,7 @@
 
     private async Task MarkAsPaidAsync(int duesId)
     {
-        if (AuthService.CurrentUser is null)
+        if (!CanWriteDues || AuthService.CurrentUser is null)
         {
             return;
         }

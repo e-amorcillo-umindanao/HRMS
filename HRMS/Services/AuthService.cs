@@ -10,6 +10,7 @@ public class AuthService
 {
     private static readonly Dictionary<string, int> RoleHierarchy = new(StringComparer.Ordinal)
     {
+        ["HOA Staff"] = 1,
         ["Staff"] = 1,
         ["Board Member"] = 2,
         ["HOA President"] = 3,
@@ -32,8 +33,10 @@ public class AuthService
     public User? CurrentUser { get; private set; }
 
     public int? CurrentHomeownerId => CurrentUser?.HomeownerId;
+    public int? CurrentSubdivisionId => CurrentUser?.SubdivisionId;
 
     public bool IsAuthenticated => CurrentUser is not null;
+    public bool IsSuperAdmin => HasRole("Super Admin");
 
     public string? CurrentRole => CurrentUser?.Role?.RoleName;
 
@@ -43,6 +46,7 @@ public class AuthService
     {
         var user = await _context.Users
             .Include(u => u.Role)
+            .Include(u => u.Subdivision)
             .SingleOrDefaultAsync(u => u.Username == username);
 
         if (user is null || !user.IsActive)
@@ -98,6 +102,7 @@ public class AuthService
     public bool CanAccessRoute(string? route)
     {
         var normalized = NormalizeRoute(route);
+        var role = CurrentRole ?? string.Empty;
 
         if (normalized == "/")
         {
@@ -106,51 +111,78 @@ public class AuthService
 
         if (normalized == "/profile")
         {
-            return IsHomeowner();
-        }
-
-        if (IsHomeowner())
-        {
-            return false;
+            return AccessHelper.CanRead(role, "profile");
         }
 
         if (normalized == "/dashboard")
         {
-            return true;
+            return AccessHelper.CanRead(role, "dashboard");
         }
 
-        if (normalized.StartsWith("/clearance", StringComparison.Ordinal))
+        if (normalized.StartsWith("/subscriptions", StringComparison.Ordinal))
         {
-            return IsAuthenticated;
+            return IsSuperAdmin;
         }
 
         if (normalized.StartsWith("/settings", StringComparison.Ordinal))
         {
-            return HasRole("Super Admin");
+            return IsSuperAdmin;
         }
 
-        if (normalized.StartsWith("/engagement", StringComparison.Ordinal) ||
-            normalized.StartsWith("/msme", StringComparison.Ordinal) ||
-            normalized.StartsWith("/violations", StringComparison.Ordinal))
+        if (IsHomeowner())
         {
-            return IsAtLeast("Board Member");
+            return normalized.StartsWith("/clearance", StringComparison.Ordinal);
         }
 
-        if (normalized.StartsWith("/homeowners", StringComparison.Ordinal) ||
-            normalized.StartsWith("/units", StringComparison.Ordinal) ||
-            normalized.StartsWith("/events", StringComparison.Ordinal) ||
-            normalized.StartsWith("/dues", StringComparison.Ordinal) ||
-            normalized.StartsWith("/reports", StringComparison.Ordinal))
+        if (IsWriteRoute(normalized, "homeowners"))
         {
-            return IsAtLeast("Staff");
+            return AccessHelper.CanWrite(role, "homeowners");
         }
 
-        if (normalized.StartsWith("/documents", StringComparison.Ordinal))
+        if (IsWriteRoute(normalized, "units"))
         {
-            return IsAtLeast("HOA President");
+            return AccessHelper.CanWrite(role, "units");
         }
 
-        return false;
+        if (IsWriteRoute(normalized, "events"))
+        {
+            return AccessHelper.CanWrite(role, "events");
+        }
+
+        if (IsWriteRoute(normalized, "msme"))
+        {
+            return AccessHelper.CanWrite(role, "msme");
+        }
+
+        if (IsWriteRoute(normalized, "dues"))
+        {
+            return AccessHelper.CanWrite(role, "dues");
+        }
+
+        if (IsWriteRoute(normalized, "violations"))
+        {
+            return AccessHelper.CanWrite(role, "violations");
+        }
+
+        if (normalized.StartsWith("/engagement/log", StringComparison.Ordinal))
+        {
+            return AccessHelper.CanWrite(role, "engagement");
+        }
+
+        return normalized switch
+        {
+            var value when value.StartsWith("/homeowners", StringComparison.Ordinal) => AccessHelper.CanRead(role, "homeowners"),
+            var value when value.StartsWith("/units", StringComparison.Ordinal) => AccessHelper.CanRead(role, "units"),
+            var value when value.StartsWith("/engagement", StringComparison.Ordinal) => AccessHelper.CanRead(role, "engagement"),
+            var value when value.StartsWith("/events", StringComparison.Ordinal) => AccessHelper.CanRead(role, "events"),
+            var value when value.StartsWith("/msme", StringComparison.Ordinal) => AccessHelper.CanRead(role, "msme"),
+            var value when value.StartsWith("/dues", StringComparison.Ordinal) => AccessHelper.CanRead(role, "dues"),
+            var value when value.StartsWith("/violations", StringComparison.Ordinal) => AccessHelper.CanRead(role, "violations"),
+            var value when value.StartsWith("/clearance", StringComparison.Ordinal) => AccessHelper.CanRead(role, "clearance"),
+            var value when value.StartsWith("/documents", StringComparison.Ordinal) => AccessHelper.CanRead(role, "documents"),
+            var value when value.StartsWith("/reports", StringComparison.Ordinal) => AccessHelper.CanRead(role, "reports"),
+            _ => false
+        };
     }
 
     public static string NormalizeRoute(string? route)
@@ -175,4 +207,27 @@ public class AuthService
     }
 
     private void NotifyStateChanged() => StateChanged?.Invoke();
+
+    private static bool IsWriteRoute(string route, string module) => module switch
+    {
+        "homeowners" => route is "/homeowners/add" or "/homeowners/new" ||
+                        route.StartsWith("/homeowners/edit/", StringComparison.Ordinal) ||
+                        route.EndsWith("/edit", StringComparison.Ordinal) && route.StartsWith("/homeowners/", StringComparison.Ordinal),
+        "units" => route is "/units/add" or "/units/new" ||
+                   route.StartsWith("/units/edit/", StringComparison.Ordinal) ||
+                   route.EndsWith("/edit", StringComparison.Ordinal) && route.StartsWith("/units/", StringComparison.Ordinal),
+        "events" => route is "/events/add" or "/events/new" ||
+                    route.StartsWith("/events/edit/", StringComparison.Ordinal) ||
+                    route.EndsWith("/edit", StringComparison.Ordinal) && route.StartsWith("/events/", StringComparison.Ordinal),
+        "msme" => route is "/msme/add" or "/msme/new" ||
+                  route.StartsWith("/msme/edit/", StringComparison.Ordinal) ||
+                  route.EndsWith("/edit", StringComparison.Ordinal) && route.StartsWith("/msme/", StringComparison.Ordinal),
+        "dues" => route is "/dues/add" or "/dues/new" ||
+                  route.StartsWith("/dues/edit/", StringComparison.Ordinal) ||
+                  route.EndsWith("/edit", StringComparison.Ordinal) && route.StartsWith("/dues/", StringComparison.Ordinal),
+        "violations" => route is "/violations/add" or "/violations/new" ||
+                        route.StartsWith("/violations/edit/", StringComparison.Ordinal) ||
+                        route.EndsWith("/edit", StringComparison.Ordinal) && route.StartsWith("/violations/", StringComparison.Ordinal),
+        _ => false
+    };
 }

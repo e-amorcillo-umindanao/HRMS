@@ -2,21 +2,31 @@
 @inject HomeownerService HomeownerService
 @inject AppDbContext DbContext
 @inject AuthService AuthService
+@inject SubdivisionContextService SubdivisionContextService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 
 <PageHeader Title="Homeowners"
             Subtitle="Manage homeowner records, profile data, and CSV imports.">
     <Actions>
-        <label class="btn btn-outline btn-sm">
-            Import CSV
-            <InputFile OnChange="ImportCsvAsync" accept=".csv" hidden />
-        </label>
-        <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/homeowners/new")'>
-            Add Homeowner
-        </button>
+        @if (CanWriteHomeowners)
+        {
+            <label class="btn btn-outline btn-sm">
+                Import CSV
+                <InputFile OnChange="ImportCsvAsync" accept=".csv" hidden />
+            </label>
+            <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/homeowners/new")'>
+                Add Homeowner
+            </button>
+        }
+        else
+        {
+            <span class="badge badge-warning badge-md px-3 py-2 font-medium">Read-only mode</span>
+        }
     </Actions>
 </PageHeader>
+
+<SubdivisionSelector OnSubdivisionSelected="HandleSubdivisionChange" />
 
 <div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
     <div class="card-body p-4">
@@ -126,8 +136,8 @@
                     <tbody>
                         @foreach (var homeowner in _homeowners)
                         {
-                            <tr class="h-[52px] hover">
-                                <td class="text-sm font-medium text-base-content">@GetFullName(homeowner)</td>
+                            <tr class="h-[52px]">
+                                <td class="text-sm font-semibold text-base-content">@GetFullName(homeowner)</td>
                                 <td><StatusChip Status="@homeowner.Status" /></td>
                                 <td class="text-sm text-base-content/60">@DisplayValue(homeowner.Phase?.Name)</td>
                                 <td class="text-sm text-base-content/60">@DisplayValue(homeowner.Unit?.UnitNumber)</td>
@@ -146,18 +156,23 @@
                                 </td>
                                 <td class="text-sm text-base-content/60">@FormatDate(homeowner.ResidencySince)</td>
                                 <td class="text-right">
+                                    <div class="flex items-center justify-end gap-1">
                                     <button class="btn btn-ghost btn-xs"
                                             @onclick='() => NavigationManager.NavigateTo($"/homeowners/{homeowner.HomeownerId}")'>
                                         View
                                     </button>
-                                    <button class="btn btn-ghost btn-xs"
-                                            @onclick='() => NavigationManager.NavigateTo($"/homeowners/{homeowner.HomeownerId}/edit")'>
-                                        Edit
-                                    </button>
-                                    <button class="btn btn-ghost btn-xs text-error"
-                                            @onclick='() => AskDelete(homeowner)'>
-                                        Delete
-                                    </button>
+                                    @if (CanWriteHomeowners)
+                                    {
+                                        <button class="btn btn-ghost btn-xs"
+                                                @onclick='() => NavigationManager.NavigateTo($"/homeowners/{homeowner.HomeownerId}/edit")'>
+                                            Edit
+                                        </button>
+                                        <button class="btn btn-ghost btn-xs text-error"
+                                                @onclick='() => AskDelete(homeowner)'>
+                                            Delete
+                                        </button>
+                                    }
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -184,6 +199,10 @@
 @code {
     private static readonly string[] StatusOptions = ["Active", "Inactive", "Transferred", "Deceased"];
     private static readonly string[] CategoryOptions = ["Senior", "PWD", "4Ps", "Indigent", "Youth"];
+    private bool CanWriteHomeowners => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "homeowners");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin
+        ? SubdivisionContextService.SelectedSubdivisionId
+        : AuthService.CurrentSubdivisionId;
 
     private readonly List<CsvImportError> _importErrors = [];
     private List<Homeowner> _homeowners = [];
@@ -201,20 +220,39 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadPhasesAsync();
+        await LoadHomeownersAsync();
+    }
+
+    private async Task LoadPhasesAsync()
+    {
+        if (!ActiveSubdivisionId.HasValue)
+        {
+            _phases = [];
+            return;
+        }
+
         _phases = await DbContext.Phases
             .AsNoTracking()
-            .OrderBy(p => p.Name)
+            .Where(phase => phase.SubdivisionId == ActiveSubdivisionId.Value)
+            .OrderBy(phase => phase.Name)
             .ToListAsync();
-
-        await LoadHomeownersAsync();
     }
 
     private async Task LoadHomeownersAsync()
     {
+        if (!ActiveSubdivisionId.HasValue)
+        {
+            _homeowners = [];
+            _isLoading = false;
+            return;
+        }
+
         _isLoading = true;
         StateHasChanged();
 
         _homeowners = await HomeownerService.SearchAsync(
+            ActiveSubdivisionId,
             NullIfEmpty(_nameFilter),
             NullIfEmpty(_statusFilter),
             _phaseFilter,
@@ -222,6 +260,14 @@
             NullIfEmpty(_categoryFilter));
 
         _isLoading = false;
+    }
+
+    private async Task HandleSubdivisionChange(int? subdivisionId)
+    {
+        _phaseFilter = null;
+        await LoadPhasesAsync();
+        await LoadHomeownersAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task OnNameInput(ChangeEventArgs args)
@@ -254,7 +300,7 @@
         _importMessage = null;
 
         var file = args.File;
-        if (file is null || AuthService.CurrentUser is null)
+        if (!CanWriteHomeowners || file is null || AuthService.CurrentUser is null)
         {
             return;
         }

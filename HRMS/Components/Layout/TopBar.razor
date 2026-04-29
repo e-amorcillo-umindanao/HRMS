@@ -4,7 +4,17 @@
 @inject NavigationManager NavigationManager
 
 <div class="navbar sticky top-0 z-40 min-h-[52px] border-b border-base-300 bg-base-100 px-6">
-    <div class="navbar-start">
+    <div class="navbar-start gap-3">
+        <button type="button"
+                class="btn btn-ghost btn-sm btn-square"
+                @onclick="OnSidebarToggle"
+                title="@(IsSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="4" y1="7" x2="20" y2="7" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="17" x2="20" y2="17" />
+            </svg>
+        </button>
         <span class="text-sm font-bold text-base-content">@GetPageTitle()</span>
     </div>
     <div class="navbar-center">
@@ -29,23 +39,11 @@
                 </svg>
             }
         </button>
-        <div class="dropdown dropdown-end">
-            <label tabindex="0"
-                   class="flex cursor-pointer items-center gap-2 rounded-md border border-transparent bg-transparent px-2 py-1.5 text-base-content transition-colors hover:bg-base-200">
-                <div class="avatar placeholder">
-                    <div class="w-7 rounded-full bg-neutral text-neutral-content flex items-center justify-center">
-                        <span class="text-xs font-semibold">@GetInitials()</span>
-                    </div>
-                </div>
-                <span class="text-sm font-medium text-base-content">@(AuthService.CurrentUser?.Username ?? "User")</span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="6 9 12 15 18 9" />
-                </svg>
-            </label>
-            <ul tabindex="0" class="dropdown-content menu menu-sm z-50 mt-2 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg">
-                <li><button class="text-sm text-base-content hover:bg-base-200" @onclick="LogoutAsync">Logout</button></li>
-            </ul>
-        </div>
+        <button type="button"
+                class="btn btn-ghost btn-sm"
+                @onclick="LogoutAsync">
+            Logout
+        </button>
     </div>
 </div>
 
@@ -56,11 +54,18 @@
     [Parameter]
     public EventCallback OnThemeToggle { get; set; }
 
+    [Parameter]
+    public bool IsSidebarCollapsed { get; set; }
+
+    [Parameter]
+    public EventCallback OnSidebarToggle { get; set; }
+
     private string _hoaName = "Homeowners Association";
 
     protected override async Task OnInitializedAsync()
     {
         AuthService.StateChanged += HandleStateChanged;
+        NavigationManager.LocationChanged += HandleLocationChanged;
 
         await using var dbContext = await DbContextFactory.CreateDbContextAsync();
         var settings = await dbContext.HOASettings.AsNoTracking().FirstOrDefaultAsync();
@@ -73,6 +78,7 @@
     public void Dispose()
     {
         AuthService.StateChanged -= HandleStateChanged;
+        NavigationManager.LocationChanged -= HandleLocationChanged;
     }
 
     private Task LogoutAsync() => AuthService.LogoutAsync();
@@ -82,25 +88,9 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
-    private string GetInitials()
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
     {
-        var username = AuthService.CurrentUser?.Username;
-        if (string.IsNullOrWhiteSpace(username))
-        {
-            return "U";
-        }
-
-        var parts = username
-            .Split(['.', '_', '-', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Take(2)
-            .ToArray();
-
-        if (parts.Length == 0)
-        {
-            return username[..1].ToUpperInvariant();
-        }
-
-        return string.Concat(parts.Select(part => part[0])).ToUpperInvariant();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private string GetPageTitle()
@@ -116,16 +106,16 @@
             var value when value.StartsWith("/units/", StringComparison.Ordinal) => "Units",
             "/engagement" => "Engagement",
             var value when value.StartsWith("/engagement/", StringComparison.Ordinal) => "Engagement",
-            "/events" => "Events",
-            var value when value.StartsWith("/events/", StringComparison.Ordinal) => "Events",
-            "/msme" => "MSME",
-            var value when value.StartsWith("/msme/", StringComparison.Ordinal) => "MSME",
-            "/dues" => "Dues",
-            var value when value.StartsWith("/dues/", StringComparison.Ordinal) => "Dues",
-            "/violations" => "Violations",
-            var value when value.StartsWith("/violations/", StringComparison.Ordinal) => "Violations",
-            "/clearance" => "Clearance",
-            var value when value.StartsWith("/clearance/", StringComparison.Ordinal) => "Clearance",
+            "/events" => "Events & Programs",
+            var value when value.StartsWith("/events/", StringComparison.Ordinal) => "Events & Programs",
+            "/msme" => "MSME Registry",
+            var value when value.StartsWith("/msme/", StringComparison.Ordinal) => "MSME Registry",
+            "/dues" => "Dues & Fees",
+            var value when value.StartsWith("/dues/", StringComparison.Ordinal) => "Dues & Fees",
+            "/violations" => "Violations & Incidents",
+            var value when value.StartsWith("/violations/", StringComparison.Ordinal) => "Violations & Incidents",
+            "/clearance" => "Clearance & Documents",
+            var value when value.StartsWith("/clearance/", StringComparison.Ordinal) => "Clearance & Documents",
             "/documents" => "Documents",
             "/reports" => "Reports",
             "/settings" => "Settings",

@@ -202,26 +202,35 @@ else
             Status = _model.Status
         };
 
-        if (IsEdit)
+        try
         {
-            var updated = await MSMEService.UpdateAsync(msme, AuthService.CurrentUser.UserId);
-            _isSaving = false;
-
-            if (updated is null)
+            if (IsEdit)
             {
-                _errorMessage = "Unable to update MSME.";
+                var updated = await MSMEService.UpdateAsync(msme, AuthService.CurrentUser.UserId);
+
+                if (updated is null)
+                {
+                    _errorMessage = "Unable to update MSME.";
+                    return;
+                }
+
+                await JS.InvokeVoidAsync("hrms.showToast", "MSME updated successfully.", "success");
+                NavigationManager.NavigateTo($"/msme/{updated.MSMEId}");
                 return;
             }
 
-            await JS.InvokeVoidAsync("hrms.showToast", "MSME updated successfully.", "success");
-            NavigationManager.NavigateTo($"/msme/{updated.MSMEId}");
-            return;
+            var created = await MSMEService.AddAsync(msme, AuthService.CurrentUser.UserId);
+            await JS.InvokeVoidAsync("hrms.showToast", "MSME registered successfully.", "success");
+            NavigationManager.NavigateTo($"/msme/{created.MSMEId}");
         }
-
-        var created = await MSMEService.AddAsync(msme, AuthService.CurrentUser.UserId);
-        _isSaving = false;
-        await JS.InvokeVoidAsync("hrms.showToast", "MSME registered successfully.", "success");
-        NavigationManager.NavigateTo($"/msme/{created.MSMEId}");
+        catch (UnauthorizedAccessException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
     private void Cancel()

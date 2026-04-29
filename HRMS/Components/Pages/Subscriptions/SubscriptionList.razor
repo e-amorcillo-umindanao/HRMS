@@ -1,0 +1,180 @@
+@page "/subscriptions"
+@inject SubdivisionService SubdivisionService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageHeader Title="Manage Subscriptions"
+            Subtitle="Manage subdivisions subscribed to and actively using the HRMS platform.">
+    <Actions>
+        <a href="/subscriptions/add" class="btn btn-primary btn-sm">Add Subdivision</a>
+    </Actions>
+</PageHeader>
+
+<div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
+    <div class="card-body p-4">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/40">Name</label>
+                <input type="text"
+                       class="input input-bordered input-sm w-full"
+                       placeholder="Search subdivision name..."
+                       value="@searchName"
+                       @oninput="OnSearchInput" />
+            </div>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-base-content/40">Status</label>
+                <select class="select select-bordered select-sm" @bind="filterStatus" @bind:after="ApplyFilter">
+                    <option value="">All Statuses</option>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="Suspended">Suspended</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border border-base-300 bg-base-100 shadow-none">
+    <div class="card-body p-0">
+        @if (filtered.Count == 0)
+        {
+            <EmptyState Title="No subdivisions found"
+                        Subtitle="Add a subdivision to get started."
+                        Icon="O" />
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr class="text-[10.5px] font-semibold uppercase tracking-wide text-base-content/50">
+                            <th>Name</th>
+                            <th>City / Province</th>
+                            <th>Subscription Start</th>
+                            <th>Subscription End</th>
+                            <th>Status</th>
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var subdivision in filtered)
+                        {
+                            <tr class="h-[52px]">
+                                <td class="font-medium text-base-content">@subdivision.Name</td>
+                                <td>
+                                    <div class="flex items-center gap-1.5 text-base-content/70">
+                                        <svg class="h-3.5 w-3.5 shrink-0 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                                        </svg>
+                                        <span>@FormatLocation(subdivision)</span>
+                                    </div>
+                                </td>
+                                <td>@FormatDate(subdivision.SubscriptionStart)</td>
+                                <td>@(string.IsNullOrWhiteSpace(subdivision.SubscriptionEnd) ? "Ongoing" : FormatDate(subdivision.SubscriptionEnd))</td>
+                                <td><StatusChip Status="@subdivision.Status" /></td>
+                                <td class="text-right">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <a href="@($"/subscriptions/edit/{subdivision.SubdivisionId}")" class="btn btn-ghost btn-xs">Edit</a>
+                                        <button class="btn btn-ghost btn-xs text-error"
+                                                @onclick="() => ConfirmDelete(subdivision)">
+                                            Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-4 pb-4">
+                <TableRecordCount Count="@filtered.Count" EntityLabel="subdivisions" />
+            </div>
+        }
+    </div>
+</div>
+
+<ConfirmDialog IsVisible="@showConfirm"
+               Title="Delete Subdivision"
+               Message="@confirmMessage"
+               ConfirmLabel="Delete"
+               OnConfirm="DeleteAsync"
+               OnCancel="CancelDelete" />
+
+@code {
+    private List<Subdivision> subdivisions = [];
+    private List<Subdivision> filtered = [];
+    private string searchName = string.Empty;
+    private string filterStatus = string.Empty;
+    private bool showConfirm;
+    private Subdivision? selectedItem;
+    private string confirmMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthService.IsSuperAdmin)
+        {
+            NavigationManager.NavigateTo("/dashboard");
+            return;
+        }
+
+        subdivisions = await SubdivisionService.GetAllAsync();
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        filtered = subdivisions
+            .Where(subdivision =>
+                (string.IsNullOrWhiteSpace(searchName) || subdivision.Name.Contains(searchName, StringComparison.OrdinalIgnoreCase)) &&
+                (string.IsNullOrWhiteSpace(filterStatus) || subdivision.Status == filterStatus))
+            .ToList();
+    }
+
+    private Task OnSearchInput(ChangeEventArgs args)
+    {
+        searchName = args.Value?.ToString() ?? string.Empty;
+        ApplyFilter();
+        return Task.CompletedTask;
+    }
+
+    private void ConfirmDelete(Subdivision subdivision)
+    {
+        selectedItem = subdivision;
+        confirmMessage = $"Delete {subdivision.Name}? This cannot be undone.";
+        showConfirm = true;
+    }
+
+    private Task CancelDelete()
+    {
+        showConfirm = false;
+        selectedItem = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (selectedItem is not null)
+        {
+            await SubdivisionService.DeleteAsync(selectedItem.SubdivisionId, AuthService.CurrentUser!.UserId);
+            subdivisions = await SubdivisionService.GetAllAsync();
+            ApplyFilter();
+        }
+
+        showConfirm = false;
+        selectedItem = null;
+    }
+
+    private static string FormatDate(string? iso) =>
+        DateTime.TryParse(iso, out var parsed) ? parsed.ToString("MMMM dd, yyyy") : "-";
+
+    private static string FormatLocation(Subdivision subdivision)
+    {
+        if (string.IsNullOrWhiteSpace(subdivision.City) && string.IsNullOrWhiteSpace(subdivision.Province))
+        {
+            return "-";
+        }
+
+        return string.Join(", ", new[] { subdivision.City, subdivision.Province }.Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+}

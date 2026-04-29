@@ -1,4 +1,5 @@
 using HRMS.Data;
+using HRMS.Helpers;
 using HRMS.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,30 +16,45 @@ public class AttendanceService
         _auditService = auditService;
     }
 
-    public async Task<List<Attendance>> GetByEventAsync(int eventId)
+    public async Task<List<Attendance>> GetByEventAsync(int eventId, int? subdivisionId = null)
     {
-        return await _context.Attendances
+        var query = _context.Attendances
             .AsNoTracking()
             .Include(attendance => attendance.Homeowner)
             .Include(attendance => attendance.Event)
-            .Where(attendance => attendance.EventId == eventId)
+            .Where(attendance => attendance.EventId == eventId);
+
+        if (subdivisionId.HasValue)
+        {
+            query = query.Where(attendance => attendance.Event.SubdivisionId == subdivisionId.Value);
+        }
+
+        return await query
             .OrderBy(attendance => attendance.Homeowner.LastName)
             .ThenBy(attendance => attendance.Homeowner.FirstName)
             .ToListAsync();
     }
 
-    public async Task<List<Attendance>> GetByHomeownerAsync(int homeownerId)
+    public async Task<List<Attendance>> GetByHomeownerAsync(int homeownerId, int? subdivisionId = null)
     {
-        return await _context.Attendances
+        var query = _context.Attendances
             .AsNoTracking()
             .Include(attendance => attendance.Event)
-            .Where(attendance => attendance.HomeownerId == homeownerId)
+            .Where(attendance => attendance.HomeownerId == homeownerId);
+
+        if (subdivisionId.HasValue)
+        {
+            query = query.Where(attendance => attendance.Event.SubdivisionId == subdivisionId.Value);
+        }
+
+        return await query
             .OrderByDescending(attendance => attendance.Event.EventDate)
             .ToListAsync();
     }
 
     public async Task<Attendance> RecordAsync(Attendance attendance, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "events", "You do not have write access to the Events module.");
         var existing = await _context.Attendances
             .SingleOrDefaultAsync(record =>
                 record.EventId == attendance.EventId &&
@@ -72,6 +88,7 @@ public class AttendanceService
 
     public async Task BulkRecordAsync(List<Attendance> attendances, int actorUserId)
     {
+        await EnsureCanWriteAsync(actorUserId, "events", "You do not have write access to the Events module.");
         if (attendances.Count == 0)
         {
             return;
@@ -112,5 +129,23 @@ public class AttendanceService
         await _context.SaveChangesAsync();
 
         await _auditService.LogAsync(actorUserId, "Update", "Attendances", eventId, $"Bulk-recorded attendance for event {eventId}.");
+    }
+
+    private async Task<string?> GetActorRoleAsync(int actorUserId)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.Role.RoleName)
+            .SingleOrDefaultAsync();
+    }
+
+    private async Task EnsureCanWriteAsync(int actorUserId, string module, string message)
+    {
+        var role = await GetActorRoleAsync(actorUserId);
+        if (!AccessHelper.CanWrite(role ?? string.Empty, module))
+        {
+            throw new UnauthorizedAccessException(message);
+        }
     }
 }

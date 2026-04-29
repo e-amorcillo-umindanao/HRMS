@@ -2,17 +2,23 @@
 @inject AppDbContext DbContext
 @inject UnitService UnitService
 @inject AuthService AuthService
+@inject SubdivisionContextService SubdivisionContextService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 
 <PageHeader Title="Units"
             Subtitle="Track subdivision units, head homeowners, and occupant assignments.">
     <Actions>
-        <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/units/add")'>
-            Add Unit
-        </button>
+        @if (CanWriteUnits)
+        {
+            <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/units/add")'>
+                Add Unit
+            </button>
+        }
     </Actions>
 </PageHeader>
+
+<SubdivisionSelector OnSubdivisionSelected="HandleSubdivisionChange" />
 
 <div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
     <div class="card-body p-4">
@@ -73,25 +79,42 @@
                     <tbody>
                         @foreach (var unit in _units)
                         {
-                            <tr class="h-[52px] hover">
-                                <td class="text-sm text-base-content">@DisplayValue(unit.UnitNumber)</td>
+                            <tr class="h-[52px]">
+                                <td class="text-sm font-medium text-base-content">@DisplayValue(unit.UnitNumber)</td>
                                 <td class="text-sm text-base-content/60">@DisplayValue(unit.Address)</td>
                                 <td class="text-sm text-base-content/60">@DisplayValue(unit.Phase?.Name)</td>
-                                <td class="text-sm text-base-content/60">@DisplayValue(GetFullName(unit.HeadHomeowner))</td>
+                                <td>
+                                    @if (unit.HeadHomeownerId.HasValue)
+                                    {
+                                        <a href="@($"/homeowners/{unit.HeadHomeownerId.Value}")"
+                                           class="link link-hover text-primary">
+                                            @DisplayValue(GetFullName(unit.HeadHomeowner))
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-sm text-base-content/30">-</span>
+                                    }
+                                </td>
                                 <td class="text-sm text-base-content/60">@GetOccupantCount(unit)</td>
                                 <td class="text-right">
+                                    <div class="flex items-center justify-end gap-1">
                                     <button class="btn btn-ghost btn-xs"
                                             @onclick='() => NavigationManager.NavigateTo($"/units/{unit.UnitId}")'>
                                         View
                                     </button>
-                                    <button class="btn btn-ghost btn-xs"
-                                            @onclick='() => NavigationManager.NavigateTo($"/units/edit/{unit.UnitId}")'>
-                                        Edit
-                                    </button>
-                                    <button class="btn btn-ghost btn-xs text-error"
-                                            @onclick='() => AskDelete(unit)'>
-                                        Delete
-                                    </button>
+                                    @if (CanWriteUnits)
+                                    {
+                                        <button class="btn btn-ghost btn-xs"
+                                                @onclick='() => NavigationManager.NavigateTo($"/units/edit/{unit.UnitId}")'>
+                                            Edit
+                                        </button>
+                                        <button class="btn btn-ghost btn-xs text-error"
+                                                @onclick='() => AskDelete(unit)'>
+                                            Delete
+                                        </button>
+                                    }
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -118,6 +141,10 @@
 @code {
     private List<Unit> _units = [];
     private List<Phase> _phases = [];
+    private bool CanWriteUnits => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "units");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin
+        ? SubdivisionContextService.SelectedSubdivisionId
+        : AuthService.CurrentSubdivisionId;
     private string _addressFilter = string.Empty;
     private int? _phaseFilter;
     private bool _isLoading = true;
@@ -127,22 +154,48 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadPhasesAsync();
+        await LoadUnitsAsync();
+    }
+
+    private async Task LoadPhasesAsync()
+    {
+        if (!ActiveSubdivisionId.HasValue)
+        {
+            _phases = [];
+            return;
+        }
+
         _phases = await DbContext.Phases
             .AsNoTracking()
-            .OrderBy(p => p.Name)
+            .Where(phase => phase.SubdivisionId == ActiveSubdivisionId.Value)
+            .OrderBy(phase => phase.Name)
             .ToListAsync();
-
-        await LoadUnitsAsync();
     }
 
     private async Task LoadUnitsAsync()
     {
+        if (!ActiveSubdivisionId.HasValue)
+        {
+            _units = [];
+            _isLoading = false;
+            return;
+        }
+
         _isLoading = true;
         StateHasChanged();
 
-        _units = await UnitService.SearchAsync(NullIfEmpty(_addressFilter), _phaseFilter);
+        _units = await UnitService.SearchAsync(ActiveSubdivisionId, NullIfEmpty(_addressFilter), _phaseFilter);
 
         _isLoading = false;
+    }
+
+    private async Task HandleSubdivisionChange(int? subdivisionId)
+    {
+        _phaseFilter = null;
+        await LoadPhasesAsync();
+        await LoadUnitsAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task OnAddressInput(ChangeEventArgs args)

@@ -24,10 +24,13 @@ else
     <PageHeader Title="@_event.Title" Subtitle="Event details and attendance recording.">
         <Actions>
             <button class="btn btn-ghost btn-sm" @onclick="GoBack">Back</button>
-            <button class="btn btn-primary btn-sm"
-                    @onclick='() => NavigationManager.NavigateTo($"/events/edit/{_event.EventId}")'>
-                Edit
-            </button>
+            @if (CanWriteEvents)
+            {
+                <button class="btn btn-primary btn-sm"
+                        @onclick='() => NavigationManager.NavigateTo($"/events/edit/{_event.EventId}")'>
+                    Edit
+                </button>
+            }
         </Actions>
     </PageHeader>
 
@@ -82,14 +85,23 @@ else
                                     <tr class="h-[52px] hover">
                                         <td class="text-sm text-base-content">@GetFullName(row.Homeowner)</td>
                                         <td>
-                                            <select class="select select-bordered select-sm max-w-[180px]"
-                                                    value="@row.Status"
-                                                    @onchange='args => OnStatusChanged(row.Homeowner.HomeownerId, args.Value?.ToString() ?? "Absent")'>
-                                                @foreach (var status in AttendanceStatuses)
-                                                {
-                                                    <option value="@status">@status</option>
-                                                }
-                                            </select>
+                                            @if (CanWriteEvents)
+                                            {
+                                                <select class="select select-bordered select-sm max-w-[180px]"
+                                                        value="@row.Status"
+                                                        @onchange='args => OnStatusChanged(row.Homeowner.HomeownerId, args.Value?.ToString() ?? "Absent")'>
+                                                    @foreach (var status in AttendanceStatuses)
+                                                    {
+                                                        <option value="@status">@status</option>
+                                                    }
+                                                </select>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge badge-sm @GetAttendanceBadgeClass(row.Status)">
+                                                    @row.Status
+                                                </span>
+                                            }
                                         </td>
                                     </tr>
                                 }
@@ -97,9 +109,12 @@ else
                         </table>
                     </div>
                     <TableRecordCount From="1" To="@_rows.Count" Total="@_rows.Count" Entity="attendance records" />
-                    <div class="mt-6 flex justify-end">
-                        <button class="btn btn-primary btn-sm" @onclick="SaveAttendanceAsync">Save Attendance</button>
-                    </div>
+                    @if (CanWriteEvents)
+                    {
+                        <div class="mt-6 flex justify-end">
+                            <button class="btn btn-primary btn-sm" @onclick="SaveAttendanceAsync">Save Attendance</button>
+                        </div>
+                    }
                 }
             </div>
         </div>
@@ -115,6 +130,7 @@ else
     private Event? _event;
     private List<AttendanceRow> _rows = [];
     private bool _isLoading = true;
+    private bool CanWriteEvents => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "events");
 
     protected override async Task OnParametersSetAsync()
     {
@@ -201,6 +217,14 @@ else
 
     private static string DisplayValue(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private static string GetAttendanceBadgeClass(string? status) => status switch
+    {
+        "Present" => "badge-success",
+        "Absent" => "badge-error",
+        "Excused" => "badge-warning",
+        _ => "badge-ghost"
+    };
 
     private static string FormatDateTime(string? value)
     {

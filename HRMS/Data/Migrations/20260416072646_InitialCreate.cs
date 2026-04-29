@@ -11,21 +11,6 @@ namespace HRMS.Data.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "Phases",
-                columns: table => new
-                {
-                    PhaseId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Phases", x => x.PhaseId);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Roles",
                 columns: table => new
                 {
@@ -36,6 +21,51 @@ namespace HRMS.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Roles", x => x.RoleId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Subdivisions",
+                columns: table => new
+                {
+                    SubdivisionId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Name = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Address = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    City = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Province = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ContactNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    SubscriptionStart = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    SubscriptionEnd = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Notes = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CreatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedBy = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Subdivisions", x => x.SubdivisionId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Phases",
+                columns: table => new
+                {
+                    PhaseId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    SubdivisionId = table.Column<int>(type: "int", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CreatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Phases", x => x.PhaseId);
+                    table.ForeignKey(
+                        name: "FK_Phases_Subdivisions_SubdivisionId",
+                        column: x => x.SubdivisionId,
+                        principalTable: "Subdivisions",
+                        principalColumn: "SubdivisionId",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -79,6 +109,7 @@ namespace HRMS.Data.Migrations
                 {
                     ClearanceId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
+                    SubdivisionId = table.Column<int>(type: "int", nullable: false),
                     HomeownerId = table.Column<int>(type: "int", nullable: false),
                     ClearanceType = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Purpose = table.Column<string>(type: "nvarchar(max)", nullable: false),
@@ -92,6 +123,12 @@ namespace HRMS.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ClearanceRequests", x => x.ClearanceId);
+                    table.ForeignKey(
+                        name: "FK_ClearanceRequests_Subdivisions_SubdivisionId",
+                        column: x => x.SubdivisionId,
+                        principalTable: "Subdivisions",
+                        principalColumn: "SubdivisionId",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -100,6 +137,7 @@ namespace HRMS.Data.Migrations
                 {
                     DuesId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
+                    SubdivisionId = table.Column<int>(type: "int", nullable: false),
                     HomeownerId = table.Column<int>(type: "int", nullable: false),
                     Month = table.Column<int>(type: "int", nullable: false),
                     Year = table.Column<int>(type: "int", nullable: false),
@@ -113,6 +151,12 @@ namespace HRMS.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_DuesRecords", x => x.DuesId);
+                    table.ForeignKey(
+                        name: "FK_DuesRecords_Subdivisions_SubdivisionId",
+                        column: x => x.SubdivisionId,
+                        principalTable: "Subdivisions",
+                        principalColumn: "SubdivisionId",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -121,6 +165,7 @@ namespace HRMS.Data.Migrations
                 {
                     EventId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
+                    SubdivisionId = table.Column<int>(type: "int", nullable: false),
                     Title = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     EventDate = table.Column<string>(type: "nvarchar(max)", nullable: false),
@@ -132,13 +177,21 @@ namespace HRMS.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Events", x => x.EventId);
+                    table.ForeignKey(
+                        name: "FK_Events_Subdivisions_SubdivisionId",
+                        column: x => x.SubdivisionId,
+                        principalTable: "Subdivisions",
+                        principalColumn: "SubdivisionId",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
                 name: "HOASettings",
                 columns: table => new
                 {
-                    SettingId = table.Column<int>(type: "int", nullable: false, defaultValue: 1),
+                    SettingId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    SubdivisionId = table.Column<int>(type: "int", nullable: false),
                     HOAName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Subdivision = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     City = table.Column<string>(type: "nvarchar(max)", nullable: false),
@@ -154,6 +207,12 @@ namespace HRMS.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_HOASettings", x => x.SettingId);
+                    table.ForeignKey(
+                        name: "FK_HOASettings_Subdivisions_SubdivisionId",
+                        column: x => x.SubdivisionId,
+                        principalTable: "Subdivisions",
+                        principalColumn: "SubdivisionId",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -162,6 +221,7 @@ namespace HRMS.Data.Migrations
                 {
                     HomeownerId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
+                    SubdivisionId = table.Column<int>(type: "int", nullable: false),
                     FirstName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     MiddleName = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     LastName = table.Column<string>(type: "nvarchar(max)", nullable: false),
@@ -189,6 +249,12 @@ namespace HRMS.Data.Migrations
                         principalTable: "Phases",
                         principalColumn: "PhaseId",
                         onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_Homeowners_Subdivisions_SubdivisionId",
+                        column: x => x.SubdivisionId,
+                        principalTable: "Subdivisions",
+                        principalColumn: "SubdivisionId",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -200,6 +266,7 @@ namespace HRMS.Data.Migrations
                     Username = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     RoleId = table.Column<int>(type: "int", nullable: false),
+                    SubdivisionId = table.Column<int>(type: "int", nullable: true),
                     HomeownerId = table.Column<int>(type: "int", nullable: true),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     CreatedAt = table.Column<string>(type: "nvarchar(max)", nullable: false),
@@ -220,6 +287,12 @@ namespace HRMS.Data.Migrations
                         principalTable: "Roles",
                         principalColumn: "RoleId",
                         onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Users_Subdivisions_SubdivisionId",
+                        column: x => x.SubdivisionId,
+                        principalTable: "Subdivisions",
+                        principalColumn: "SubdivisionId",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -228,6 +301,7 @@ namespace HRMS.Data.Migrations
                 {
                     UnitId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
+                    SubdivisionId = table.Column<int>(type: "int", nullable: false),
                     UnitNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Address = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     PhaseId = table.Column<int>(type: "int", nullable: true),
@@ -251,6 +325,12 @@ namespace HRMS.Data.Migrations
                         principalColumn: "PhaseId",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
+                        name: "FK_Units_Subdivisions_SubdivisionId",
+                        column: x => x.SubdivisionId,
+                        principalTable: "Subdivisions",
+                        principalColumn: "SubdivisionId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
                         name: "FK_Units_Users_CreatedBy",
                         column: x => x.CreatedBy,
                         principalTable: "Users",
@@ -264,6 +344,7 @@ namespace HRMS.Data.Migrations
                 {
                     ViolationId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
+                    SubdivisionId = table.Column<int>(type: "int", nullable: false),
                     ViolationNumber = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     HomeownerId = table.Column<int>(type: "int", nullable: true),
                     HomeownerName = table.Column<string>(type: "nvarchar(max)", nullable: false),
@@ -287,6 +368,12 @@ namespace HRMS.Data.Migrations
                         principalColumn: "HomeownerId",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
+                        name: "FK_ViolationRecords_Subdivisions_SubdivisionId",
+                        column: x => x.SubdivisionId,
+                        principalTable: "Subdivisions",
+                        principalColumn: "SubdivisionId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
                         name: "FK_ViolationRecords_Users_FiledBy",
                         column: x => x.FiledBy,
                         principalTable: "Users",
@@ -306,6 +393,7 @@ namespace HRMS.Data.Migrations
                 {
                     MSMEId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
+                    SubdivisionId = table.Column<int>(type: "int", nullable: false),
                     BusinessName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     BusinessType = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     HomeownerId = table.Column<int>(type: "int", nullable: false),
@@ -328,6 +416,12 @@ namespace HRMS.Data.Migrations
                         principalColumn: "HomeownerId",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
+                        name: "FK_MSMEs_Subdivisions_SubdivisionId",
+                        column: x => x.SubdivisionId,
+                        principalTable: "Subdivisions",
+                        principalColumn: "SubdivisionId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
                         name: "FK_MSMEs_Units_UnitId",
                         column: x => x.UnitId,
                         principalTable: "Units",
@@ -347,6 +441,7 @@ namespace HRMS.Data.Migrations
                 {
                     InteractionLogId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
+                    SubdivisionId = table.Column<int>(type: "int", nullable: false),
                     HomeownerId = table.Column<int>(type: "int", nullable: true),
                     MSMEId = table.Column<int>(type: "int", nullable: true),
                     InteractionType = table.Column<string>(type: "nvarchar(max)", nullable: false),
@@ -370,6 +465,12 @@ namespace HRMS.Data.Migrations
                         principalTable: "MSMEs",
                         principalColumn: "MSMEId",
                         onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_InteractionLogs_Subdivisions_SubdivisionId",
+                        column: x => x.SubdivisionId,
+                        principalTable: "Subdivisions",
+                        principalColumn: "SubdivisionId",
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_InteractionLogs_Users_CreatedBy",
                         column: x => x.CreatedBy,
@@ -410,6 +511,11 @@ namespace HRMS.Data.Migrations
                 column: "ProcessedBy");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ClearanceRequests_SubdivisionId",
+                table: "ClearanceRequests",
+                column: "SubdivisionId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_DuesRecords_CreatedBy",
                 table: "DuesRecords",
                 column: "CreatedBy");
@@ -421,9 +527,25 @@ namespace HRMS.Data.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_DuesRecords_SubdivisionId",
+                table: "DuesRecords",
+                column: "SubdivisionId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Events_CreatedBy",
                 table: "Events",
                 column: "CreatedBy");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Events_SubdivisionId",
+                table: "Events",
+                column: "SubdivisionId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_HOASettings_SubdivisionId",
+                table: "HOASettings",
+                column: "SubdivisionId",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_HOASettings_UpdatedBy",
@@ -439,6 +561,11 @@ namespace HRMS.Data.Migrations
                 name: "IX_Homeowners_PhaseId",
                 table: "Homeowners",
                 column: "PhaseId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Homeowners_SubdivisionId",
+                table: "Homeowners",
+                column: "SubdivisionId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Homeowners_UnitId",
@@ -461,6 +588,11 @@ namespace HRMS.Data.Migrations
                 column: "MSMEId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_InteractionLogs_SubdivisionId",
+                table: "InteractionLogs",
+                column: "SubdivisionId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_MSMEs_CreatedBy",
                 table: "MSMEs",
                 column: "CreatedBy");
@@ -471,9 +603,25 @@ namespace HRMS.Data.Migrations
                 column: "HomeownerId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_MSMEs_SubdivisionId",
+                table: "MSMEs",
+                column: "SubdivisionId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_MSMEs_UnitId",
                 table: "MSMEs",
                 column: "UnitId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Phases_SubdivisionId",
+                table: "Phases",
+                column: "SubdivisionId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Subdivisions_Name",
+                table: "Subdivisions",
+                column: "Name",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Units_CreatedBy",
@@ -491,6 +639,11 @@ namespace HRMS.Data.Migrations
                 column: "PhaseId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Units_SubdivisionId",
+                table: "Units",
+                column: "SubdivisionId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Users_HomeownerId",
                 table: "Users",
                 column: "HomeownerId",
@@ -501,6 +654,11 @@ namespace HRMS.Data.Migrations
                 name: "IX_Users_RoleId",
                 table: "Users",
                 column: "RoleId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_SubdivisionId",
+                table: "Users",
+                column: "SubdivisionId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_Username",
@@ -517,6 +675,11 @@ namespace HRMS.Data.Migrations
                 name: "IX_ViolationRecords_HomeownerId",
                 table: "ViolationRecords",
                 column: "HomeownerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ViolationRecords_SubdivisionId",
+                table: "ViolationRecords",
+                column: "SubdivisionId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ViolationRecords_UpdatedBy",
@@ -678,6 +841,9 @@ namespace HRMS.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "Roles");
+
+            migrationBuilder.DropTable(
+                name: "Subdivisions");
         }
     }
 }

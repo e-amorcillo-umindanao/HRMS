@@ -29,6 +29,13 @@ else if (_homeowner is null)
 else
 {
     <div class="flex flex-col gap-4">
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <div role="alert" class="alert alert-error">
+                <span>@_errorMessage</span>
+            </div>
+        }
+
         <div class="card border border-base-300 bg-base-100 shadow-none">
             <div class="card-body p-0">
                 <div class="border-b border-base-300 p-5">
@@ -235,40 +242,59 @@ else
     private List<DuesRecord> _dues = [];
     private List<ViolationRecord> _violations = [];
     private List<ClearanceRequest> _clearances = [];
+    private string? _errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
-        var homeownerId = AuthService.CurrentHomeownerId;
-
-        if (!homeownerId.HasValue)
+        try
         {
-            _loading = false;
-            return;
+            var homeownerId = AuthService.CurrentHomeownerId;
+
+            if (!homeownerId.HasValue)
+            {
+                _loading = false;
+                return;
+            }
+
+            var homeownerTask = HomeownerService.GetByIdAsync(homeownerId.Value);
+            var duesTask = DuesService.GetByHomeownerIdAsync(homeownerId.Value);
+            var violationsTask = ViolationService.GetByHomeownerIdAsync(homeownerId.Value);
+            var clearancesTask = ClearanceService.GetByHomeownerIdAsync(homeownerId.Value);
+
+            await Task.WhenAll(homeownerTask, duesTask, violationsTask, clearancesTask);
+
+            _homeowner = await homeownerTask;
+            _dues = await duesTask;
+            _violations = await violationsTask;
+            _clearances = await clearancesTask;
+        }
+        catch (Exception exception)
+        {
+            _errorMessage = $"Unable to load your homeowner profile: {exception.Message}";
         }
 
-        var homeownerTask = HomeownerService.GetByIdAsync(homeownerId.Value);
-        var duesTask = DuesService.GetByHomeownerIdAsync(homeownerId.Value);
-        var violationsTask = ViolationService.GetByHomeownerIdAsync(homeownerId.Value);
-        var clearancesTask = ClearanceService.GetByHomeownerIdAsync(homeownerId.Value);
-
-        await Task.WhenAll(homeownerTask, duesTask, violationsTask, clearancesTask);
-
-        _homeowner = await homeownerTask;
-        _dues = await duesTask;
-        _violations = await violationsTask;
-        _clearances = await clearancesTask;
         _loading = false;
     }
 
-    private static string GetInitials(Homeowner homeowner)
+    private static string GetInitials(Homeowner? homeowner)
     {
+        if (homeowner is null)
+        {
+            return "H";
+        }
+
         var first = string.IsNullOrWhiteSpace(homeowner.FirstName) ? string.Empty : homeowner.FirstName[..1];
         var last = string.IsNullOrWhiteSpace(homeowner.LastName) ? string.Empty : homeowner.LastName[..1];
         return (first + last).ToUpperInvariant();
     }
 
-    private static string GetFullName(Homeowner homeowner)
+    private static string GetFullName(Homeowner? homeowner)
     {
+        if (homeowner is null)
+        {
+            return "-";
+        }
+
         var parts = new[] { homeowner.FirstName, homeowner.MiddleName, homeowner.LastName }
             .Where(value => !string.IsNullOrWhiteSpace(value));
 
@@ -300,8 +326,8 @@ else
 
     private static string FormatCurrency(decimal amount) => $"PHP {amount:N2}";
 
-    private static List<string> GetCategories(Homeowner homeowner) =>
-        string.IsNullOrWhiteSpace(homeowner.Categories)
+    private static List<string> GetCategories(Homeowner? homeowner) =>
+        homeowner is null || string.IsNullOrWhiteSpace(homeowner.Categories)
             ? []
             : homeowner.Categories
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

@@ -1,17 +1,24 @@
 @page "/msme"
 @inject MSMEService MSMEService
 @inject AuthService AuthService
+@inject SubdivisionContextService SubdivisionContextService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 
 <PageHeader Title="MSME Registry"
             Subtitle="Track registered businesses, owners, and permit status.">
     <Actions>
-        <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/msme/add")'>
-            Register Business
-        </button>
+        @if (CanWriteMsme)
+        {
+            <button class="btn btn-primary btn-sm" @onclick='() => NavigationManager.NavigateTo("/msme/add")'>
+                Register Business
+            </button>
+        }
     </Actions>
 </PageHeader>
+
+<SubdivisionSelector OnSubdivisionSelected="HandleSubdivisionChange"
+                     IsReadOnly="false" />
 
 <div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
     <div class="card-body p-4">
@@ -86,28 +93,45 @@
                     <tbody>
                         @foreach (var msme in _msmes)
                         {
-                            <tr class="h-[52px] hover">
-                                <td class="text-sm text-base-content">@DisplayValue(msme.BusinessName)</td>
+                            <tr class="h-[52px]">
+                                <td class="text-sm font-medium text-base-content">@DisplayValue(msme.BusinessName)</td>
                                 <td>
                                     <span class="badge badge-sm @GetBusinessTypeBadge(msme.BusinessType)">@DisplayValue(msme.BusinessType)</span>
                                 </td>
                                 <td class="text-sm text-base-content/60">@DisplayValue(GetFullName(msme.Homeowner))</td>
                                 <td><StatusChip Status="@msme.Status" /></td>
                                 <td class="text-sm text-base-content/60">@FormatDate(msme.RegistrationDate)</td>
-                                <td class="@(IsExpiredWarning(msme) ? "text-error font-semibold" : "text-base-content/60") text-sm">@FormatDate(msme.ExpiryDate)</td>
+                                <td>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-sm text-base-content/80">@FormatDate(msme.ExpiryDate)</span>
+                                        @if (IsExpiringSoon(msme))
+                                        {
+                                            <span class="badge badge-warning badge-xs">Expiring soon</span>
+                                        }
+                                        @if (IsExpired(msme))
+                                        {
+                                            <span class="badge badge-error badge-xs">Expired</span>
+                                        }
+                                    </div>
+                                </td>
                                 <td class="text-right">
+                                    <div class="flex items-center justify-end gap-1">
                                     <button class="btn btn-ghost btn-xs"
                                             @onclick='() => NavigationManager.NavigateTo($"/msme/{msme.MSMEId}")'>
                                         View
                                     </button>
-                                    <button class="btn btn-ghost btn-xs"
-                                            @onclick='() => NavigationManager.NavigateTo($"/msme/edit/{msme.MSMEId}")'>
-                                        Edit
-                                    </button>
-                                    <button class="btn btn-ghost btn-xs text-error"
-                                            @onclick='() => AskDelete(msme)'>
-                                        Delete
-                                    </button>
+                                    @if (CanWriteMsme)
+                                    {
+                                        <button class="btn btn-ghost btn-xs"
+                                                @onclick='() => NavigationManager.NavigateTo($"/msme/edit/{msme.MSMEId}")'>
+                                            Edit
+                                        </button>
+                                        <button class="btn btn-ghost btn-xs text-error"
+                                                @onclick='() => AskDelete(msme)'>
+                                            Delete
+                                        </button>
+                                    }
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -144,6 +168,10 @@
     ];
 
     private List<MSME> _msmes = [];
+    private bool CanWriteMsme => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "msme");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin
+        ? SubdivisionContextService.SelectedSubdivisionId
+        : AuthService.CurrentSubdivisionId;
     private string _nameFilter = string.Empty;
     private string _statusFilter = string.Empty;
     private string _businessTypeFilter = string.Empty;
@@ -159,15 +187,29 @@
 
     private async Task LoadMsmesAsync()
     {
+        if (!ActiveSubdivisionId.HasValue)
+        {
+            _msmes = [];
+            _isLoading = false;
+            return;
+        }
+
         _isLoading = true;
         StateHasChanged();
 
         _msmes = await MSMEService.SearchAsync(
+            ActiveSubdivisionId,
             NullIfEmpty(_nameFilter),
             NullIfEmpty(_statusFilter),
             NullIfEmpty(_businessTypeFilter));
 
         _isLoading = false;
+    }
+
+    private async Task HandleSubdivisionChange(int? subdivisionId)
+    {
+        await LoadMsmesAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task OnNameInput(ChangeEventArgs args)
@@ -253,12 +295,17 @@
         return parsed.ToString("MMMM dd, yyyy");
     }
 
-    private static bool IsExpiredWarning(MSME msme) =>
+    private static bool IsExpiringSoon(MSME msme) =>
         !string.IsNullOrWhiteSpace(msme.ExpiryDate)
         && DateTime.TryParse(msme.ExpiryDate, out var expiryDate)
-        && expiryDate.Date < DateTime.Today
-        && msme.Status != "Expired"
-        && msme.Status != "Closed";
+        && expiryDate.Date >= DateTime.Today
+        && expiryDate.Date <= DateTime.Today.AddDays(30)
+        && msme.Status == "Active";
+
+    private static bool IsExpired(MSME msme) =>
+        !string.IsNullOrWhiteSpace(msme.ExpiryDate)
+        && DateTime.TryParse(msme.ExpiryDate, out var expiryDate)
+        && expiryDate.Date < DateTime.Today;
 
     private static string GetBusinessTypeBadge(string? businessType) => businessType switch
     {
