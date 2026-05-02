@@ -17,7 +17,7 @@
     </Actions>
 </PageHeader>
 
-<SubdivisionSelector OnSubdivisionSelected="HandleSubdivisionChange" />
+<SubdivisionSelector OnSubdivisionSelected="OnSubdivisionChanged" />
 
 <div class="card mb-4 border border-base-300 bg-base-100 shadow-none">
     <div class="card-body p-4">
@@ -182,7 +182,7 @@
         _isLoading = false;
     }
 
-    private async Task HandleSubdivisionChange(int? subdivisionId)
+    private async Task OnSubdivisionChanged(int? subdivisionId)
     {
         await LoadEventsAsync();
         await InvokeAsync(StateHasChanged);
@@ -237,7 +237,11 @@
     }
 
     private static int GetAttendeeCount(Event evt) =>
-        evt.Attendances.Count(attendance => attendance.Status == "Present");
+        evt.Attendances.Count(attendance =>
+            attendance.Status == "Present" &&
+            attendance.Homeowner is not null &&
+            !attendance.Homeowner.IsDeleted &&
+            attendance.Homeowner.SubdivisionId == evt.SubdivisionId);
 
     private static string DisplayValue(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "-" : value;

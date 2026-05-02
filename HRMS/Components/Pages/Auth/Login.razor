@@ -100,7 +100,7 @@
     {
         if (AuthSvc.IsAuthenticated)
         {
-            Nav.NavigateTo("/dashboard", replace: true);
+            Nav.NavigateTo(AuthSvc.DefaultRoute, replace: true);
         }
     }
 
@@ -121,7 +121,7 @@
 
         if (success)
         {
-            Nav.NavigateTo("/dashboard", replace: true);
+            Nav.NavigateTo(AuthSvc.DefaultRoute, replace: true);
             return;
         }
 

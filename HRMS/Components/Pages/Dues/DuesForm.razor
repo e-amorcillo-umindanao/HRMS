@@ -57,11 +57,18 @@ else
                     </select>
                 </FieldGroup>
                 <FieldGroup Label="Amount">
-                    <input type="number" min="0" step="0.01" class="input input-bordered w-full" @bind="_model.Amount" />
+                    <input type="text"
+                           inputmode="decimal"
+                           class="input input-bordered w-full"
+                           placeholder="0.00"
+                           value="@_amountInput"
+                           @oninput="OnAmountInput"
+                           @onblur="FormatAmountOnBlur" />
                 </FieldGroup>
                 <FieldGroup Label="Due Date">
                     <input type="date"
                            class="input input-bordered w-full"
+                           max="@MaxDueDateString"
                            value="@FormatHtmlDate(_dueDate)"
                            @onchange="OnDueDateChanged" />
                 </FieldGroup>
@@ -83,6 +90,7 @@ else
                     <FieldGroup Label="Paid Date">
                         <input type="date"
                                class="input input-bordered w-full"
+                               max="@TodayDateString"
                                value="@FormatHtmlDate(_paidDate)"
                                @onchange="OnPaidDateChanged" />
                     </FieldGroup>
@@ -117,6 +125,12 @@ else
     private bool _isLoading = true;
     private bool _isSaving;
     private string? _errorMessage;
+    private string _amountInput = "0.00";
+    private bool _hasAmountParseError;
+    private int MinDuesYear => 2020;
+    private int MaxDuesYear => DateTime.Today.Year + 1;
+    private string MaxDueDateString => new DateTime(MaxDuesYear, 12, 31).ToString("yyyy-MM-dd");
+    private static string TodayDateString => DateTime.Today.ToString("yyyy-MM-dd");
 
     private bool IsEdit => DuesId.HasValue;
 
@@ -142,6 +156,8 @@ else
             _model.Month = dues.Month;
             _model.Year = dues.Year;
             _model.Amount = dues.Amount;
+            _amountInput = FormatHelper.Number(dues.Amount);
+            _hasAmountParseError = false;
             _model.Status = dues.Status;
             _dueDate = ParseDate(dues.DueDate);
             _paidDate = ParseDate(dues.PaidDate);
@@ -157,6 +173,7 @@ else
 
     private async Task SaveAsync()
     {
+        FormatAmountOnBlur();
         _errorMessage = Validate();
         if (!string.IsNullOrWhiteSpace(_errorMessage) || AuthService.CurrentUser is null || !_selectedHomeownerId.HasValue)
         {
@@ -232,6 +249,16 @@ else
             return "Year is required.";
         }
 
+        if (_model.Year < MinDuesYear || _model.Year > MaxDuesYear)
+        {
+            return $"Year must be between {MinDuesYear} and {MaxDuesYear}.";
+        }
+
+        if (_hasAmountParseError)
+        {
+            return "Amount must be a valid number.";
+        }
+
         if (_model.Amount <= 0)
         {
             return "Amount must be greater than zero.";
@@ -242,9 +269,19 @@ else
             return "Due Date is required.";
         }
 
+        if (_dueDate.Value.Date > new DateTime(MaxDuesYear, 12, 31))
+        {
+            return $"Due Date cannot be later than {MaxDueDateString}.";
+        }
+
         if (_model.Status == "Paid" && !_paidDate.HasValue)
         {
             return "Paid Date is required when status is Paid.";
+        }
+
+        if (_model.Status == "Paid" && _paidDate!.Value.Date > DateTime.Today)
+        {
+            return "Paid Date cannot be in the future.";
         }
 
         return null;
@@ -256,6 +293,8 @@ else
         _model.Month = DateTime.UtcNow.Month;
         _model.Year = DateTime.UtcNow.Year;
         _model.Amount = 0;
+        _amountInput = FormatHelper.Number(_model.Amount);
+        _hasAmountParseError = false;
         _model.Status = "Unpaid";
         _selectedHomeownerId = null;
         _dueDate = DateTime.UtcNow.Date;
@@ -274,11 +313,38 @@ else
 
     private static List<int> BuildYearOptions()
     {
-        var currentYear = DateTime.UtcNow.Year;
+        const int minDuesYear = 2020;
+        var maxDuesYear = DateTime.Today.Year + 1;
 
-        return Enumerable.Range(currentYear - 5, 9)
+        return Enumerable.Range(minDuesYear, maxDuesYear - minDuesYear + 1)
             .OrderByDescending(year => year)
             .ToList();
+    }
+
+    private void OnAmountInput(ChangeEventArgs args)
+    {
+        _amountInput = args.Value?.ToString() ?? string.Empty;
+
+        if (TryParseAmount(_amountInput, out var amount))
+        {
+            _model.Amount = amount;
+            _hasAmountParseError = false;
+            return;
+        }
+
+        _hasAmountParseError = !string.IsNullOrWhiteSpace(_amountInput);
+    }
+
+    private void FormatAmountOnBlur()
+    {
+        if (!TryParseAmount(_amountInput, out var amount))
+        {
+            return;
+        }
+
+        _model.Amount = amount;
+        _amountInput = FormatHelper.Number(amount);
+        _hasAmountParseError = false;
     }
 
     private void OnDueDateChanged(ChangeEventArgs args) =>
@@ -323,6 +389,28 @@ else
 
     private static string FormatHtmlDate(DateTime? value) =>
         value?.ToString("yyyy-MM-dd") ?? string.Empty;
+
+    private static bool TryParseAmount(string? value, out decimal amount)
+    {
+        amount = 0;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var sanitized = value
+            .Replace("\u20B1", string.Empty, StringComparison.Ordinal)
+            .Replace("PHP", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace(",", string.Empty, StringComparison.Ordinal)
+            .Trim();
+
+        return decimal.TryParse(
+            sanitized,
+            System.Globalization.NumberStyles.Number,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out amount);
+    }
 
     private sealed class DuesFormModel
     {

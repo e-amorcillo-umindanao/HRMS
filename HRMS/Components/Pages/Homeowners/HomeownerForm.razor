@@ -41,6 +41,7 @@ else
                 <FieldGroup Label="Birth Date">
                     <input type="date"
                            class="input input-bordered w-full"
+                           max="@TodayDateString"
                            value="@FormatHtmlDate(_birthDate)"
                            @onchange="OnBirthDateChanged" />
                 </FieldGroup>
@@ -112,6 +113,7 @@ else
                 <FieldGroup Label="Residency Since">
                     <input type="date"
                            class="input input-bordered w-full"
+                           max="@TodayDateString"
                            value="@FormatHtmlDate(_residencySince)"
                            @onchange="OnResidencySinceChanged" />
                 </FieldGroup>
@@ -163,6 +165,7 @@ else
     private bool _isLoading = true;
     private bool _isSaving;
     private string? _errorMessage;
+    private static string TodayDateString => DateTime.Today.ToString("yyyy-MM-dd");
 
     private bool IsEdit => HomeownerId.HasValue;
 
@@ -303,6 +306,11 @@ else
             return "Birth Date is required.";
         }
 
+        if (_birthDate.Value.Date > DateTime.Today)
+        {
+            return "Birth Date cannot be in the future.";
+        }
+
         if (string.IsNullOrWhiteSpace(_model.Gender))
         {
             return "Gender is required.";
@@ -311,6 +319,11 @@ else
         if (_residencySince is null)
         {
             return "Residency Since is required.";
+        }
+
+        if (_residencySince.Value.Date > DateTime.Today)
+        {
+            return "Residency Since cannot be in the future.";
         }
 
         return null;

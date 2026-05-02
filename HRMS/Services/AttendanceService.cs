@@ -16,20 +16,17 @@ public class AttendanceService
         _auditService = auditService;
     }
 
-    public async Task<List<Attendance>> GetByEventAsync(int eventId, int? subdivisionId = null)
+    public async Task<List<Attendance>> GetByEventAsync(int eventId, int subdivisionId)
     {
-        var query = _context.Attendances
+        return await _context.Attendances
             .AsNoTracking()
             .Include(attendance => attendance.Homeowner)
             .Include(attendance => attendance.Event)
-            .Where(attendance => attendance.EventId == eventId);
-
-        if (subdivisionId.HasValue)
-        {
-            query = query.Where(attendance => attendance.Event.SubdivisionId == subdivisionId.Value);
-        }
-
-        return await query
+            .Where(attendance =>
+                attendance.EventId == eventId &&
+                attendance.Event.SubdivisionId == subdivisionId &&
+                attendance.Homeowner.SubdivisionId == subdivisionId &&
+                !attendance.Homeowner.IsDeleted)
             .OrderBy(attendance => attendance.Homeowner.LastName)
             .ThenBy(attendance => attendance.Homeowner.FirstName)
             .ToListAsync();
@@ -55,6 +52,8 @@ public class AttendanceService
     public async Task<Attendance> RecordAsync(Attendance attendance, int actorUserId)
     {
         await EnsureCanWriteAsync(actorUserId, "events", "You do not have write access to the Events module.");
+        await EnsureEventAndHomeownerShareSubdivisionAsync(attendance.EventId, [attendance.HomeownerId]);
+
         var existing = await _context.Attendances
             .SingleOrDefaultAsync(record =>
                 record.EventId == attendance.EventId &&
@@ -95,10 +94,17 @@ public class AttendanceService
         }
 
         var eventId = attendances[0].EventId;
+        if (attendances.Any(attendance => attendance.EventId != eventId))
+        {
+            throw new InvalidOperationException("All attendance rows must belong to the same event.");
+        }
+
         var homeownerIds = attendances
             .Select(attendance => attendance.HomeownerId)
             .Distinct()
             .ToList();
+
+        await EnsureEventAndHomeownerShareSubdivisionAsync(eventId, homeownerIds);
 
         var existingRecords = await _context.Attendances
             .Where(record => record.EventId == eventId && homeownerIds.Contains(record.HomeownerId))
@@ -146,6 +152,38 @@ public class AttendanceService
         if (!AccessHelper.CanWrite(role ?? string.Empty, module))
         {
             throw new UnauthorizedAccessException(message);
+        }
+    }
+
+    private async Task EnsureEventAndHomeownerShareSubdivisionAsync(int eventId, IReadOnlyCollection<int> homeownerIds)
+    {
+        var evt = await _context.Events
+            .AsNoTracking()
+            .SingleOrDefaultAsync(record => record.EventId == eventId);
+
+        if (evt is null)
+        {
+            throw new InvalidOperationException("Event not found.");
+        }
+
+        var distinctHomeownerIds = homeownerIds
+            .Distinct()
+            .ToList();
+
+        var homeowners = await _context.Homeowners
+            .AsNoTracking()
+            .Where(homeowner => distinctHomeownerIds.Contains(homeowner.HomeownerId) && !homeowner.IsDeleted)
+            .Select(homeowner => new { homeowner.HomeownerId, homeowner.SubdivisionId })
+            .ToListAsync();
+
+        if (homeowners.Count != distinctHomeownerIds.Count)
+        {
+            throw new InvalidOperationException("One or more homeowners were not found.");
+        }
+
+        if (homeowners.Any(homeowner => homeowner.SubdivisionId != evt.SubdivisionId))
+        {
+            throw new InvalidOperationException("Cannot record attendance: homeowner does not belong to this subdivision.");
         }
     }
 }

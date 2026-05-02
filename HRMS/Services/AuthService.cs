@@ -34,6 +34,7 @@ public class AuthService
 
     public int? CurrentHomeownerId => CurrentUser?.HomeownerId;
     public int? CurrentSubdivisionId => CurrentUser?.SubdivisionId;
+    public string CurrentSubdivisionName => CurrentUser?.Subdivision?.Name ?? string.Empty;
 
     public bool IsAuthenticated => CurrentUser is not null;
     public bool IsSuperAdmin => HasRole("Super Admin");

@@ -107,7 +107,7 @@
                             <tr class="h-[52px]">
                                 <td class="text-sm font-medium text-base-content">@DisplayValue(GetFullName(dues.Homeowner))</td>
                                 <td class="text-sm text-base-content/60">@FormatMonthYear(dues.Month, dues.Year)</td>
-                                <td class="text-sm font-medium text-base-content">@FormatCurrency(dues.Amount)</td>
+                                <td class="text-sm font-medium text-base-content">@FormatHelper.Peso(dues.Amount)</td>
                                 <td class="text-sm text-base-content/60">@FormatDate(dues.DueDate)</td>
                                 <td class="text-sm text-base-content/60">@FormatDate(dues.PaidDate)</td>
                                 <td><StatusChip Status="@dues.Status" /></td>
@@ -361,5 +361,4 @@
         return System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
     }
 
-    private static string FormatCurrency(decimal amount) => $"{'\u20B1'}{amount:N2}";
 }

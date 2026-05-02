@@ -334,25 +334,28 @@
     {
         _showConfirm = false;
         _pendingDeleteId = null;
+        _confirmMessage = string.Empty;
         return Task.CompletedTask;
     }
 
     private async Task DeleteConfirmedAsync()
     {
-        _showConfirm = false;
-
         if (!_pendingDeleteId.HasValue || AuthService.CurrentUser is null)
         {
+            await CancelDelete();
             return;
         }
 
-        var deleted = await HomeownerService.SoftDeleteAsync(_pendingDeleteId.Value, AuthService.CurrentUser.UserId);
-        _pendingDeleteId = null;
+        var homeownerId = _pendingDeleteId.Value;
+        await CancelDelete();
+
+        var deleted = await HomeownerService.SoftDeleteAsync(homeownerId, AuthService.CurrentUser.UserId);
 
         if (deleted)
         {
             await JS.InvokeVoidAsync("hrms.showToast", "Homeowner deleted successfully.", "success");
             await LoadHomeownersAsync();
+            await InvokeAsync(StateHasChanged);
         }
     }
 

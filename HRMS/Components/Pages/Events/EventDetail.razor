@@ -3,6 +3,7 @@
 @inject AttendanceService AttendanceService
 @inject HomeownerService HomeownerService
 @inject AuthService AuthService
+@inject SubdivisionContextService SubdivisionContextService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 
@@ -131,6 +132,9 @@ else
     private List<AttendanceRow> _rows = [];
     private bool _isLoading = true;
     private bool CanWriteEvents => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "events");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin
+        ? SubdivisionContextService.SelectedSubdivisionId
+        : AuthService.CurrentSubdivisionId;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -141,7 +145,12 @@ else
     {
         _isLoading = true;
 
-        _event = await EventService.GetByIdAsync(Id);
+        _event = await EventService.GetByIdAsync(Id, ActiveSubdivisionId);
+        if (_event is null && AuthService.IsSuperAdmin && !ActiveSubdivisionId.HasValue)
+        {
+            _event = await EventService.GetByIdAsync(Id);
+        }
+
         if (_event is null)
         {
             _rows = [];
@@ -149,8 +158,9 @@ else
             return;
         }
 
-        var activeHomeowners = await HomeownerService.GetAllActiveAsync();
-        var attendanceRecords = await AttendanceService.GetByEventAsync(Id);
+        var subdivisionId = _event.SubdivisionId;
+        var activeHomeowners = await HomeownerService.GetAllActiveAsync(subdivisionId);
+        var attendanceRecords = await AttendanceService.GetByEventAsync(Id, subdivisionId);
         var attendanceByHomeowner = attendanceRecords.ToDictionary(record => record.HomeownerId, record => record);
 
         _rows = activeHomeowners

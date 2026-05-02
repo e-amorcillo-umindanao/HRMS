@@ -172,7 +172,7 @@ public static class PdfExportHelper
                 {
                     table.Cell().Element(cell => StyleBodyCell(cell, GetMonthName(dues.Month)));
                     table.Cell().Element(cell => StyleBodyCell(cell, dues.Year.ToString()));
-                    table.Cell().Element(cell => StyleBodyCell(cell, FormatCurrency(dues.Amount)));
+                    table.Cell().Element(cell => StyleBodyCell(cell, FormatHelper.Peso(dues.Amount)));
                     table.Cell().Element(cell => StyleBodyCell(cell, FormatDate(dues.DueDate)));
                     table.Cell().Element(cell => StyleBodyCell(cell, dues.Status));
                     table.Cell().Element(cell => StyleBodyCell(cell, FormatDate(dues.PaidDate)));
@@ -184,7 +184,7 @@ public static class PdfExportHelper
                 }
             });
 
-            column.Item().AlignRight().Text($"Total Amount Due: {FormatCurrency(totalDue)}").Bold().FontSize(12);
+            column.Item().AlignRight().Text($"Total Amount Due: {FormatHelper.Peso(totalDue)}").Bold().FontSize(12);
         });
     }
 
@@ -428,8 +428,6 @@ public static class PdfExportHelper
 
     private static string DisplayValue(string? value) =>
         string.IsNullOrWhiteSpace(value) ? "-" : value;
-
-    private static string FormatCurrency(decimal value) => $"PHP {value:N2}";
 
     private static byte[]? TryReadLogo(string? logoPath)
     {

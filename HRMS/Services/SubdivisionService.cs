@@ -23,6 +23,16 @@ public class SubdivisionService
             .ToListAsync();
     }
 
+    public async Task<List<Subdivision>> GetActiveAsync()
+    {
+        await using var ctx = await _factory.CreateDbContextAsync();
+        return await ctx.Subdivisions
+            .AsNoTracking()
+            .Where(subdivision => subdivision.Status == "Active")
+            .OrderBy(subdivision => subdivision.Name)
+            .ToListAsync();
+    }
+
     public async Task<Subdivision?> GetByIdAsync(int id)
     {
         await using var ctx = await _factory.CreateDbContextAsync();

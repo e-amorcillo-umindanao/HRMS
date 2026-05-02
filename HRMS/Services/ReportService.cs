@@ -360,7 +360,7 @@ public class ReportService
             {
                 GetFullName(record.Homeowner),
                 FormatMonthYear(record.Month, record.Year),
-                FormatCurrency(record.Amount),
+                FormatHelper.Peso(record.Amount),
                 FormatDate(record.DueDate),
                 FormatDate(record.PaidDate),
                 DisplayValue(record.Status)
@@ -404,7 +404,7 @@ public class ReportService
             {
                 GetFullName(record.Homeowner),
                 FormatMonthYear(record.Month, record.Year),
-                FormatCurrency(record.Amount),
+                FormatHelper.Peso(record.Amount),
                 FormatDate(record.DueDate),
                 FormatDate(record.PaidDate),
                 DisplayValue(record.Status)
@@ -636,8 +636,6 @@ public class ReportService
 
         return CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month);
     }
-
-    private static string FormatCurrency(decimal amount) => $"PHP {amount:N2}";
 
     private sealed class AttendanceMetric
     {

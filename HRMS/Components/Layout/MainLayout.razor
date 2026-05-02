@@ -8,7 +8,15 @@
 
     <aside class="hrms-sidebar">
         <div class="sidebar-header">
-            <span class="sidebar-logo">HRMS</span>
+            <div class="sidebar-brand">
+                <span class="sidebar-logo">HRMS</span>
+                @if (!IsSuperAdmin && !string.IsNullOrWhiteSpace(AuthSvc.CurrentSubdivisionName))
+                {
+                    <span class="sidebar-subdivision-badge sidebar-label-visible" title="@AuthSvc.CurrentSubdivisionName">
+                        @AuthSvc.CurrentSubdivisionName
+                    </span>
+                }
+            </div>
             <button class="sidebar-toggle-btn" @onclick="ToggleSidebar" title="Toggle sidebar">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -150,7 +158,17 @@
                 <span class="topbar-title">@currentPageTitle</span>
             </div>
             <div class="topbar-center">
-                <span class="topbar-hoa">@hoaName</span>
+                <div class="topbar-context">
+                    @if (IsSuperAdmin)
+                    {
+                        <span class="topbar-hoa">Platform Administration</span>
+                    }
+                    else
+                    {
+                        <span class="topbar-hoa">@AuthSvc.CurrentSubdivisionName</span>
+                        <span class="topbar-role">@CurrentRole</span>
+                    }
+                </div>
             </div>
             <div class="topbar-right">
                 <button class="icon-btn" @onclick="ToggleTheme" title="Toggle dark mode">
@@ -209,7 +227,6 @@
     private bool sidebarCollapsed;
     private bool userMenuOpen;
     private string currentPageTitle = "Dashboard";
-    private string hoaName = "Homeowners Association";
     private string CurrentRole => AuthSvc.CurrentRole ?? string.Empty;
 
     private bool IsSuperAdmin => AuthSvc.HasRole("Super Admin");

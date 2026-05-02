@@ -3,6 +3,7 @@
 @inject AuthService AuthService
 @inject SubdivisionContextService SubdivisionContextService
 @inject IJSRuntime JS
+@implements IDisposable
 
 @if (_isLoading)
 {
@@ -256,6 +257,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        AuthService.StateChanged += HandleAuthStateChanged;
         await LoadAsync();
     }
 
@@ -357,5 +359,22 @@ else
         catch
         {
         }
+    }
+
+    private void HandleAuthStateChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (AuthService.IsAuthenticated)
+            {
+                await LoadAsync();
+                StateHasChanged();
+            }
+        });
+    }
+
+    public void Dispose()
+    {
+        AuthService.StateChanged -= HandleAuthStateChanged;
     }
 }
