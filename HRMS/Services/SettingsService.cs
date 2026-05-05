@@ -2,6 +2,7 @@ using HRMS.Data;
 using HRMS.Helpers;
 using HRMS.Models;
 using Microsoft.EntityFrameworkCore;
+using PhaseModel = global::HRMS.Models.Phase;
 
 namespace HRMS.Services;
 
@@ -174,7 +175,84 @@ public class SettingsService
         return user;
     }
 
-    public async Task<Phase> AddPhaseAsync(string name, string? description, int subdivisionId, int actorUserId)
+    public async Task<User> UpdateUserAsync(int userId, int roleId, int? homeownerId, int? activeSubdivisionId, int actorUserId)
+    {
+        await EnsureCanWriteAsync(actorUserId, "settings", "Only Super Admin can manage settings.");
+
+        var user = await _context.Users
+            .FirstOrDefaultAsync(item => item.UserId == userId);
+
+        if (user is null)
+        {
+            throw new InvalidOperationException("The selected user could not be found.");
+        }
+
+        var role = await _context.Roles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.RoleId == roleId);
+
+        if (role is null)
+        {
+            throw new InvalidOperationException("The selected role could not be found.");
+        }
+
+        if (homeownerId.HasValue && await _context.Users.AnyAsync(item => item.UserId != userId && item.HomeownerId == homeownerId.Value))
+        {
+            throw new InvalidOperationException("That homeowner is already linked to another user.");
+        }
+
+        var linkedHomeownerSubdivisionId = homeownerId.HasValue
+            ? await _context.Homeowners
+                .AsNoTracking()
+                .Where(homeowner => homeowner.HomeownerId == homeownerId.Value && !homeowner.IsDeleted)
+                .Select(homeowner => (int?)homeowner.SubdivisionId)
+                .FirstOrDefaultAsync()
+            : null;
+
+        if (homeownerId.HasValue && !linkedHomeownerSubdivisionId.HasValue)
+        {
+            throw new InvalidOperationException("The selected homeowner could not be found.");
+        }
+
+        var resolvedSubdivisionId = role.RoleName == "Super Admin"
+            ? null
+            : linkedHomeownerSubdivisionId ?? activeSubdivisionId ?? user.SubdivisionId;
+
+        if (role.RoleName != "Super Admin" && !resolvedSubdivisionId.HasValue)
+        {
+            throw new InvalidOperationException("Select a subdivision first.");
+        }
+
+        user.RoleId = roleId;
+        user.HomeownerId = homeownerId;
+        user.SubdivisionId = resolvedSubdivisionId;
+
+        await _context.SaveChangesAsync();
+        await _auditService.LogAsync(actorUserId, "Update", "Users", user.UserId, $"Updated user '{user.Username}' role and assignment.");
+
+        return user;
+    }
+
+    public async Task<User> ReactivateUserAsync(int userId, int actorUserId)
+    {
+        await EnsureCanWriteAsync(actorUserId, "settings", "Only Super Admin can manage settings.");
+
+        var user = await _context.Users
+            .FirstOrDefaultAsync(item => item.UserId == userId);
+
+        if (user is null)
+        {
+            throw new InvalidOperationException("The selected user could not be found.");
+        }
+
+        user.IsActive = true;
+        await _context.SaveChangesAsync();
+        await _auditService.LogAsync(actorUserId, "Update", "Users", user.UserId, $"Reactivated user '{user.Username}'.");
+
+        return user;
+    }
+
+    public async Task<PhaseModel> AddPhaseAsync(string name, string? description, int subdivisionId, int actorUserId)
     {
         await EnsureCanWriteAsync(actorUserId, "settings", "Only Super Admin can manage settings.");
 
@@ -188,7 +266,7 @@ public class SettingsService
             throw new InvalidOperationException("Phase name is required.");
         }
 
-        var phase = new Phase
+        var phase = new PhaseModel
         {
             Name = name.Trim(),
             Description = NormalizeOptional(description),
@@ -203,7 +281,7 @@ public class SettingsService
         return phase;
     }
 
-    public async Task<Phase?> UpdatePhaseAsync(int phaseId, string name, string? description, int actorUserId)
+    public async Task<PhaseModel?> UpdatePhaseAsync(int phaseId, string name, string? description, int actorUserId)
     {
         await EnsureCanWriteAsync(actorUserId, "settings", "Only Super Admin can manage settings.");
 

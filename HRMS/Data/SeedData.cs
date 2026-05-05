@@ -2,6 +2,7 @@ using HRMS.Helpers;
 using HRMS.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using PhaseModel = global::HRMS.Models.Phase;
 
 namespace HRMS.Data;
 
@@ -26,19 +27,7 @@ public static class SeedData
         var staffRole = context.Roles.Single(role => role.RoleName == "HOA Staff");
         var homeownerRole = context.Roles.Single(role => role.RoleName == "Homeowner");
 
-        if (!context.Users.Any(user => user.Username == "superadmin"))
-        {
-            context.Users.Add(new User
-            {
-                Username = "superadmin",
-                PasswordHash = HashHelper.Hash("superadmin123"),
-                RoleId = superAdminRole.RoleId,
-                SubdivisionId = null,
-                HomeownerId = null,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow.ToString("o")
-            });
-        }
+        EnsureUser(context, "superadmin", "superadmin123", superAdminRole.RoleId, null, null);
 
         context.SaveChanges();
 
@@ -79,12 +68,12 @@ public static class SeedData
         var goldenFields = context.Subdivisions.Single(subdivision => subdivision.Name == "Golden Fields Residences");
         var palmeraSouth = context.Subdivisions.Single(subdivision => subdivision.Name == "Palmera South Residences");
 
-        EnsureUser(context, "gf.president", "president123", presidentRole.RoleId, goldenFields.SubdivisionId, null);
-        EnsureUser(context, "gf.boardmember", "boardmember123", boardRole.RoleId, goldenFields.SubdivisionId, null);
-        EnsureUser(context, "gf.staff", "staff123", staffRole.RoleId, goldenFields.SubdivisionId, null);
-        EnsureUser(context, "ps.president", "president123", presidentRole.RoleId, palmeraSouth.SubdivisionId, null);
-        EnsureUser(context, "ps.boardmember", "boardmember123", boardRole.RoleId, palmeraSouth.SubdivisionId, null);
-        EnsureUser(context, "ps.staff", "staff123", staffRole.RoleId, palmeraSouth.SubdivisionId, null);
+        EnsureUser(context, "gf.president", "gf.president123", presidentRole.RoleId, goldenFields.SubdivisionId, null);
+        EnsureUser(context, "gf.boardmember", "gf.boardmember123", boardRole.RoleId, goldenFields.SubdivisionId, null);
+        EnsureUser(context, "gf.staff", "gf.staff123", staffRole.RoleId, goldenFields.SubdivisionId, null);
+        EnsureUser(context, "ps.president", "ps.president123", presidentRole.RoleId, palmeraSouth.SubdivisionId, null);
+        EnsureUser(context, "ps.boardmember", "ps.boardmember123", boardRole.RoleId, palmeraSouth.SubdivisionId, null);
+        EnsureUser(context, "ps.staff", "ps.staff123", staffRole.RoleId, palmeraSouth.SubdivisionId, null);
 
         context.SaveChanges();
 
@@ -135,7 +124,7 @@ public static class SeedData
 
         if (!context.Phases.Any(phase => phase.SubdivisionId == goldenFields.SubdivisionId && phase.Name == "Phase 1"))
         {
-            context.Phases.Add(new Phase
+            context.Phases.Add(new PhaseModel
             {
                 Name = "Phase 1",
                 Description = "Primary residential cluster for Golden Fields demo data.",
@@ -146,7 +135,7 @@ public static class SeedData
 
         if (!context.Phases.Any(phase => phase.SubdivisionId == goldenFields.SubdivisionId && phase.Name == "Phase 2"))
         {
-            context.Phases.Add(new Phase
+            context.Phases.Add(new PhaseModel
             {
                 Name = "Phase 2",
                 Description = "Secondary residential cluster for Golden Fields demo data.",
@@ -157,7 +146,7 @@ public static class SeedData
 
         if (!context.Phases.Any(phase => phase.SubdivisionId == palmeraSouth.SubdivisionId && phase.Name == "Phase 1"))
         {
-            context.Phases.Add(new Phase
+            context.Phases.Add(new PhaseModel
             {
                 Name = "Phase 1",
                 Description = "Primary residential cluster for Palmera South demo data.",
@@ -168,7 +157,7 @@ public static class SeedData
 
         if (!context.Phases.Any(phase => phase.SubdivisionId == palmeraSouth.SubdivisionId && phase.Name == "Phase 2"))
         {
-            context.Phases.Add(new Phase
+            context.Phases.Add(new PhaseModel
             {
                 Name = "Phase 2",
                 Description = "Secondary residential cluster for Palmera South demo data.",
@@ -404,8 +393,8 @@ public static class SeedData
 
         context.SaveChanges();
 
-        EnsureUser(context, "gf.homeowner", "homeowner123", homeownerRole.RoleId, goldenFields.SubdivisionId, gfHomeowner.HomeownerId);
-        EnsureUser(context, "ps.homeowner", "homeowner123", homeownerRole.RoleId, palmeraSouth.SubdivisionId, psHomeowner.HomeownerId);
+        EnsureUser(context, "gf.homeowner", "gf.homeowner123", homeownerRole.RoleId, goldenFields.SubdivisionId, gfHomeowner.HomeownerId);
+        EnsureUser(context, "ps.homeowner", "ps.homeowner123", homeownerRole.RoleId, palmeraSouth.SubdivisionId, psHomeowner.HomeownerId);
 
         context.SaveChanges();
 
@@ -472,6 +461,7 @@ public static class SeedData
         {
             context.Attendances.Add(new Attendance
             {
+                SubdivisionId = goldenFields.SubdivisionId,
                 EventId = gfEvent.EventId,
                 HomeownerId = gfHomeowner.HomeownerId,
                 Status = "Present",
@@ -484,6 +474,7 @@ public static class SeedData
         {
             context.Attendances.Add(new Attendance
             {
+                SubdivisionId = palmeraSouth.SubdivisionId,
                 EventId = psEvent.EventId,
                 HomeownerId = psHomeowner.HomeownerId,
                 Status = "Present",
@@ -726,8 +717,14 @@ public static class SeedData
 
     private static void EnsureUser(AppDbContext context, string username, string password, int roleId, int? subdivisionId, int? homeownerId)
     {
-        if (context.Users.Any(user => user.Username == username))
+        var existingUser = context.Users.SingleOrDefault(user => user.Username == username);
+        if (existingUser is not null)
         {
+            existingUser.PasswordHash = HashHelper.Hash(password);
+            existingUser.RoleId = roleId;
+            existingUser.SubdivisionId = subdivisionId;
+            existingUser.HomeownerId = homeownerId;
+            existingUser.IsActive = true;
             return;
         }
 

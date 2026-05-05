@@ -15,7 +15,9 @@
 .login-photo-bg {
   position: absolute;
   inset: 0;
-  background: url('../images/login-bg.jpg') center/cover no-repeat;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 35%),
+    linear-gradient(160deg, #2f4858 0%, #1e293b 52%, #0f172a 100%);
 }
 
 .login-photo-overlay {

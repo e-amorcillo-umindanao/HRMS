@@ -151,7 +151,7 @@ else
 
 @code {
     private static readonly string[] StatusOptions = ["Active", "Inactive", "Transferred", "Deceased"];
-    private static readonly string[] CategoryOptions = ["Senior", "PWD", "4Ps", "Indigent", "Youth"];
+    private static readonly string[] CategoryOptions = ["Senior", "PWD", "4Ps", "Indigent", "Youth", "Solo Parent"];
 
     [Parameter]
     public int? HomeownerId { get; set; }
@@ -166,6 +166,7 @@ else
     private bool _isSaving;
     private string? _errorMessage;
     private static string TodayDateString => DateTime.Today.ToString("yyyy-MM-dd");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin ? null : AuthService.CurrentSubdivisionId;
 
     private bool IsEdit => HomeownerId.HasValue;
 
@@ -174,12 +175,18 @@ else
         _isLoading = true;
         _errorMessage = null;
 
-        _phases = await DbContext.Phases.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
-        _units = await DbContext.Units.AsNoTracking().OrderBy(u => u.UnitNumber).ToListAsync();
+        _phases = await DbContext.Phases.AsNoTracking()
+            .Where(phase => !ActiveSubdivisionId.HasValue || phase.SubdivisionId == ActiveSubdivisionId.Value)
+            .OrderBy(p => p.Name)
+            .ToListAsync();
+        _units = await DbContext.Units.AsNoTracking()
+            .Where(unit => !ActiveSubdivisionId.HasValue || unit.SubdivisionId == ActiveSubdivisionId.Value)
+            .OrderBy(u => u.UnitNumber)
+            .ToListAsync();
 
         if (IsEdit)
         {
-            var homeowner = await HomeownerService.GetByIdAsync(HomeownerId.GetValueOrDefault());
+            var homeowner = await HomeownerService.GetByIdAsync(HomeownerId.GetValueOrDefault(), ActiveSubdivisionId);
             if (homeowner is null)
             {
                 _errorMessage = "Homeowner record not found.";

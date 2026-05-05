@@ -1,7 +1,10 @@
+@using Microsoft.JSInterop
 @inherits LayoutComponentBase
 @inject AuthService AuthSvc
 @inject ThemeService ThemeSvc
 @inject NavigationManager Nav
+@inject SessionHelper SessionHelper
+@inject IJSRuntime JS
 @implements IDisposable
 
 <div class="hrms-layout @(sidebarCollapsed ? "sidebar-collapsed" : "")" data-theme="@ThemeSvc.CurrentTheme">
@@ -223,10 +226,29 @@
     </div>
 </div>
 
+@if (showSessionWarning)
+{
+    <div class="fixed inset-0 z-[1200] flex items-center justify-center bg-black/35 p-4">
+        <div class="w-full max-w-md rounded-xl border border-base-300 bg-base-100 p-6 shadow-2xl">
+            <p class="text-lg font-semibold text-base-content">Session expiring soon</p>
+            <p class="mt-2 text-sm leading-relaxed text-base-content/70">
+                You've been inactive for a while. Select Continue Session to stay signed in.
+            </p>
+            <div class="mt-5 flex justify-end gap-3">
+                <button class="btn btn-ghost btn-sm" @onclick="Logout">Logout</button>
+                <button class="btn btn-primary btn-sm" @onclick="ContinueSessionAsync">Continue Session</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private bool sidebarCollapsed;
     private bool userMenuOpen;
+    private bool showSessionWarning;
+    private bool sessionActivityRegistered;
     private string currentPageTitle = "Dashboard";
+    private DotNetObjectReference<MainLayout>? sessionDotNetRef;
     private string CurrentRole => AuthSvc.CurrentRole ?? string.Empty;
 
     private bool IsSuperAdmin => AuthSvc.HasRole("Super Admin");
@@ -240,8 +262,20 @@
         ThemeSvc.OnThemeChanged += HandleThemeChanged;
         AuthSvc.StateChanged += HandleAuthChanged;
         Nav.LocationChanged += HandleLocationChanged;
+        SessionHelper.SessionWarningRaised += HandleSessionWarningRaised;
         currentPageTitle = GetPageTitle();
         await Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var theme = await JS.InvokeAsync<string>("hrms.initTheme");
+            ThemeSvc.Initialize(theme);
+        }
+
+        await SyncSessionTrackingAsync();
     }
 
     private void ToggleSidebar()
@@ -249,9 +283,10 @@
         sidebarCollapsed = !sidebarCollapsed;
     }
 
-    private void ToggleTheme()
+    private async Task ToggleTheme()
     {
         ThemeSvc.Toggle();
+        await JS.InvokeVoidAsync("hrms.setTheme", ThemeSvc.CurrentTheme);
     }
 
     private void ToggleUserMenu()
@@ -261,9 +296,28 @@
 
     private Task Logout() => AuthSvc.LogoutAsync();
 
+    private async Task ContinueSessionAsync()
+    {
+        showSessionWarning = false;
+        SessionHelper.RecordActivity();
+        await InvokeAsync(StateHasChanged);
+    }
+
     private void HandleThemeChanged() => InvokeAsync(StateHasChanged);
 
-    private void HandleAuthChanged() => InvokeAsync(StateHasChanged);
+    private void HandleAuthChanged()
+    {
+        if (!AuthSvc.IsAuthenticated)
+        {
+            showSessionWarning = false;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            await SyncSessionTrackingAsync();
+            StateHasChanged();
+        });
+    }
 
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
     {
@@ -305,10 +359,53 @@
         };
     }
 
+    [JSInvokable]
+    public void HandleUserActivity()
+    {
+        showSessionWarning = false;
+        SessionHelper.RecordActivity();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleSessionWarningRaised()
+    {
+        showSessionWarning = true;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SyncSessionTrackingAsync()
+    {
+        if (AuthSvc.IsAuthenticated)
+        {
+            SessionHelper.Start();
+
+            if (!sessionActivityRegistered)
+            {
+                sessionDotNetRef ??= DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("hrmsSession.registerActivity", sessionDotNetRef);
+                sessionActivityRegistered = true;
+            }
+
+            return;
+        }
+
+        SessionHelper.Stop();
+        showSessionWarning = false;
+
+        if (sessionActivityRegistered)
+        {
+            await JS.InvokeVoidAsync("hrmsSession.unregisterActivity");
+            sessionActivityRegistered = false;
+        }
+    }
+
     public void Dispose()
     {
         ThemeSvc.OnThemeChanged -= HandleThemeChanged;
         AuthSvc.StateChanged -= HandleAuthChanged;
         Nav.LocationChanged -= HandleLocationChanged;
+        SessionHelper.SessionWarningRaised -= HandleSessionWarningRaised;
+        SessionHelper.Stop();
+        sessionDotNetRef?.Dispose();
     }
 }

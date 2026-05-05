@@ -33,6 +33,7 @@ public class EventService
     {
         await EnsureCanWriteAsync(actorUserId, "events", "You do not have write access to the Events module.");
         evt.SubdivisionId = await ResolveSubdivisionIdAsync(evt.SubdivisionId, actorUserId);
+        await EnsureActorCanAccessSubdivisionAsync(evt.SubdivisionId, actorUserId);
         evt.CreatedAt = DateTime.UtcNow.ToString("o");
         evt.CreatedBy = actorUserId;
         evt.EventDate = NormalizeDate(evt.EventDate);
@@ -60,8 +61,12 @@ public class EventService
             return null;
         }
 
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
+        var targetSubdivisionId = evt.SubdivisionId == 0 ? existing.SubdivisionId : evt.SubdivisionId;
+        await EnsureActorCanAccessSubdivisionAsync(targetSubdivisionId, actorUserId);
+
         existing.Title = evt.Title.Trim();
-        existing.SubdivisionId = evt.SubdivisionId == 0 ? existing.SubdivisionId : evt.SubdivisionId;
+        existing.SubdivisionId = targetSubdivisionId;
         existing.EventDate = NormalizeDate(evt.EventDate);
         existing.EventType = evt.EventType.Trim();
         existing.Venue = NormalizeOptional(evt.Venue);
@@ -85,6 +90,8 @@ public class EventService
         {
             return false;
         }
+
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
 
         if (existing.Attendances.Count > 0)
         {
@@ -156,6 +163,20 @@ public class EventService
         if (!AccessHelper.CanWrite(role ?? string.Empty, module))
         {
             throw new UnauthorizedAccessException(message);
+        }
+    }
+
+    private async Task EnsureActorCanAccessSubdivisionAsync(int subdivisionId, int actorUserId)
+    {
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue && actorSubdivisionId.Value != subdivisionId)
+        {
+            throw new UnauthorizedAccessException("You cannot manage events outside your assigned subdivision.");
         }
     }
 

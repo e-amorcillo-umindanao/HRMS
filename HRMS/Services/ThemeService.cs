@@ -10,6 +10,16 @@ public class ThemeService
 
     public event Action? OnThemeChanged;
 
+    public void Initialize(string? theme)
+    {
+        if (string.IsNullOrWhiteSpace(theme))
+        {
+            return;
+        }
+
+        SetTheme(theme);
+    }
+
     public void SetTheme(string theme)
     {
         if (_currentTheme == theme)

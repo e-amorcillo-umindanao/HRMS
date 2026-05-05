@@ -20,12 +20,12 @@ public class AttendanceService
     {
         return await _context.Attendances
             .AsNoTracking()
+            .Include(attendance => attendance.Subdivision)
             .Include(attendance => attendance.Homeowner)
             .Include(attendance => attendance.Event)
             .Where(attendance =>
                 attendance.EventId == eventId &&
-                attendance.Event.SubdivisionId == subdivisionId &&
-                attendance.Homeowner.SubdivisionId == subdivisionId &&
+                attendance.SubdivisionId == subdivisionId &&
                 !attendance.Homeowner.IsDeleted)
             .OrderBy(attendance => attendance.Homeowner.LastName)
             .ThenBy(attendance => attendance.Homeowner.FirstName)
@@ -36,12 +36,13 @@ public class AttendanceService
     {
         var query = _context.Attendances
             .AsNoTracking()
+            .Include(attendance => attendance.Subdivision)
             .Include(attendance => attendance.Event)
             .Where(attendance => attendance.HomeownerId == homeownerId);
 
         if (subdivisionId.HasValue)
         {
-            query = query.Where(attendance => attendance.Event.SubdivisionId == subdivisionId.Value);
+            query = query.Where(attendance => attendance.SubdivisionId == subdivisionId.Value);
         }
 
         return await query
@@ -52,7 +53,7 @@ public class AttendanceService
     public async Task<Attendance> RecordAsync(Attendance attendance, int actorUserId)
     {
         await EnsureCanWriteAsync(actorUserId, "events", "You do not have write access to the Events module.");
-        await EnsureEventAndHomeownerShareSubdivisionAsync(attendance.EventId, [attendance.HomeownerId]);
+        var subdivisionId = await EnsureEventAndHomeownerShareSubdivisionAsync(attendance.EventId, [attendance.HomeownerId], actorUserId);
 
         var existing = await _context.Attendances
             .SingleOrDefaultAsync(record =>
@@ -70,6 +71,7 @@ public class AttendanceService
             _context.Attendances.Add(existing);
         }
 
+        existing.SubdivisionId = subdivisionId;
         existing.Status = attendance.Status.Trim();
         existing.RecordedAt = DateTime.UtcNow.ToString("o");
         existing.RecordedBy = actorUserId;
@@ -104,7 +106,7 @@ public class AttendanceService
             .Distinct()
             .ToList();
 
-        await EnsureEventAndHomeownerShareSubdivisionAsync(eventId, homeownerIds);
+        var subdivisionId = await EnsureEventAndHomeownerShareSubdivisionAsync(eventId, homeownerIds, actorUserId);
 
         var existingRecords = await _context.Attendances
             .Where(record => record.EventId == eventId && homeownerIds.Contains(record.HomeownerId))
@@ -127,6 +129,7 @@ public class AttendanceService
                 existingRecords.Add(existing);
             }
 
+            existing.SubdivisionId = subdivisionId;
             existing.Status = attendance.Status.Trim();
             existing.RecordedAt = DateTime.UtcNow.ToString("o");
             existing.RecordedBy = actorUserId;
@@ -155,7 +158,7 @@ public class AttendanceService
         }
     }
 
-    private async Task EnsureEventAndHomeownerShareSubdivisionAsync(int eventId, IReadOnlyCollection<int> homeownerIds)
+    private async Task<int> EnsureEventAndHomeownerShareSubdivisionAsync(int eventId, IReadOnlyCollection<int> homeownerIds, int actorUserId)
     {
         var evt = await _context.Events
             .AsNoTracking()
@@ -185,5 +188,18 @@ public class AttendanceService
         {
             throw new InvalidOperationException("Cannot record attendance: homeowner does not belong to this subdivision.");
         }
+
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue && actorSubdivisionId.Value != evt.SubdivisionId)
+        {
+            throw new UnauthorizedAccessException("You cannot manage attendance for another subdivision.");
+        }
+
+        return evt.SubdivisionId;
     }
 }

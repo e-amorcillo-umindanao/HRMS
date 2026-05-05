@@ -116,6 +116,7 @@ else
     private bool _isLoading = true;
     private bool _isSaving;
     private string? _errorMessage;
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin ? null : AuthService.CurrentSubdivisionId;
 
     private bool IsEdit => ViolationId.HasValue;
 
@@ -124,11 +125,11 @@ else
         _isLoading = true;
         _errorMessage = null;
 
-        _homeowners = await HomeownerService.GetAllAsync();
+        _homeowners = await HomeownerService.GetAllAsync(ActiveSubdivisionId);
 
         if (IsEdit)
         {
-            var violation = await ViolationService.GetByIdAsync(ViolationId.GetValueOrDefault());
+            var violation = await ViolationService.GetByIdAsync(ViolationId.GetValueOrDefault(), ActiveSubdivisionId);
             if (violation is null)
             {
                 _errorMessage = "Violation record not found.";

@@ -71,13 +71,17 @@ public class AuthService
         return true;
     }
 
-    public Task LogoutAsync()
+    public async Task LogoutAsync()
     {
+        var user = CurrentUser;
         CurrentUser = null;
         NotifyStateChanged();
         _navigationManager.NavigateTo("/login");
 
-        return Task.CompletedTask;
+        if (user is not null)
+        {
+            await _auditService.LogAsync(user.UserId, "Logout", "Users", user.UserId, $"User '{user.Username}' logged out.");
+        }
     }
 
     public bool IsHomeowner() => string.Equals(CurrentRole, "Homeowner", StringComparison.Ordinal);

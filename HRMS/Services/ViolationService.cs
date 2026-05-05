@@ -71,6 +71,7 @@ public class ViolationService
     {
         await EnsureCanWriteAsync(actorUserId, "violations", "Super Admin does not have write access to the Violations module.");
         record.SubdivisionId = await ResolveSubdivisionIdAsync(record.SubdivisionId, record.HomeownerId, actorUserId);
+        await EnsureActorCanAccessSubdivisionAsync(record.SubdivisionId, actorUserId);
         record.ViolationType = record.ViolationType.Trim();
         record.HomeownerName = record.HomeownerName.Trim();
         record.Details = record.Details.Trim();
@@ -102,8 +103,12 @@ public class ViolationService
             return null;
         }
 
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
+        var targetSubdivisionId = await ResolveSubdivisionIdAsync(record.SubdivisionId == 0 ? existing.SubdivisionId : record.SubdivisionId, record.HomeownerId, actorUserId);
+        await EnsureActorCanAccessSubdivisionAsync(targetSubdivisionId, actorUserId);
+
         existing.HomeownerId = record.HomeownerId;
-        existing.SubdivisionId = record.SubdivisionId == 0 ? existing.SubdivisionId : record.SubdivisionId;
+        existing.SubdivisionId = targetSubdivisionId;
         existing.HomeownerName = record.HomeownerName.Trim();
         existing.ViolationType = record.ViolationType.Trim();
         existing.ViolationDate = NormalizeDate(record.ViolationDate);
@@ -130,6 +135,8 @@ public class ViolationService
         {
             return false;
         }
+
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
 
         _context.ViolationRecords.Remove(existing);
         await _context.SaveChangesAsync();
@@ -183,25 +190,49 @@ public class ViolationService
         }
     }
 
+    private async Task EnsureActorCanAccessSubdivisionAsync(int subdivisionId, int actorUserId)
+    {
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue && actorSubdivisionId.Value != subdivisionId)
+        {
+            throw new UnauthorizedAccessException("You cannot manage violations outside your assigned subdivision.");
+        }
+    }
+
     private async Task<int> ResolveSubdivisionIdAsync(int subdivisionId, int? homeownerId, int actorUserId)
     {
-        if (subdivisionId > 0)
-        {
-            return subdivisionId;
-        }
-
         if (homeownerId.HasValue)
         {
             var homeownerSubdivisionId = await _context.Homeowners
                 .AsNoTracking()
                 .Where(homeowner => homeowner.HomeownerId == homeownerId.Value && !homeowner.IsDeleted)
-                .Select(homeowner => homeowner.SubdivisionId)
+                .Select(homeowner => (int?)homeowner.SubdivisionId)
                 .SingleOrDefaultAsync();
 
-            if (homeownerSubdivisionId > 0)
+            if (!homeownerSubdivisionId.HasValue)
             {
-                return homeownerSubdivisionId;
+                throw new InvalidOperationException("The selected homeowner could not be found.");
             }
+
+            if (subdivisionId > 0 && homeownerSubdivisionId.Value != subdivisionId)
+            {
+                throw new InvalidOperationException("The selected homeowner does not belong to this subdivision.");
+            }
+
+            if (subdivisionId == 0)
+            {
+                return homeownerSubdivisionId.Value;
+            }
+        }
+
+        if (subdivisionId > 0)
+        {
+            return subdivisionId;
         }
 
         var actorSubdivisionId = await _context.Users

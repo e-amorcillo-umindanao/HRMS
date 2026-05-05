@@ -13,11 +13,13 @@ public class ReportService
 
     private readonly AppDbContext _context;
     private readonly EngagementService _engagementService;
+    private readonly AuditService _auditService;
 
-    public ReportService(AppDbContext context, EngagementService engagementService)
+    public ReportService(AppDbContext context, EngagementService engagementService, AuditService auditService)
     {
         _context = context;
         _engagementService = engagementService;
+        _auditService = auditService;
     }
 
     public async Task<DashboardKpiSummary> GetDashboardKPIsAsync(int? subdivisionId = null)
@@ -270,11 +272,12 @@ public class ReportService
     public async Task<byte[]> ExportHomeownersToPdfAsync(int? subdivisionId, int actorUserId)
     {
         await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
+        var effectiveSubdivisionId = await ResolveReportSubdivisionIdAsync(subdivisionId, actorUserId);
         var homeowners = await _context.Homeowners
             .AsNoTracking()
             .Include(record => record.Phase)
             .Include(record => record.Unit)
-            .Where(record => !record.IsDeleted && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value))
+            .Where(record => !record.IsDeleted && record.SubdivisionId == effectiveSubdivisionId)
             .OrderBy(record => record.LastName)
             .ThenBy(record => record.FirstName)
             .ToListAsync();
@@ -292,21 +295,25 @@ public class ReportService
             })
             .ToList();
 
-        return PdfExportHelper.GenerateTableReport(
-            await GetSettingsAsync(),
+        var bytes = PdfExportHelper.GenerateTableReport(
+            await GetSettingsAsync(effectiveSubdivisionId),
             "Homeowners Report",
             ["Full Name", "Status", "Phase", "Unit", "Categories", "Residency Since", "Contact Number"],
             rows);
+
+        await LogExportAsync(actorUserId, "Homeowners PDF", effectiveSubdivisionId);
+        return bytes;
     }
 
     public async Task<byte[]> ExportHomeownersToExcelAsync(int? subdivisionId, int actorUserId)
     {
         await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
+        var effectiveSubdivisionId = await ResolveReportSubdivisionIdAsync(subdivisionId, actorUserId);
         var homeowners = await _context.Homeowners
             .AsNoTracking()
             .Include(record => record.Phase)
             .Include(record => record.Unit)
-            .Where(record => !record.IsDeleted && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value))
+            .Where(record => !record.IsDeleted && record.SubdivisionId == effectiveSubdivisionId)
             .OrderBy(record => record.LastName)
             .ThenBy(record => record.FirstName)
             .ToListAsync();
@@ -324,19 +331,23 @@ public class ReportService
             })
             .ToList();
 
-        return ExcelExportHelper.GenerateWorksheet(
+        var bytes = ExcelExportHelper.GenerateWorksheet(
             "Homeowners",
             ["Full Name", "Status", "Phase", "Unit", "Categories", "Residency Since", "Contact Number"],
             rows);
+
+        await LogExportAsync(actorUserId, "Homeowners Excel", effectiveSubdivisionId);
+        return bytes;
     }
 
     public async Task<byte[]> ExportDuesToPdfAsync(int? month, int? year, int? subdivisionId, int actorUserId)
     {
         await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
+        var effectiveSubdivisionId = await ResolveReportSubdivisionIdAsync(subdivisionId, actorUserId);
         var query = _context.DuesRecords
             .AsNoTracking()
             .Include(record => record.Homeowner)
-            .Where(record => !record.Homeowner.IsDeleted && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value));
+            .Where(record => !record.Homeowner.IsDeleted && record.SubdivisionId == effectiveSubdivisionId);
 
         if (month.HasValue)
         {
@@ -367,20 +378,24 @@ public class ReportService
             })
             .ToList();
 
-        return PdfExportHelper.GenerateTableReport(
-            await GetSettingsAsync(),
+        var bytes = PdfExportHelper.GenerateTableReport(
+            await GetSettingsAsync(effectiveSubdivisionId),
             BuildDuesReportTitle(month, year),
             ["Homeowner", "Month/Year", "Amount", "Due Date", "Paid Date", "Status"],
             rows);
+
+        await LogExportAsync(actorUserId, "Dues PDF", effectiveSubdivisionId);
+        return bytes;
     }
 
     public async Task<byte[]> ExportDuesToExcelAsync(int? month, int? year, int? subdivisionId, int actorUserId)
     {
         await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
+        var effectiveSubdivisionId = await ResolveReportSubdivisionIdAsync(subdivisionId, actorUserId);
         var query = _context.DuesRecords
             .AsNoTracking()
             .Include(record => record.Homeowner)
-            .Where(record => !record.Homeowner.IsDeleted && (!subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value));
+            .Where(record => !record.Homeowner.IsDeleted && record.SubdivisionId == effectiveSubdivisionId);
 
         if (month.HasValue)
         {
@@ -411,19 +426,23 @@ public class ReportService
             })
             .ToList();
 
-        return ExcelExportHelper.GenerateWorksheet(
+        var bytes = ExcelExportHelper.GenerateWorksheet(
             "Dues",
             ["Homeowner", "Month/Year", "Amount", "Due Date", "Paid Date", "Status"],
             rows);
+
+        await LogExportAsync(actorUserId, "Dues Excel", effectiveSubdivisionId);
+        return bytes;
     }
 
     public async Task<byte[]> ExportViolationsToPdfAsync(int? subdivisionId, int actorUserId)
     {
         await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
+        var effectiveSubdivisionId = await ResolveReportSubdivisionIdAsync(subdivisionId, actorUserId);
         var violations = await _context.ViolationRecords
             .AsNoTracking()
             .Include(record => record.FiledByUser)
-            .Where(record => !subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)
+            .Where(record => record.SubdivisionId == effectiveSubdivisionId)
             .OrderByDescending(record => record.FiledAt)
             .ToListAsync();
 
@@ -439,20 +458,24 @@ public class ReportService
             })
             .ToList();
 
-        return PdfExportHelper.GenerateTableReport(
-            await GetSettingsAsync(),
+        var bytes = PdfExportHelper.GenerateTableReport(
+            await GetSettingsAsync(effectiveSubdivisionId),
             "Violations Report",
             ["Violation Number", "Homeowner", "Type", "Violation Date", "Status", "Filed By"],
             rows);
+
+        await LogExportAsync(actorUserId, "Violations PDF", effectiveSubdivisionId);
+        return bytes;
     }
 
     public async Task<byte[]> ExportViolationsToExcelAsync(int? subdivisionId, int actorUserId)
     {
         await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
+        var effectiveSubdivisionId = await ResolveReportSubdivisionIdAsync(subdivisionId, actorUserId);
         var violations = await _context.ViolationRecords
             .AsNoTracking()
             .Include(record => record.FiledByUser)
-            .Where(record => !subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)
+            .Where(record => record.SubdivisionId == effectiveSubdivisionId)
             .OrderByDescending(record => record.FiledAt)
             .ToListAsync();
 
@@ -468,20 +491,24 @@ public class ReportService
             })
             .ToList();
 
-        return ExcelExportHelper.GenerateWorksheet(
+        var bytes = ExcelExportHelper.GenerateWorksheet(
             "Violations",
             ["Violation Number", "Homeowner", "Type", "Violation Date", "Status", "Filed By"],
             rows);
+
+        await LogExportAsync(actorUserId, "Violations Excel", effectiveSubdivisionId);
+        return bytes;
     }
 
     public async Task<byte[]> ExportClearancesToPdfAsync(int? subdivisionId, int actorUserId)
     {
         await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
+        var effectiveSubdivisionId = await ResolveReportSubdivisionIdAsync(subdivisionId, actorUserId);
         var clearances = await _context.ClearanceRequests
             .AsNoTracking()
             .Include(record => record.Homeowner)
             .Include(record => record.ProcessedByUser)
-            .Where(record => !subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)
+            .Where(record => record.SubdivisionId == effectiveSubdivisionId)
             .OrderByDescending(record => record.RequestedAt)
             .ToListAsync();
 
@@ -497,21 +524,25 @@ public class ReportService
             })
             .ToList();
 
-        return PdfExportHelper.GenerateTableReport(
-            await GetSettingsAsync(),
+        var bytes = PdfExportHelper.GenerateTableReport(
+            await GetSettingsAsync(effectiveSubdivisionId),
             "Clearance Requests Report",
             ["Homeowner", "Clearance Type", "Purpose", "Status", "Requested At", "Processed At"],
             rows);
+
+        await LogExportAsync(actorUserId, "Clearances PDF", effectiveSubdivisionId);
+        return bytes;
     }
 
     public async Task<byte[]> ExportClearancesToExcelAsync(int? subdivisionId, int actorUserId)
     {
         await EnsureCanWriteAsync(actorUserId, "reports", "You do not have permission to export reports.");
+        var effectiveSubdivisionId = await ResolveReportSubdivisionIdAsync(subdivisionId, actorUserId);
         var clearances = await _context.ClearanceRequests
             .AsNoTracking()
             .Include(record => record.Homeowner)
             .Include(record => record.ProcessedByUser)
-            .Where(record => !subdivisionId.HasValue || record.SubdivisionId == subdivisionId.Value)
+            .Where(record => record.SubdivisionId == effectiveSubdivisionId)
             .OrderByDescending(record => record.RequestedAt)
             .ToListAsync();
 
@@ -527,17 +558,20 @@ public class ReportService
             })
             .ToList();
 
-        return ExcelExportHelper.GenerateWorksheet(
+        var bytes = ExcelExportHelper.GenerateWorksheet(
             "Clearances",
             ["Homeowner", "Clearance Type", "Purpose", "Status", "Requested At", "Processed At"],
             rows);
+
+        await LogExportAsync(actorUserId, "Clearances Excel", effectiveSubdivisionId);
+        return bytes;
     }
 
-    private async Task<HOASettings?> GetSettingsAsync()
+    private async Task<HOASettings?> GetSettingsAsync(int subdivisionId)
     {
         return await _context.HOASettings
             .AsNoTracking()
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(record => record.SubdivisionId == subdivisionId);
     }
 
     private async Task<string?> GetActorRoleAsync(int actorUserId)
@@ -557,6 +591,45 @@ public class ReportService
             throw new UnauthorizedAccessException(message);
         }
     }
+
+    private async Task<int> ResolveReportSubdivisionIdAsync(int? subdivisionId, int actorUserId)
+    {
+        var actor = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => new { user.SubdivisionId, RoleName = user.Role.RoleName })
+            .SingleOrDefaultAsync();
+
+        if (actor is null)
+        {
+            throw new UnauthorizedAccessException("The current user could not be resolved.");
+        }
+
+        if (string.Equals(actor.RoleName, "Super Admin", StringComparison.Ordinal))
+        {
+            if (!subdivisionId.HasValue || subdivisionId.Value <= 0)
+            {
+                throw new InvalidOperationException("Select a subdivision first.");
+            }
+
+            return subdivisionId.Value;
+        }
+
+        if (!actor.SubdivisionId.HasValue)
+        {
+            throw new UnauthorizedAccessException("Your account is not assigned to a subdivision.");
+        }
+
+        if (subdivisionId.HasValue && subdivisionId.Value != actor.SubdivisionId.Value)
+        {
+            throw new UnauthorizedAccessException("You cannot export reports for another subdivision.");
+        }
+
+        return actor.SubdivisionId.Value;
+    }
+
+    private Task LogExportAsync(int actorUserId, string exportName, int subdivisionId) =>
+        _auditService.LogAsync(actorUserId, "Export", "Reports", subdivisionId, $"Generated {exportName} export.");
 
     private static List<DateTime> GetReferenceMonths(int count)
     {

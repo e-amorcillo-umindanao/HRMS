@@ -57,6 +57,8 @@ public class UnitService
     {
         await EnsureCanWriteAsync(actorUserId, "units", "You do not have write access to the Units module.");
         unit.SubdivisionId = await ResolveSubdivisionIdAsync(unit.SubdivisionId, unit.PhaseId, actorUserId);
+        await EnsureActorCanAccessSubdivisionAsync(unit.SubdivisionId, actorUserId);
+        await EnsureAssignmentsBelongToSubdivisionAsync(unit.PhaseId, unit.HeadHomeownerId, unit.SubdivisionId);
         unit.CreatedAt = DateTime.UtcNow.ToString("o");
         unit.CreatedBy = actorUserId;
 
@@ -77,9 +79,16 @@ public class UnitService
             return null;
         }
 
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
+        var targetSubdivisionId = unit.SubdivisionId == 0
+            ? await ResolveSubdivisionIdAsync(existing.SubdivisionId, unit.PhaseId ?? existing.PhaseId, actorUserId)
+            : await ResolveSubdivisionIdAsync(unit.SubdivisionId, unit.PhaseId, actorUserId);
+        await EnsureActorCanAccessSubdivisionAsync(targetSubdivisionId, actorUserId);
+        await EnsureAssignmentsBelongToSubdivisionAsync(unit.PhaseId, unit.HeadHomeownerId, targetSubdivisionId);
+
         existing.UnitNumber = unit.UnitNumber;
         existing.Address = unit.Address;
-        existing.SubdivisionId = unit.SubdivisionId == 0 ? existing.SubdivisionId : unit.SubdivisionId;
+        existing.SubdivisionId = targetSubdivisionId;
         existing.PhaseId = unit.PhaseId;
         existing.HeadHomeownerId = unit.HeadHomeownerId;
 
@@ -98,6 +107,8 @@ public class UnitService
         {
             return UnitOperationResult.Fail("Unit not found.");
         }
+
+        await EnsureActorCanAccessSubdivisionAsync(unit.SubdivisionId, actorUserId);
 
         var assignedHomeowners = await _context.Homeowners
             .AnyAsync(h => h.UnitId == id && !h.IsDeleted);
@@ -141,10 +152,17 @@ public class UnitService
             return UnitOperationResult.Fail("Unit not found.");
         }
 
+        await EnsureActorCanAccessSubdivisionAsync(unit.SubdivisionId, actorUserId);
+
         var homeowner = await _context.Homeowners.SingleOrDefaultAsync(h => h.HomeownerId == homeownerId && !h.IsDeleted);
         if (homeowner is null)
         {
             return UnitOperationResult.Fail("Homeowner not found.");
+        }
+
+        if (homeowner.SubdivisionId != unit.SubdivisionId)
+        {
+            return UnitOperationResult.Fail("The selected homeowner belongs to a different subdivision.");
         }
 
         homeowner.UnitId = unitId;
@@ -164,10 +182,17 @@ public class UnitService
             return UnitOperationResult.Fail("Unit not found.");
         }
 
+        await EnsureActorCanAccessSubdivisionAsync(unit.SubdivisionId, actorUserId);
+
         var homeowner = await _context.Homeowners.SingleOrDefaultAsync(h => h.HomeownerId == headHomeownerId && !h.IsDeleted);
         if (homeowner is null)
         {
             return UnitOperationResult.Fail("Homeowner not found.");
+        }
+
+        if (homeowner.SubdivisionId != unit.SubdivisionId)
+        {
+            return UnitOperationResult.Fail("The selected homeowner belongs to a different subdivision.");
         }
 
         unit.HeadHomeownerId = headHomeownerId;
@@ -250,6 +275,61 @@ public class UnitService
         if (!AccessHelper.CanWrite(role ?? string.Empty, module))
         {
             throw new UnauthorizedAccessException(message);
+        }
+    }
+
+    private async Task EnsureAssignmentsBelongToSubdivisionAsync(int? phaseId, int? headHomeownerId, int subdivisionId)
+    {
+        if (phaseId.HasValue)
+        {
+            var phaseSubdivisionId = await _context.Phases
+                .AsNoTracking()
+                .Where(phase => phase.PhaseId == phaseId.Value)
+                .Select(phase => (int?)phase.SubdivisionId)
+                .SingleOrDefaultAsync();
+
+            if (!phaseSubdivisionId.HasValue)
+            {
+                throw new InvalidOperationException("The selected phase could not be found.");
+            }
+
+            if (phaseSubdivisionId.Value != subdivisionId)
+            {
+                throw new InvalidOperationException("The selected phase does not belong to this subdivision.");
+            }
+        }
+
+        if (headHomeownerId.HasValue)
+        {
+            var homeownerSubdivisionId = await _context.Homeowners
+                .AsNoTracking()
+                .Where(homeowner => homeowner.HomeownerId == headHomeownerId.Value && !homeowner.IsDeleted)
+                .Select(homeowner => (int?)homeowner.SubdivisionId)
+                .SingleOrDefaultAsync();
+
+            if (!homeownerSubdivisionId.HasValue)
+            {
+                throw new InvalidOperationException("The selected head homeowner could not be found.");
+            }
+
+            if (homeownerSubdivisionId.Value != subdivisionId)
+            {
+                throw new InvalidOperationException("The selected head homeowner does not belong to this subdivision.");
+            }
+        }
+    }
+
+    private async Task EnsureActorCanAccessSubdivisionAsync(int subdivisionId, int actorUserId)
+    {
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue && actorSubdivisionId.Value != subdivisionId)
+        {
+            throw new UnauthorizedAccessException("You cannot manage units outside your assigned subdivision.");
         }
     }
 

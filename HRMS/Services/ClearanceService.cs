@@ -79,6 +79,7 @@ public class ClearanceService
     {
         await EnsureCanWriteAsync(actorUserId, "clearance", "You do not have write access to the Clearance module.");
         request.SubdivisionId = await ResolveSubdivisionIdAsync(request.SubdivisionId, request.HomeownerId, actorUserId);
+        await EnsureActorCanAccessSubdivisionAsync(request.SubdivisionId, actorUserId);
         request.ClearanceType = request.ClearanceType.Trim();
         request.Purpose = request.Purpose.Trim();
         request.Status = "Pending";
@@ -108,6 +109,8 @@ public class ClearanceService
             return null;
         }
 
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
+
         existing.Status = "Approved";
         existing.ProcessedAt = DateTime.UtcNow.ToString("o");
         existing.ProcessedBy = actorUserId;
@@ -135,6 +138,8 @@ public class ClearanceService
             return null;
         }
 
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
+
         existing.Status = "Rejected";
         existing.ProcessedAt = DateTime.UtcNow.ToString("o");
         existing.ProcessedBy = actorUserId;
@@ -158,6 +163,8 @@ public class ClearanceService
         {
             return false;
         }
+
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
 
         _context.ClearanceRequests.Remove(existing);
         await _context.SaveChangesAsync();
@@ -207,34 +214,28 @@ public class ClearanceService
 
     private async Task<int> ResolveSubdivisionIdAsync(int subdivisionId, int homeownerId, int actorUserId)
     {
+        var homeownerSubdivisionId = await _context.Homeowners
+            .AsNoTracking()
+            .Where(homeowner => homeowner.HomeownerId == homeownerId && !homeowner.IsDeleted)
+            .Select(homeowner => (int?)homeowner.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (!homeownerSubdivisionId.HasValue)
+        {
+            throw new InvalidOperationException("The selected homeowner could not be found.");
+        }
+
+        if (subdivisionId > 0 && homeownerSubdivisionId.Value != subdivisionId)
+        {
+            throw new InvalidOperationException("The selected homeowner does not belong to this subdivision.");
+        }
+
         if (subdivisionId > 0)
         {
             return subdivisionId;
         }
 
-        var homeownerSubdivisionId = await _context.Homeowners
-            .AsNoTracking()
-            .Where(homeowner => homeowner.HomeownerId == homeownerId && !homeowner.IsDeleted)
-            .Select(homeowner => homeowner.SubdivisionId)
-            .SingleOrDefaultAsync();
-
-        if (homeownerSubdivisionId > 0)
-        {
-            return homeownerSubdivisionId;
-        }
-
-        var actorSubdivisionId = await _context.Users
-            .AsNoTracking()
-            .Where(user => user.UserId == actorUserId)
-            .Select(user => user.SubdivisionId)
-            .SingleOrDefaultAsync();
-
-        if (actorSubdivisionId.HasValue)
-        {
-            return actorSubdivisionId.Value;
-        }
-
-        throw new InvalidOperationException("Subdivision is required for clearance requests.");
+        return homeownerSubdivisionId.Value;
     }
 
     private static void EnsurePresident(string? role)
@@ -245,5 +246,19 @@ public class ClearanceService
         }
 
         throw new UnauthorizedAccessException("Only the HOA President can approve or reject clearance requests.");
+    }
+
+    private async Task EnsureActorCanAccessSubdivisionAsync(int subdivisionId, int actorUserId)
+    {
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue && actorSubdivisionId.Value != subdivisionId)
+        {
+            throw new UnauthorizedAccessException("You cannot manage clearance requests outside your assigned subdivision.");
+        }
     }
 }

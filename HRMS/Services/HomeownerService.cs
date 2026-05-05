@@ -75,6 +75,8 @@ public class HomeownerService
     {
         await EnsureCanWriteAsync(actorUserId, "homeowners", "You do not have write access to the Homeowners module.");
         homeowner.SubdivisionId = await ResolveSubdivisionIdAsync(homeowner.SubdivisionId, actorUserId);
+        await EnsureActorCanAccessSubdivisionAsync(homeowner.SubdivisionId, actorUserId);
+        await EnsureAssignmentsBelongToSubdivisionAsync(homeowner.PhaseId, homeowner.UnitId, homeowner.SubdivisionId);
         homeowner.CreatedBy = actorUserId;
         homeowner.CreatedAt = DateTime.UtcNow.ToString("o");
         homeowner.Status = string.IsNullOrWhiteSpace(homeowner.Status) ? "Active" : homeowner.Status;
@@ -99,6 +101,11 @@ public class HomeownerService
             return null;
         }
 
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
+        var targetSubdivisionId = homeowner.SubdivisionId == 0 ? existing.SubdivisionId : homeowner.SubdivisionId;
+        await EnsureActorCanAccessSubdivisionAsync(targetSubdivisionId, actorUserId);
+        await EnsureAssignmentsBelongToSubdivisionAsync(homeowner.PhaseId, homeowner.UnitId, targetSubdivisionId);
+
         existing.FirstName = homeowner.FirstName;
         existing.MiddleName = homeowner.MiddleName;
         existing.LastName = homeowner.LastName;
@@ -108,7 +115,7 @@ public class HomeownerService
         existing.ContactNumber = homeowner.ContactNumber;
         existing.Email = homeowner.Email;
         existing.Address = homeowner.Address;
-        existing.SubdivisionId = homeowner.SubdivisionId == 0 ? existing.SubdivisionId : homeowner.SubdivisionId;
+        existing.SubdivisionId = targetSubdivisionId;
         existing.PhaseId = homeowner.PhaseId;
         existing.UnitId = homeowner.UnitId;
         existing.Status = string.IsNullOrWhiteSpace(homeowner.Status) ? "Active" : homeowner.Status;
@@ -132,6 +139,8 @@ public class HomeownerService
         {
             return false;
         }
+
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
 
         existing.IsDeleted = true;
         await _context.SaveChangesAsync();
@@ -236,6 +245,47 @@ public class HomeownerService
         throw new InvalidOperationException("Subdivision is required for homeowner records.");
     }
 
+    private async Task EnsureAssignmentsBelongToSubdivisionAsync(int? phaseId, int? unitId, int subdivisionId)
+    {
+        if (phaseId.HasValue)
+        {
+            var phaseSubdivisionId = await _context.Phases
+                .AsNoTracking()
+                .Where(phase => phase.PhaseId == phaseId.Value)
+                .Select(phase => (int?)phase.SubdivisionId)
+                .SingleOrDefaultAsync();
+
+            if (!phaseSubdivisionId.HasValue)
+            {
+                throw new InvalidOperationException("The selected phase could not be found.");
+            }
+
+            if (phaseSubdivisionId.Value != subdivisionId)
+            {
+                throw new InvalidOperationException("The selected phase does not belong to this subdivision.");
+            }
+        }
+
+        if (unitId.HasValue)
+        {
+            var unitSubdivisionId = await _context.Units
+                .AsNoTracking()
+                .Where(unit => unit.UnitId == unitId.Value)
+                .Select(unit => (int?)unit.SubdivisionId)
+                .SingleOrDefaultAsync();
+
+            if (!unitSubdivisionId.HasValue)
+            {
+                throw new InvalidOperationException("The selected unit could not be found.");
+            }
+
+            if (unitSubdivisionId.Value != subdivisionId)
+            {
+                throw new InvalidOperationException("The selected unit does not belong to this subdivision.");
+            }
+        }
+    }
+
     private async Task<string?> GetActorRoleAsync(int actorUserId)
     {
         return await _context.Users
@@ -251,6 +301,20 @@ public class HomeownerService
         if (!AccessHelper.CanWrite(role ?? string.Empty, module))
         {
             throw new UnauthorizedAccessException(message);
+        }
+    }
+
+    private async Task EnsureActorCanAccessSubdivisionAsync(int subdivisionId, int actorUserId)
+    {
+        var actorSubdivisionId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.UserId == actorUserId)
+            .Select(user => user.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (actorSubdivisionId.HasValue && actorSubdivisionId.Value != subdivisionId)
+        {
+            throw new UnauthorizedAccessException("You cannot manage homeowners outside your assigned subdivision.");
         }
     }
 

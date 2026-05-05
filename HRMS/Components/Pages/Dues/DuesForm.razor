@@ -131,6 +131,7 @@ else
     private int MaxDuesYear => DateTime.Today.Year + 1;
     private string MaxDueDateString => new DateTime(MaxDuesYear, 12, 31).ToString("yyyy-MM-dd");
     private static string TodayDateString => DateTime.Today.ToString("yyyy-MM-dd");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin ? null : AuthService.CurrentSubdivisionId;
 
     private bool IsEdit => DuesId.HasValue;
 
@@ -139,12 +140,12 @@ else
         _isLoading = true;
         _errorMessage = null;
 
-        _activeHomeowners = await HomeownerService.GetAllActiveAsync();
+        _activeHomeowners = await HomeownerService.GetAllActiveAsync(ActiveSubdivisionId);
         _yearOptions = BuildYearOptions();
 
         if (IsEdit)
         {
-            var dues = await DuesService.GetByIdAsync(DuesId.GetValueOrDefault());
+            var dues = await DuesService.GetByIdAsync(DuesId.GetValueOrDefault(), ActiveSubdivisionId);
             if (dues is null)
             {
                 _errorMessage = "Dues record not found.";

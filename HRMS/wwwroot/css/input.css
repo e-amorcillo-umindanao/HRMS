@@ -594,7 +594,9 @@ a.active .nav-dot {
 .login-left {
   flex: 1;
   position: relative;
-  background-image: url('/images/login-bg.jpg');
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 35%),
+    linear-gradient(160deg, #2f4858 0%, #1e293b 52%, #0f172a 100%);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

@@ -295,6 +295,7 @@ else
     private bool _isLoading = true;
     private string _activeTab = "attendance";
     private bool CanWriteHomeowners => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "homeowners");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin ? null : AuthService.CurrentSubdivisionId;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -307,27 +308,27 @@ else
         }
 
         _homeowner = targetId.HasValue
-            ? await HomeownerService.GetByIdAsync(targetId.Value)
+            ? await HomeownerService.GetByIdAsync(targetId.Value, ActiveSubdivisionId)
             : null;
 
         _attendanceHistory = targetId.HasValue
-            ? await AttendanceService.GetByHomeownerAsync(targetId.Value)
+            ? await AttendanceService.GetByHomeownerAsync(targetId.Value, ActiveSubdivisionId)
             : [];
 
         _duesHistory = targetId.HasValue
-            ? await DuesService.GetByHomeownerAsync(targetId.Value)
+            ? await DuesService.GetByHomeownerAsync(targetId.Value, ActiveSubdivisionId)
             : [];
 
         _violations = targetId.HasValue
-            ? await ViolationService.GetByHomeownerAsync(targetId.Value)
+            ? await ViolationService.GetByHomeownerAsync(targetId.Value, ActiveSubdivisionId)
             : [];
 
         _clearanceRequests = targetId.HasValue
-            ? await ClearanceService.GetByHomeownerAsync(targetId.Value)
+            ? await ClearanceService.GetByHomeownerAsync(targetId.Value, ActiveSubdivisionId)
             : [];
 
         _interactionLogs = targetId.HasValue
-            ? await InteractionService.GetByHomeownerAsync(targetId.Value)
+            ? await InteractionService.GetByHomeownerAsync(targetId.Value, ActiveSubdivisionId)
             : [];
 
         _isLoading = false;

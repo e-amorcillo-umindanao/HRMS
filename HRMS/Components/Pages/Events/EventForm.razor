@@ -87,6 +87,7 @@ else
     private bool _isLoading = true;
     private bool _isSaving;
     private string? _errorMessage;
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin ? null : AuthService.CurrentSubdivisionId;
 
     private bool IsEdit => EventId.HasValue;
 
@@ -97,7 +98,7 @@ else
 
         if (IsEdit)
         {
-            var evt = await EventService.GetByIdAsync(EventId.GetValueOrDefault());
+            var evt = await EventService.GetByIdAsync(EventId.GetValueOrDefault(), ActiveSubdivisionId);
             if (evt is null)
             {
                 _errorMessage = "Event record not found.";

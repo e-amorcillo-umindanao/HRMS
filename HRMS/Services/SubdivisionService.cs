@@ -58,6 +58,7 @@ public class SubdivisionService
         await EnsureCanWriteAsync(ctx, actorUserId, "subscriptions", "Only Super Admin can manage subscriptions.");
         ctx.Subdivisions.Add(subdivision);
         await ctx.SaveChangesAsync();
+        await LogAsync(ctx, actorUserId, "Create", subdivision.SubdivisionId, $"Created subdivision '{subdivision.Name}'.");
     }
 
     public async Task UpdateAsync(Subdivision subdivision, int actorUserId)
@@ -66,6 +67,7 @@ public class SubdivisionService
         await EnsureCanWriteAsync(ctx, actorUserId, "subscriptions", "Only Super Admin can manage subscriptions.");
         ctx.Subdivisions.Update(subdivision);
         await ctx.SaveChangesAsync();
+        await LogAsync(ctx, actorUserId, "Update", subdivision.SubdivisionId, $"Updated subdivision '{subdivision.Name}'.");
     }
 
     public async Task DeleteAsync(int id, int actorUserId)
@@ -80,6 +82,7 @@ public class SubdivisionService
 
         ctx.Subdivisions.Remove(subdivision);
         await ctx.SaveChangesAsync();
+        await LogAsync(ctx, actorUserId, "Delete", subdivision.SubdivisionId, $"Deleted subdivision '{subdivision.Name}'.");
     }
 
     private static async Task EnsureCanWriteAsync(AppDbContext ctx, int actorUserId, string module, string message)
@@ -94,5 +97,20 @@ public class SubdivisionService
         {
             throw new UnauthorizedAccessException(message);
         }
+    }
+
+    private static async Task LogAsync(AppDbContext ctx, int actorUserId, string action, int subdivisionId, string details)
+    {
+        ctx.AuditLogs.Add(new AuditLog
+        {
+            UserId = actorUserId,
+            Action = action,
+            TableAffected = "Subdivisions",
+            RecordId = subdivisionId,
+            Details = details,
+            Timestamp = DateTime.UtcNow.ToString("o")
+        });
+
+        await ctx.SaveChangesAsync();
     }
 }

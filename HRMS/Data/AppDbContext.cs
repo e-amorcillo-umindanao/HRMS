@@ -12,7 +12,7 @@ public class AppDbContext : DbContext
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Subdivision> Subdivisions => Set<Subdivision>();
     public DbSet<User> Users => Set<User>();
-    public DbSet<Phase> Phases => Set<Phase>();
+    public DbSet<global::HRMS.Models.Phase> Phases => Set<global::HRMS.Models.Phase>();
     public DbSet<Homeowner> Homeowners => Set<Homeowner>();
     public DbSet<Unit> Units => Set<Unit>();
     public DbSet<Event> Events => Set<Event>();
@@ -36,6 +36,9 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Attendance>()
             .HasIndex(a => new { a.EventId, a.HomeownerId })
             .IsUnique();
+
+        modelBuilder.Entity<Attendance>()
+            .HasIndex(a => a.SubdivisionId);
 
         modelBuilder.Entity<DuesRecord>()
             .HasIndex(d => new { d.HomeownerId, d.Month, d.Year })
@@ -116,10 +119,16 @@ public class AppDbContext : DbContext
             .HasForeignKey(u => u.CreatedBy)
             .OnDelete(DeleteBehavior.Restrict);
 
-        modelBuilder.Entity<Phase>()
+        modelBuilder.Entity<global::HRMS.Models.Phase>()
             .HasOne(p => p.Subdivision)
             .WithMany(s => s.Phases)
             .HasForeignKey(p => p.SubdivisionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Attendance>()
+            .HasOne(a => a.Subdivision)
+            .WithMany(s => s.Attendances)
+            .HasForeignKey(a => a.SubdivisionId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Event>()

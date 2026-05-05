@@ -58,11 +58,12 @@ else
     private bool _isLoading = true;
     private bool CanWriteViolations => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "violations");
     private bool CanGenerateViolationPdf => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "violation-pdf");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin ? null : AuthService.CurrentSubdivisionId;
 
     protected override async Task OnParametersSetAsync()
     {
         _isLoading = true;
-        _violation = await ViolationService.GetByIdAsync(Id);
+        _violation = await ViolationService.GetByIdAsync(Id, ActiveSubdivisionId);
         _isLoading = false;
     }
 

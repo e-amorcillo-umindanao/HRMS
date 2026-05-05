@@ -198,7 +198,7 @@
 
 @code {
     private static readonly string[] StatusOptions = ["Active", "Inactive", "Transferred", "Deceased"];
-    private static readonly string[] CategoryOptions = ["Senior", "PWD", "4Ps", "Indigent", "Youth"];
+    private static readonly string[] CategoryOptions = ["Senior", "PWD", "4Ps", "Indigent", "Youth", "Solo Parent"];
     private bool CanWriteHomeowners => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "homeowners");
     private int? ActiveSubdivisionId => AuthService.IsSuperAdmin
         ? SubdivisionContextService.SelectedSubdivisionId

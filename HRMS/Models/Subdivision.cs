@@ -20,6 +20,7 @@ public class Subdivision
     public ICollection<Unit> Units { get; set; } = new List<Unit>();
     public ICollection<Phase> Phases { get; set; } = new List<Phase>();
     public ICollection<Event> Events { get; set; } = new List<Event>();
+    public ICollection<Attendance> Attendances { get; set; } = new List<Attendance>();
     public ICollection<MSME> MSMEs { get; set; } = new List<MSME>();
     public ICollection<DuesRecord> DuesRecords { get; set; } = new List<DuesRecord>();
     public ICollection<ViolationRecord> ViolationRecords { get; set; } = new List<ViolationRecord>();

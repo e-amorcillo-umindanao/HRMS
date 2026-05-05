@@ -124,6 +124,7 @@ else
     private int? _selectedOccupantId;
     private bool _isLoading = true;
     private bool CanWriteUnits => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "units");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin ? null : AuthService.CurrentSubdivisionId;
 
     private IEnumerable<Homeowner> AssignableHomeowners
     {
@@ -145,9 +146,9 @@ else
     private async Task LoadAsync()
     {
         _isLoading = true;
-        _unit = await UnitService.GetByIdAsync(Id);
-        _occupants = await UnitService.GetOccupantsAsync(Id);
-        _activeHomeowners = await HomeownerService.GetAllActiveAsync();
+        _unit = await UnitService.GetByIdAsync(Id, ActiveSubdivisionId);
+        _occupants = await UnitService.GetOccupantsAsync(Id, ActiveSubdivisionId);
+        _activeHomeowners = await HomeownerService.GetAllActiveAsync(ActiveSubdivisionId);
         _selectedOccupantId = null;
         _isLoading = false;
     }

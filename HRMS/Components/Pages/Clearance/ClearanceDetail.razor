@@ -120,6 +120,7 @@ else
     private string? _loadErrorMessage;
     private bool CanApproveClearance => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "clearance-approve");
     private bool CanGenerateDocuments => AccessHelper.CanWrite(AuthService.CurrentRole ?? string.Empty, "documents");
+    private int? ActiveSubdivisionId => AuthService.IsSuperAdmin ? null : AuthService.CurrentSubdivisionId;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -128,7 +129,7 @@ else
 
         try
         {
-            _request = await ClearanceService.GetByIdAsync(Id);
+            _request = await ClearanceService.GetByIdAsync(Id, ActiveSubdivisionId);
 
             if (_request is not null && AuthService.IsHomeowner() && _request.HomeownerId != AuthService.CurrentUser?.HomeownerId)
             {
@@ -167,7 +168,7 @@ else
             }
 
             await JS.InvokeVoidAsync("hrms.showToast", "Clearance request approved.", "success");
-            _request = await ClearanceService.GetByIdAsync(Id);
+            _request = await ClearanceService.GetByIdAsync(Id, ActiveSubdivisionId);
         }
         catch (UnauthorizedAccessException exception)
         {
@@ -198,7 +199,7 @@ else
             }
 
             await JS.InvokeVoidAsync("hrms.showToast", "Clearance request rejected.", "success");
-            _request = await ClearanceService.GetByIdAsync(Id);
+            _request = await ClearanceService.GetByIdAsync(Id, ActiveSubdivisionId);
         }
         catch (UnauthorizedAccessException exception)
         {

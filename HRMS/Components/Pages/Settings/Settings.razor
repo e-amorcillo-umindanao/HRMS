@@ -143,9 +143,14 @@ else
                                             <td><StatusChip Status="@(user.IsActive ? "Active" : "Inactive")" /></td>
                                             <td class="text-sm text-base-content/60">@FormatDate(user.LastLoginAt)</td>
                                             <td class="text-right">
+                                                <button class="btn btn-ghost btn-xs" @onclick="() => BeginEditUser(user)">Edit</button>
                                                 @if (user.IsActive)
                                                 {
                                                     <button class="btn btn-ghost btn-xs text-error" @onclick="() => DeactivateUserAsync(user.UserId)">Deactivate</button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn btn-ghost btn-xs text-success" @onclick="() => ReactivateUserAsync(user.UserId)">Reactivate</button>
                                                 }
                                                 <button class="btn btn-ghost btn-xs" @onclick="() => BeginPasswordReset(user)">Reset Password</button>
                                             </td>
@@ -155,6 +160,37 @@ else
                             </table>
                         </div>
                         <TableRecordCount Count="@FilteredUsers.Count()" EntityLabel="users" />
+                    }
+
+                    @if (_editingUser is not null)
+                    {
+                        <div class="rounded border border-base-300 p-4">
+                            <p class="text-sm font-semibold text-base-content">Edit User: @_editingUser.Username</p>
+                            <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <FieldGroup Label="Role">
+                                    <select class="select select-bordered w-full" @bind="_editUserForm.RoleId">
+                                        <option value="0">Select Role</option>
+                                        @foreach (var role in _roles)
+                                        {
+                                            <option value="@role.RoleId">@role.RoleName</option>
+                                        }
+                                    </select>
+                                </FieldGroup>
+                                <FieldGroup Label="Homeowner Link">
+                                    <select class="select select-bordered w-full" @bind="_editUserForm.HomeownerId">
+                                        <option value="">No linked homeowner</option>
+                                        @foreach (var homeowner in GetEditableHomeowners(_editingUser))
+                                        {
+                                            <option value="@homeowner.HomeownerId">@GetHomeownerDisplay(homeowner)</option>
+                                        }
+                                    </select>
+                                </FieldGroup>
+                            </div>
+                            <div class="mt-4 flex justify-end gap-3">
+                                <button class="btn btn-ghost btn-sm" @onclick="CancelEditUser">Cancel</button>
+                                <button class="btn btn-primary btn-sm" @onclick="SaveUserEditAsync">Save User</button>
+                            </div>
+                        </div>
                     }
 
                     @if (_resetPasswordUser is not null)
@@ -286,8 +322,8 @@ else
 }
 
 @code {
-    private static readonly string[] AuditActionOptions = ["Login", "Create", "Update", "Delete"];
-    private static readonly string[] AuditTableOptions = ["Users", "Homeowners", "Units", "Events", "Attendances", "InteractionLogs", "MSMEs", "DuesRecords", "ViolationRecords", "ClearanceRequests", "AuditLogs", "HOASettings", "Phases"];
+    private static readonly string[] AuditActionOptions = ["Login", "Logout", "Create", "Update", "Delete", "Export", "Generate"];
+    private static readonly string[] AuditTableOptions = ["Users", "Homeowners", "Units", "Events", "Attendances", "InteractionLogs", "MSMEs", "DuesRecords", "ViolationRecords", "ClearanceRequests", "AuditLogs", "HOASettings", "Phases", "Reports", "Documents", "Subdivisions"];
     private HOASettings _hoaSettings = new() { SettingId = 1 };
     private List<User> _users = [];
     private List<Role> _roles = [];
@@ -295,7 +331,9 @@ else
     private List<PhaseSummaryRow> _phases = [];
     private List<AuditLog> _auditLogs = [];
     private UserFormModel _userForm = new();
+    private EditUserFormModel _editUserForm = new();
     private PhaseFormModel _phaseForm = new();
+    private User? _editingUser;
     private User? _resetPasswordUser;
     private string _resetPasswordValue = string.Empty;
     private string? _logoPreviewUrl;
@@ -460,6 +498,23 @@ else
         _resetPasswordValue = string.Empty;
     }
 
+    private void BeginEditUser(User user)
+    {
+        _editingUser = user;
+        _editUserForm = new EditUserFormModel
+        {
+            UserId = user.UserId,
+            RoleId = user.RoleId,
+            HomeownerId = user.HomeownerId
+        };
+    }
+
+    private void CancelEditUser()
+    {
+        _editingUser = null;
+        _editUserForm = new EditUserFormModel();
+    }
+
     private void CancelPasswordReset()
     {
         _resetPasswordUser = null;
@@ -499,6 +554,53 @@ else
         {
             await SettingsService.DeactivateUserAsync(userId, AuthService.CurrentUser.UserId);
             await ShowToastAsync("User deactivated.", "success");
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            await ShowToastAsync(ex.Message, "error");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            await ShowToastAsync(ex.Message, "error");
+        }
+    }
+
+    private async Task ReactivateUserAsync(int userId)
+    {
+        if (AuthService.CurrentUser is null) return;
+
+        try
+        {
+            await SettingsService.ReactivateUserAsync(userId, AuthService.CurrentUser.UserId);
+            await ShowToastAsync("User reactivated.", "success");
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            await ShowToastAsync(ex.Message, "error");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            await ShowToastAsync(ex.Message, "error");
+        }
+    }
+
+    private async Task SaveUserEditAsync()
+    {
+        if (AuthService.CurrentUser is null || _editingUser is null) return;
+
+        try
+        {
+            await SettingsService.UpdateUserAsync(
+                _editUserForm.UserId,
+                _editUserForm.RoleId,
+                _editUserForm.HomeownerId,
+                ActiveSubdivisionId,
+                AuthService.CurrentUser.UserId);
+
+            await ShowToastAsync("User updated successfully.", "success");
+            CancelEditUser();
             await LoadAsync();
         }
         catch (InvalidOperationException ex)
@@ -629,6 +731,20 @@ else
             .ToListAsync();
     }
 
+    private IEnumerable<Homeowner> GetEditableHomeowners(User user)
+    {
+        var homeowners = _availableHomeowners.AsEnumerable();
+
+        if (user.Homeowner is not null && homeowners.All(homeowner => homeowner.HomeownerId != user.Homeowner.HomeownerId))
+        {
+            homeowners = homeowners.Append(user.Homeowner);
+        }
+
+        return homeowners
+            .OrderBy(homeowner => homeowner.LastName)
+            .ThenBy(homeowner => homeowner.FirstName);
+    }
+
     private async Task<HOASettings> LoadHoaSettingsAsync(int? subdivisionId)
     {
         var settings = subdivisionId.HasValue
@@ -681,6 +797,7 @@ else
     private static DateTime? ParseDate(string? value) => DateTime.TryParse(value, out var parsed) ? parsed : null;
 
     private sealed class UserFormModel { public string Username { get; set; } = string.Empty; public string Password { get; set; } = string.Empty; public int RoleId { get; set; } public int? HomeownerId { get; set; } }
+    private sealed class EditUserFormModel { public int UserId { get; set; } public int RoleId { get; set; } public int? HomeownerId { get; set; } }
     private sealed class PhaseFormModel { public string Name { get; set; } = string.Empty; public string? Description { get; set; } }
     private sealed class PhaseSummaryRow { public int PhaseId { get; set; } public string Name { get; set; } = string.Empty; public string? Description { get; set; } public int HomeownerCount { get; set; } public int UnitCount { get; set; } }
 }

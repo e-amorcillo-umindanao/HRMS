@@ -57,6 +57,7 @@ public class DuesService
     {
         await EnsureCanWriteAsync(actorUserId, "dues", "You do not have write access to the Dues module.");
         dues.SubdivisionId = await ResolveSubdivisionIdAsync(dues.SubdivisionId, dues.HomeownerId, actorUserId);
+        await EnsureActorCanAccessSubdivisionAsync(dues.SubdivisionId, actorUserId);
         await EnsureUniqueAsync(dues.HomeownerId, dues.Month, dues.Year, null);
 
         dues.Status = NormalizeStatus(dues.Status);
@@ -84,10 +85,14 @@ public class DuesService
             return null;
         }
 
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
+        var targetSubdivisionId = await ResolveSubdivisionIdAsync(dues.SubdivisionId == 0 ? existing.SubdivisionId : dues.SubdivisionId, dues.HomeownerId, actorUserId);
+        await EnsureActorCanAccessSubdivisionAsync(targetSubdivisionId, actorUserId);
+
         await EnsureUniqueAsync(dues.HomeownerId, dues.Month, dues.Year, dues.DuesId);
 
         existing.HomeownerId = dues.HomeownerId;
-        existing.SubdivisionId = dues.SubdivisionId == 0 ? existing.SubdivisionId : dues.SubdivisionId;
+        existing.SubdivisionId = targetSubdivisionId;
         existing.Month = dues.Month;
         existing.Year = dues.Year;
         existing.Amount = dues.Amount;
@@ -113,6 +118,8 @@ public class DuesService
             return false;
         }
 
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
+
         _context.DuesRecords.Remove(existing);
         await _context.SaveChangesAsync();
 
@@ -131,6 +138,8 @@ public class DuesService
         {
             return null;
         }
+
+        await EnsureActorCanAccessSubdivisionAsync(existing.SubdivisionId, actorUserId);
 
         existing.Status = "Paid";
         existing.PaidDate = DateTime.SpecifyKind(paidDate.Date, DateTimeKind.Utc).ToString("o");
@@ -165,34 +174,42 @@ public class DuesService
 
     private async Task<int> ResolveSubdivisionIdAsync(int subdivisionId, int homeownerId, int actorUserId)
     {
+        var homeownerSubdivisionId = await _context.Homeowners
+            .AsNoTracking()
+            .Where(homeowner => homeowner.HomeownerId == homeownerId && !homeowner.IsDeleted)
+            .Select(homeowner => (int?)homeowner.SubdivisionId)
+            .SingleOrDefaultAsync();
+
+        if (!homeownerSubdivisionId.HasValue)
+        {
+            throw new InvalidOperationException("The selected homeowner could not be found.");
+        }
+
+        if (subdivisionId > 0 && homeownerSubdivisionId.Value != subdivisionId)
+        {
+            throw new InvalidOperationException("The selected homeowner does not belong to this subdivision.");
+        }
+
         if (subdivisionId > 0)
         {
             return subdivisionId;
         }
 
-        var homeownerSubdivisionId = await _context.Homeowners
-            .AsNoTracking()
-            .Where(homeowner => homeowner.HomeownerId == homeownerId && !homeowner.IsDeleted)
-            .Select(homeowner => homeowner.SubdivisionId)
-            .SingleOrDefaultAsync();
+        return homeownerSubdivisionId.Value;
+    }
 
-        if (homeownerSubdivisionId > 0)
-        {
-            return homeownerSubdivisionId;
-        }
-
+    private async Task EnsureActorCanAccessSubdivisionAsync(int subdivisionId, int actorUserId)
+    {
         var actorSubdivisionId = await _context.Users
             .AsNoTracking()
             .Where(user => user.UserId == actorUserId)
             .Select(user => user.SubdivisionId)
             .SingleOrDefaultAsync();
 
-        if (actorSubdivisionId.HasValue)
+        if (actorSubdivisionId.HasValue && actorSubdivisionId.Value != subdivisionId)
         {
-            return actorSubdivisionId.Value;
+            throw new UnauthorizedAccessException("You cannot manage dues records outside your assigned subdivision.");
         }
-
-        throw new InvalidOperationException("Subdivision is required for dues records.");
     }
 
     private async Task EnsureUniqueAsync(int homeownerId, int month, int year, int? existingId)
